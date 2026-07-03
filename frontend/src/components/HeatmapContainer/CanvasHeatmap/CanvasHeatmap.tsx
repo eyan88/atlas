@@ -80,16 +80,11 @@ function textColorForCell(r: number, g: number, b: number): string {
 }
 
 /**
- * Returns the percentage-change label color (green/red) with enough contrast
- * against the given cell background.
+ * Returns a bright percentage-change label color (green/red).
+ * Always uses vivid variants since text sits on a dark translucent pill.
  */
-function pctColorForCell(r: number, g: number, b: number, isPositive: boolean): string {
-  const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  if (isPositive) {
-    return luminance > 140 ? 'rgba(16, 110, 55, 0.95)' : 'rgba(74, 222, 128, 0.95)';
-  } else {
-    return luminance > 140 ? 'rgba(170, 30, 30, 0.95)' : 'rgba(248, 113, 113, 0.95)';
-  }
+function pctColorForCell(isPositive: boolean): string {
+  return isPositive ? 'rgba(90, 235, 140, 0.95)' : 'rgba(255, 120, 120, 0.95)';
 }
 
 function normalizeMatrix(data: number[][]): number[][] {
@@ -281,7 +276,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
           ctx.fill();
 
-          ctx.fillStyle = pctColorForCell(r_, g_, b_, isPos);
+          ctx.fillStyle = pctColorForCell(isPos);
           ctx.textAlign = 'center';
           ctx.fillText(pctLabel, x + CELL_W / 2, y + 21);
         }
