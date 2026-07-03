@@ -80,15 +80,17 @@ try:
             
             # Save dealer metrics snapshots for each strike & expiration
             for strike in strikes:
-                for exp in expirations:
-                    # GEX Call Wall seed (around spot + 3)
-                    # GEX Put Wall seed (around spot - 4)
-                    # Use a model mimicking actual exposure profile
+                for exp_idx, exp in enumerate(expirations):
+                    # Call Wall: base_price + 2 for even exp_idx, base_price + 4 for odd exp_idx
+                    # Put Wall: base_price - 3 for even exp_idx, base_price - 5 for odd exp_idx
+                    call_offset = 2 if exp_idx % 2 == 0 else 4
+                    put_offset = -3 if exp_idx % 2 == 0 else -5
+                    
                     dist = strike - spot
-                    if abs(strike - (base_price + 3)) < 0.5:
+                    if abs(strike - (base_price + call_offset)) < 0.5:
                         gex = 1.8e9 * (1 + 0.02 * step)
                         dex = 5e7
-                    elif abs(strike - (base_price - 4)) < 0.5:
+                    elif abs(strike - (base_price + put_offset)) < 0.5:
                         gex = -1.5e9 * (1 + 0.01 * step)
                         dex = -3e7
                     else:

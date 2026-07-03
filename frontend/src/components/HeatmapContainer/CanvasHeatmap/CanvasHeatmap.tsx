@@ -163,6 +163,31 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
       // Normalize absolute exposures for color intensities
       const norm = normalizeMatrix(snap.data);
 
+      // Find the expiry-specific Call Wall and Put Wall index for each column (expiration)
+      const colCallWallRows = new Array(cols.length).fill(-1);
+      const colPutWallRows = new Array(cols.length).fill(-1);
+
+      for (let c = 0; c < cols.length; c++) {
+        let maxPositiveVal = -Infinity;
+        let maxPosRowIdx = -1;
+        let minNegativeVal = Infinity;
+        let minNegRowIdx = -1;
+
+        for (let r = 0; r < rows.length; r++) {
+          const val = snap.data[r][c];
+          if (val > 0 && val > maxPositiveVal) {
+            maxPositiveVal = val;
+            maxPosRowIdx = r;
+          }
+          if (val < 0 && val < minNegativeVal) {
+            minNegativeVal = val;
+            minNegRowIdx = r;
+          }
+        }
+        colCallWallRows[c] = maxPosRowIdx;
+        colPutWallRows[c] = minNegRowIdx;
+      }
+
       // Calculate percentage changes for display labels
       const pctChanges = rows.map((strike, r) => {
         return cols.map((_exp, c) => {
@@ -240,23 +265,26 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;
           ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
 
-          // Highlight row borders based on priority: Spot > Flip > Call > Put
+          const isCellCallWall = colCallWallRows[c] === r;
+          const isCellPutWall = colPutWallRows[c] === r;
+
+          // Highlight row/cell borders based on priority: Spot > Flip > Expiry Call Wall > Expiry Put Wall
           if (isSpot) {
-            ctx.strokeStyle = 'rgba(249,250,251,0.45)'; // White
+            ctx.strokeStyle = 'rgba(249,250,251,0.45)'; // White (Spot row)
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
           } else if (isFlip) {
-            ctx.strokeStyle = 'rgba(251,191,36,0.55)'; // Amber/Gold
+            ctx.strokeStyle = 'rgba(251,191,36,0.55)'; // Amber/Gold (Flip row)
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
-          } else if (isCall) {
-            ctx.strokeStyle = 'rgba(52,211,153,0.65)'; // Mint Green
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
-          } else if (isPut) {
-            ctx.strokeStyle = 'rgba(248,113,113,0.65)'; // Coral Red
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+          } else if (isCellCallWall) {
+            ctx.strokeStyle = '#34d399'; // Mint Green (Call Wall cell)
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
+          } else if (isCellPutWall) {
+            ctx.strokeStyle = '#f87171'; // Coral Red (Put Wall cell)
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
           }
 
           // Line 1: Absolute Value
