@@ -166,3 +166,87 @@ class TestAPI(unittest.TestCase):
             # Gamma Flip: crossing between 100 (5e9) and 105 (-2e9)
             # s_star = 100 + (105 - 100) * (0 - 5e9) / (-2e9 - 5e9) = 100 + 5 * 5/7 = 103.5714...
             self.assertAlmostEqual(data["gamma_flip"], 103.5714, places=3)
+
+    def test_get_heatmap_history(self):
+        target_ts = datetime(2026, 7, 2, 13, 30, 0, tzinfo=timezone.utc)
+        rec = MagicMock()
+        rec.timestamp = target_ts
+        rec.strike = 100.0
+        rec.expiration = date(2026, 7, 31)
+        rec.net_gex = 1e9
+        rec.net_dex = 5e6
+        rec.net_vanna = 10.0
+        rec.net_charm = -0.1
+        rec.call_oi = 500
+        rec.put_oi = 400
+        rec.call_volume = 50
+        rec.put_volume = 40
+        rec.call_iv = 0.22
+        rec.put_iv = 0.24
+
+        def mock_query_router(*args, **kwargs):
+            q_mock = MagicMock()
+            if len(args) > 0:
+                target_model = args[0]
+                if target_model == DealerMetricSnapshot:
+                    q_mock.filter.return_value.order_by.return_value.all.return_value = [rec]
+                elif target_model == UnderlyingPriceSnapshot:
+                    spot_rec = MagicMock()
+                    spot_rec.timestamp = target_ts
+                    spot_rec.price = 100.0
+                    q_mock.filter.return_value.order_by.return_value.all.return_value = [spot_rec]
+            return q_mock
+
+        with patch.object(mock_db, 'query', side_effect=mock_query_router):
+            res = self.client.get("/api/v1/heatmap/SPY/history?date=2026-07-02&metric=net_gex")
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertEqual(data["ticker"], "SPY")
+            self.assertEqual(data["date"], "2026-07-02")
+            
+            # Key is stringified unix timestamp of 13:30 UTC: 1782999000
+            ts_str = str(int(target_ts.timestamp()))
+            self.assertIn(ts_str, data["history"])
+            snap = data["history"][ts_str]
+            self.assertEqual(snap["spot_price"], 100.0)
+            self.assertEqual(snap["rows"], [100.0])
+            self.assertEqual(snap["columns"], ["2026-07-31"])
+            self.assertEqual(snap["data"][0][0], 1e9)
+
+    def test_websocket_feed(self):
+        target_ts = datetime(2026, 7, 2, 13, 30, 0, tzinfo=timezone.utc)
+        rec = MagicMock()
+        rec.strike = 100.0
+        rec.expiration = date(2026, 7, 31)
+        rec.net_gex = 5e9
+        rec.net_dex = 1e7
+        rec.net_vanna = 50.0
+        rec.net_charm = 1.2
+        rec.call_oi = 1000
+        rec.put_oi = 500
+        rec.call_volume = 100
+        rec.put_volume = 50
+        rec.call_iv = 0.22
+        rec.put_iv = 0.24
+
+        def mock_query_router(*args, **kwargs):
+            q_mock = MagicMock()
+            if len(args) > 0:
+                target_model = args[0]
+                if hasattr(target_model, '_as_impl') or 'max' in str(target_model):
+                    q_mock.filter.return_value.scalar.return_value = target_ts
+                elif target_model == DealerMetricSnapshot:
+                    q_mock.filter.return_value.all.return_value = [rec]
+                elif target_model == UnderlyingPriceSnapshot:
+                    spot_rec = MagicMock()
+                    spot_rec.price = 100.5
+                    q_mock.filter.return_value.order_by.return_value.first.return_value = spot_rec
+            return q_mock
+
+        with patch.object(mock_db, 'query', side_effect=mock_query_router):
+            with self.client.websocket_connect("/api/v1/ws/SPY") as websocket:
+                msg = websocket.receive_json()
+                self.assertEqual(msg["type"], "INIT")
+                self.assertEqual(msg["payload"]["ticker"], "SPY")
+                self.assertEqual(msg["payload"]["spot_price"], 100.5)
+

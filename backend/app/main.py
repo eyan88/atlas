@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.endpoints import tickers, heatmap
+from app.api.websockets import feed
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -34,8 +35,16 @@ app.include_router(
 # This exposes:
 #   - GET /api/v1/heatmap/{ticker}
 #   - GET /api/v1/replay/timeline/{ticker}
+#   - GET /api/v1/heatmap/{ticker}/history
 app.include_router(
     heatmap.router,
     prefix=settings.API_V1_STR,
     tags=["heatmap"]
+)
+
+# WebSocket feed router mounted at /api/v1/ws
+app.include_router(
+    feed.router,
+    prefix=f"{settings.API_V1_STR}/ws",
+    tags=["websockets"]
 )

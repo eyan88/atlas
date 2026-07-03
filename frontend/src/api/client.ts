@@ -34,6 +34,20 @@ export const api = {
   /** GET /api/v1/replay/timeline/{ticker}?date=YYYY-MM-DD */
   getTimeline: (ticker: string, date: string): Promise<ReplayTimeline> =>
     get<ReplayTimeline>(`/replay/timeline/${ticker}?date=${date}`),
+
+  /** GET /api/v1/heatmap/{ticker}/history?date=YYYY-MM-DD&metric=&strikeCount= */
+  getHeatmapHistory: (
+    ticker: string,
+    opts: { date: string; metric?: Metric; strikeCount?: number }
+  ): Promise<{ ticker: string; date: string; history: Record<number, HeatmapSnapshot> }> => {
+    const params = new URLSearchParams();
+    params.set('date', opts.date);
+    if (opts.metric) params.set('metric', opts.metric);
+    if (opts.strikeCount !== undefined) params.set('strikeCount', String(opts.strikeCount));
+    return get<{ ticker: string; date: string; history: Record<number, HeatmapSnapshot> }>(
+      `/heatmap/${ticker}/history?${params.toString()}`
+    );
+  },
 };
 
 // ─── Mock data for development (no backend required) ─────────────────────────

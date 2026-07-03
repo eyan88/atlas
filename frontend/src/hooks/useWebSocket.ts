@@ -19,7 +19,6 @@ export function useWebSocket() {
   const setHeatmap    = useAppStore((s) => s.setHeatmap);
   const applyDiff     = useAppStore((s) => s.applyDiff);
   const setWsConnected = useAppStore((s) => s.setWsConnected);
-  const updateMarketLevels = useAppStore((s) => s.updateMarketLevels);
 
   const wsRef       = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -45,21 +44,7 @@ export function useWebSocket() {
           if (msg.type === 'INIT') {
             setHeatmap(msg.payload);
           } else if (msg.type === 'PATCH') {
-            const p = msg.payload;
-            updateMarketLevels(p.spot_price, p.gamma_flip, p.call_wall, p.put_wall);
-            // Full snapshot replacement for now; future: apply cell-level diffs
-            applyDiff({
-              ticker: p.ticker,
-              timestamp: p.timestamp,
-              spot_price: p.spot_price,
-              gamma_flip: p.gamma_flip,
-              call_wall: p.call_wall,
-              put_wall: p.put_wall,
-              // preserve existing columns/rows/data until diff engine is implemented
-              columns: [],
-              rows: [],
-              data: [],
-            });
+            applyDiff(msg.payload);
           }
         } catch {
           // Ignore non-JSON frames (e.g. pong)
