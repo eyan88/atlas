@@ -54,6 +54,12 @@ export function Sidebar() {
                 <span className={styles.detailLabel}>Expiration</span>
                 <span className={styles.detailValue}>{hoveredCell.expiration}</span>
               </div>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Evolution</span>
+                <span className={`${styles.detailValue} ${hoveredCell.pctChange >= 0 ? styles.positive : styles.negative}`}>
+                  {hoveredCell.pctChange >= 0 ? '▲ +' : '▼ '}{hoveredCell.pctChange.toFixed(1)}%
+                </span>
+              </div>
             </div>
           </section>
         ) : (
