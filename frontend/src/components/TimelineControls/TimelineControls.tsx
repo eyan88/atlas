@@ -122,11 +122,18 @@ export function TimelineControls() {
         />
       </div>
 
-      {/* Current Time Badge */}
-      <div className={styles.timeBadge}>
-        <span className={`${styles.timeDot} ${timestamp === null ? styles.live : ''}`} />
-        <span className={styles.timeLabel}>{timeLabel}</span>
-      </div>
+      {/* Live Toggle Button */}
+      <button
+        id="toggle-live-btn"
+        className={`${styles.liveBtn} ${timestamp === null ? styles.liveActive : ''}`}
+        onClick={() => setTimestamp(null)}
+        title={timestamp === null ? 'Active WebSocket streaming live feed' : 'Switch to real-time live trading session'}
+      >
+        <span className={`${styles.timeDot} ${timestamp === null ? styles.liveDot : ''}`} />
+        <span className={styles.timeLabel}>
+          {timestamp === null ? 'LIVE FEED' : `GO LIVE (${timeLabel})`}
+        </span>
+      </button>
     </footer>
   );
 }

@@ -20,10 +20,22 @@ export function useWebSocket() {
   const applyDiff     = useAppStore((s) => s.applyDiff);
   const setWsConnected = useAppStore((s) => s.setWsConnected);
 
+  const currentTimestamp = useAppStore((s) => s.currentTimestamp);
+  const isLive = currentTimestamp === null;
+
   const wsRef       = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!isLive) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setWsConnected(false);
+      return;
+    }
+
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
@@ -68,5 +80,5 @@ export function useWebSocket() {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       wsRef.current?.close();
     };
-  }, [activeTicker]); // reconnect whenever the active ticker changes
+  }, [activeTicker, isLive]); // reconnect whenever the active ticker changes
 }

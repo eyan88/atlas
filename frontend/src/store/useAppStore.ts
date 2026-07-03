@@ -186,6 +186,7 @@ export const useAppStore = create<AppState>((set) => ({
         gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
         callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
         putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
+        isPlaying: ts === null ? false : state.isPlaying,
       };
     }),
 

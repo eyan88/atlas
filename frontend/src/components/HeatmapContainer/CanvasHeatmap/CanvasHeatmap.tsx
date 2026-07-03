@@ -209,9 +209,21 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
         const strike = rows[r];
         const isSpot = spotPrice !== null && Math.abs(strike - spotPrice) < 0.5;
         const isFlip = gammaFlip !== null && Math.abs(strike - gammaFlip) < 0.5;
+        const isCall = snap.call_wall !== null && Math.abs(strike - snap.call_wall) < 0.5;
+        const isPut = snap.put_wall !== null && Math.abs(strike - snap.put_wall) < 0.5;
 
         // Strike label
-        ctx.fillStyle = isSpot ? '#f9fafb' : isFlip ? '#fbbf24' : '#6b7280';
+        if (isSpot) {
+          ctx.fillStyle = '#f9fafb'; // White
+        } else if (isFlip) {
+          ctx.fillStyle = '#fbbf24'; // Amber/Gold
+        } else if (isCall) {
+          ctx.fillStyle = '#34d399'; // Mint Green
+        } else if (isPut) {
+          ctx.fillStyle = '#f87171'; // Coral Red
+        } else {
+          ctx.fillStyle = '#6b7280'; // Gray
+        }
         ctx.font = FONT;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
@@ -228,16 +240,21 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;
           ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
 
-          // Spot price row highlight
+          // Highlight row borders based on priority: Spot > Flip > Call > Put
           if (isSpot) {
-            ctx.strokeStyle = 'rgba(249,250,251,0.45)';
+            ctx.strokeStyle = 'rgba(249,250,251,0.45)'; // White
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
-          }
-
-          // Gamma flip row highlight
-          if (isFlip) {
-            ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+          } else if (isFlip) {
+            ctx.strokeStyle = 'rgba(251,191,36,0.55)'; // Amber/Gold
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+          } else if (isCall) {
+            ctx.strokeStyle = 'rgba(52,211,153,0.65)'; // Mint Green
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+          } else if (isPut) {
+            ctx.strokeStyle = 'rgba(248,113,113,0.65)'; // Coral Red
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
           }

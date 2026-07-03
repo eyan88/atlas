@@ -27,19 +27,19 @@ export function HeatmapContainer({ ticker }: HeatmapContainerProps) {
         </button>
       </div>
       <div className={styles.levelBar}>
-        <div className={styles.levelBadge} title="Current spot price">
+        <div className={`${styles.levelBadge} ${styles.badgeSpot}`} title="Current spot price (White row outline)">
           <span className={styles.levelLabel}>SPOT</span>
           <span className={styles.levelValue}>{snapshot?.spot_price?.toFixed(2) ?? '—'}</span>
         </div>
-        <div className={styles.levelBadge} title="Gamma flip level">
+        <div className={`${styles.levelBadge} ${styles.badgeFlip}`} title="Gamma flip level (Amber/Gold row outline)">
           <span className={styles.levelLabel}>FLIP</span>
           <span className={styles.levelValue}>{snapshot?.gamma_flip?.toFixed(0) ?? '—'}</span>
         </div>
-        <div className={styles.levelBadge} title="Call wall">
+        <div className={`${styles.levelBadge} ${styles.badgeCall}`} title="Call wall (Mint Green row outline)">
           <span className={styles.levelLabel}>CALL</span>
           <span className={styles.levelValue}>{snapshot?.call_wall?.toFixed(0) ?? '—'}</span>
         </div>
-        <div className={styles.levelBadge} title="Put wall">
+        <div className={`${styles.levelBadge} ${styles.badgePut}`} title="Put wall (Coral Red row outline)">
           <span className={styles.levelLabel}>PUT</span>
           <span className={styles.levelValue}>{snapshot?.put_wall?.toFixed(0) ?? '—'}</span>
         </div>
