@@ -188,6 +188,22 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
         colPutWallRows[c] = minNegRowIdx;
       }
 
+      // Find the cell with the highest absolute exposure value in the entire matrix
+      let maxAbsValue = -Infinity;
+      let maxAbsRowIdx = -1;
+      let maxAbsColIdx = -1;
+
+      for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < cols.length; c++) {
+          const absVal = Math.abs(snap.data[r][c]);
+          if (absVal > maxAbsValue) {
+            maxAbsValue = absVal;
+            maxAbsRowIdx = r;
+            maxAbsColIdx = c;
+          }
+        }
+      }
+
       // Calculate percentage changes for display labels
       const pctChanges = rows.map((strike, r) => {
         return cols.map((_exp, c) => {
@@ -285,6 +301,15 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
             ctx.strokeStyle = '#f87171'; // Coral Red (Put Wall cell)
             ctx.lineWidth = 2;
             ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
+          }
+
+          // If this cell is the absolute maximum exposure node in the entire matrix, draw a gold star waypoint ★
+          if (r === maxAbsRowIdx && c === maxAbsColIdx) {
+            ctx.fillStyle = '#fbbf24'; // Gold
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.fillText('★', x + CELL_W - 4, y + 3);
           }
 
           // Line 1: Absolute Value

@@ -87,10 +87,10 @@ try:
                     put_offset = -3 if exp_idx % 2 == 0 else -5
                     
                     dist = strike - spot
-                    if abs(strike - (base_price + call_offset)) < 0.5:
+                    if abs(strike - (spot + call_offset)) < 0.5:
                         gex = 1.8e9 * (1 + 0.02 * step)
                         dex = 5e7
-                    elif abs(strike - (base_price + put_offset)) < 0.5:
+                    elif abs(strike - (spot + put_offset)) < 0.5:
                         gex = -1.5e9 * (1 + 0.01 * step)
                         dex = -3e7
                     else:
