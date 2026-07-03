@@ -1,0 +1,40 @@
+.wrapper {
+  display: inline-block;
+  min-width: max-content;
+  min-height: max-content;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #0d0f14;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+
+.canvas {
+  display: block;
+  max-width: none;
+  background: #0d0f14;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 280px;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(88, 166, 255, 0.18);
+  border-top-color: var(--accent);
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

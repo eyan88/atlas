@@ -28,7 +28,7 @@ load_dotenv(BASE_DIR.parent / ".env")
 load_dotenv(BASE_DIR / ".env")
 
 class Settings(BaseModel):
-    PROJECT_NAME: str = os.getenv("PROJECT_NAME", "Atlas Options Positioning Analytics")
+    PROJECT_NAME: str = os.getenv("PROJECT_NAME", "Atlas")
     ENV: str = os.getenv("ENV", "development")  # development, testing, production
     API_V1_STR: str = "/api/v1"
     

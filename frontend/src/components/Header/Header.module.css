@@ -1,0 +1,285 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 20px;
+  height: var(--header-h);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  position: relative;
+  z-index: 10;
+}
+
+/* Brand */
+.brand { display: flex; align-items: center; gap: 10px; margin-right: 8px; }
+.brandLogo { font-size: 20px; color: var(--accent); line-height: 1; }
+.brandName {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+}
+.brandTagline {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.searchTrigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(22, 27, 34, 0.82);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+.searchTrigger:hover {
+  border-color: rgba(88,166,255,0.25);
+  background: rgba(28, 33, 40, 0.92);
+  opacity: 1;
+}
+
+.searchTriggerLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.searchShortcut {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+.tickerInput {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  outline: none;
+}
+.searchForm {
+  display: flex;
+  gap: 6px;
+}
+.tickerInput::placeholder { color: var(--text-muted); }
+.tickerInput:hover { border-color: rgba(88,166,255,0.25); }
+.tickerInput:focus { border-color: rgba(88,166,255,0.35); }
+.tickerInputBlocked {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18) inset;
+}
+.tickerSubmit {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(88,166,255,0.24);
+  background: rgba(88,166,255,0.08);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tickerSubmit:hover {
+  background: rgba(88,166,255,0.14);
+}
+.tickerSubmit:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: rgba(22, 27, 34, 0.6);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.tickerSubmitBlocked {
+  background: rgba(127, 29, 29, 0.18);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #fca5a5;
+  opacity: 1;
+}
+.tickerSubmitBlocked:hover {
+  background: rgba(127, 29, 29, 0.22);
+}
+
+/* Strike control */
+.strikeControl { display: flex; align-items: center; gap: 6px; }
+.strikeLabel {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.strikeSelect {
+  min-width: 68px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+}
+.strikeSelect:hover { border-color: rgba(88,166,255,0.25); }
+.strikeSelect:focus { border-color: rgba(88,166,255,0.35); }
+
+/* Level badges */
+/* Status */
+.status { display: flex; align-items: center; gap: 6px; }
+.statusDot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background var(--t-mid);
+}
+.statusLive { background: var(--positive); box-shadow: 0 0 6px var(--positive); animation: pulse 2s infinite; }
+.statusOff  { background: var(--text-muted); }
+.statusLabel { font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); }
+
+.searchOverlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  padding-top: 72px;
+  background: rgba(7, 10, 14, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 50;
+}
+
+.searchPane {
+  width: min(520px, calc(100vw - 32px));
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.searchHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.searchTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.searchClose {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.historySection {
+  margin-top: 12px;
+}
+
+.capHint {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--negative);
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.historyLabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.historyClear {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.historyClear:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.historyClear:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.historyList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.historyItem {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.historyItem:hover {
+  background: var(--bg-hover);
+  border-color: rgba(88,166,255,0.25);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
