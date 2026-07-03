@@ -9,13 +9,13 @@ type Rgb = [number, number, number];
 
 // Sequential Parula-themed diverging colormap stops (Violet [-1.0] -> Cyan/Sky Blue [0.0] -> Radiant Gold [1.0])
 const COLOR_STOPS: Array<[number, Rgb]> = [
-  [-1.0,  [139, 92, 246]],    // Vivid Violet (maximum short GEX)
-  [-0.6,  [59, 130, 246]],     // Sky-themed Blue
-  [-0.2,  [14, 165, 233]],     // Cyanish-Blue
-  [0.0,   [6, 182, 212]],      // Cyan / Sky Blue (neutral GEX)
-  [0.3,   [16, 185, 129]],     // Emerald Green
-  [0.6,   [132, 204, 22]],     // Lime Green
-  [1.0,   [250, 235, 40]],     // Radiant Gold (maximum long GEX)
+  [-1.0,  [88, 28, 135]],     // Vivid Deep Purple (maximum short GEX)
+  [-0.6,  [109, 40, 217]],    // Vivid Violet
+  [-0.2,  [14, 165, 233]],    // Sky-themed Blue
+  [0.0,   [6, 182, 212]],     // Cyan / Sky Blue (neutral GEX)
+  [0.3,   [16, 185, 129]],    // Emerald Green
+  [0.6,   [132, 204, 22]],    // Lime Green
+  [1.0,   [250, 235, 40]],    // Radiant Gold (maximum long GEX)
 ];
 
 function lerp(a: number, b: number, t: number): number {
@@ -60,7 +60,7 @@ function valueToColor(normalized: number): [number, number, number, number] {
 
 function textColorForCell(r: number, g: number, b: number): string {
   const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  return luminance > 140 ? '#0b0c10' : '#f9fafb';
+  return luminance > 165 ? '#0b0c10' : '#f9fafb';
 }
 
 /**
