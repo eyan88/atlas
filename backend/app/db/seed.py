@@ -86,17 +86,13 @@ try:
                     call_offset = 2 if exp_idx % 2 == 0 else 4
                     put_offset = -3 if exp_idx % 2 == 0 else -5
                     
-                    dist = strike - spot
-                    if abs(strike - (spot + call_offset)) < 0.5:
-                        gex = 1.8e9 * (1 + 0.02 * step)
-                        dex = 5e7
-                    elif abs(strike - (spot + put_offset)) < 0.5:
-                        gex = -1.5e9 * (1 + 0.01 * step)
-                        dex = -3e7
-                    else:
-                        # Standard decay profile
-                        gex = np.sin(strike) * 1e8 - (dist * 1e7)
-                        dex = dist * 2e6
+                    # Smooth Gaussian decay model around the dynamic Call and Put Walls
+                    pos_gex = 1.8e9 * np.exp(-((strike - (spot + call_offset)) / 3.5) ** 2) * (1 + 0.02 * step)
+                    neg_gex = -1.6e9 * np.exp(-((strike - (spot + put_offset)) / 4.5) ** 2) * (1 + 0.01 * step)
+                    gex = pos_gex + neg_gex
+                    
+                    # Compute delta exposure (DEX) proportionally
+                    dex = gex * 0.025
                         
                     metric_snap = DealerMetricSnapshot(
                         id=metric_id_counter,
