@@ -7,26 +7,15 @@ import styles from './CanvasHeatmap.module.css';
 
 type Rgb = [number, number, number];
 
-// Positive exposure (dealers long gamma — Parula-themed: Blue → Cyan → Green → Yellow)
-const POSITIVE_STOPS: Array<[number, Rgb]> = [
-  [0.0,  [35, 47, 68]],      // Slate Blue-Grey midpoint (neutral)
-  [0.15, [44, 70, 144]],     // Deep Parula Blue
-  [0.35, [29, 115, 170]],    // Bright Sky Blue
-  [0.55, [18, 155, 160]],    // Vibrant Cyan/Teal
-  [0.75, [34, 185, 110]],    // Fresh Green
-  [0.90, [150, 210, 60]],    // Lime Green
-  [1.0,  [250, 235, 40]],    // Radiant Parula Gold/Yellow
-];
-
-// Negative exposure (dealers short gamma — Viridis-themed: Purple → Violet → Orchid → Red)
-const NEGATIVE_STOPS: Array<[number, Rgb]> = [
-  [0.0,  [35, 47, 68]],      // Slate Blue-Grey midpoint (neutral)
-  [0.15, [65, 30, 100]],     // Deep Indigo/Purple
-  [0.35, [95, 25, 125]],     // Rich Violet
-  [0.55, [130, 20, 130]],    // Radiant Orchid/Magenta
-  [0.75, [170, 30, 110]],    // Deep Rose-Pink
-  [0.90, [215, 45, 95]],     // Vibrant Coral
-  [1.0,  [245, 75, 75]],     // Hot Flame Red
+// Sequential Parula-themed diverging colormap stops (Violet [-1.0] -> Cyan/Sky Blue [0.0] -> Radiant Gold [1.0])
+const COLOR_STOPS: Array<[number, Rgb]> = [
+  [-1.0,  [139, 92, 246]],    // Vivid Violet (maximum short GEX)
+  [-0.6,  [59, 130, 246]],     // Sky-themed Blue
+  [-0.2,  [14, 165, 233]],     // Cyanish-Blue
+  [0.0,   [6, 182, 212]],      // Cyan / Sky Blue (neutral GEX)
+  [0.3,   [16, 185, 129]],     // Emerald Green
+  [0.6,   [132, 204, 22]],     // Lime Green
+  [1.0,   [250, 235, 40]],     // Radiant Gold (maximum long GEX)
 ];
 
 function lerp(a: number, b: number, t: number): number {
@@ -62,17 +51,16 @@ function rampLookup(stops: Array<[number, Rgb]>, magnitude: number): Rgb {
  * Magnitude drives intensity; sign drives hue.
  */
 function valueToColor(normalized: number): [number, number, number, number] {
-  const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
-  const alpha = 0.35 + magnitude * 0.55; // 0.35..0.90
+  const val = Math.max(-1, Math.min(1, normalized));
+  const alpha = 0.55 + Math.abs(val) * 0.35; // 0.55..0.90
 
-  const stops = normalized >= 0 ? POSITIVE_STOPS : NEGATIVE_STOPS;
-  const [r, g, b] = rampLookup(stops, magnitude);
+  const [r, g, b] = rampLookup(COLOR_STOPS, val);
   return [r, g, b, alpha];
 }
 
 function textColorForCell(r: number, g: number, b: number): string {
   const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  return luminance > 130 ? '#0b0c10' : '#f9fafb';
+  return luminance > 140 ? '#0b0c10' : '#f9fafb';
 }
 
 /**
@@ -98,8 +86,8 @@ const CELL_W    = 106;  // px
 const CELL_H    = 42;   // px
 const AXIS_LEFT = 76;   // px for strike labels
 const AXIS_TOP  = 52;   // px for expiration labels
-const FONT      = "bold 12px 'JetBrains Mono', monospace";
-const FONT_HDR  = "bold 12px 'Inter', sans-serif";
+const FONT      = "12px 'Inter', sans-serif";
+const FONT_HDR  = "12px 'Inter', sans-serif";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -317,24 +305,18 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
           else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
 
-          // Main text outline for high legibility
-          ctx.strokeStyle = '#090d16';
-          ctx.lineWidth = 2.5;
-          ctx.lineJoin = 'round';
-          ctx.font = "bold 11px 'JetBrains Mono', monospace";
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.strokeText(label, x + CELL_W / 2, y + 8);
-
           // Fill main text
           ctx.fillStyle = textColorForCell(r_, g_, b_);
+          ctx.font = "11px 'Inter', sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
           ctx.fillText(label, x + CELL_W / 2, y + 8);
 
           // Line 2: Percentage Change (Evolution)
           const pct = pctChanges[r][c];
           const isPos = pct >= 0;
           const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
-          ctx.font = "9px 'JetBrains Mono', monospace";
+          ctx.font = "9px 'Inter', sans-serif";
 
           // Translucent pill backdrop for readability
           const pctTextW = ctx.measureText(pctLabel).width;
