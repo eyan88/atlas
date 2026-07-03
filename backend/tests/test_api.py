@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from fastapi.testclient import TestClient
 from app.main import app
 from app.api.deps import get_db
@@ -69,7 +69,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(data["ticker"], "SPY")
         self.assertEqual(data["date"], "2026-07-01")
         self.assertEqual(len(data["timestamps"]), 3)
-        self.assertEqual(data["timestamps"][0], int(datetime(2026, 7, 1, 9, 30).timestamp()))
+        self.assertEqual(data["timestamps"][0], int(datetime(2026, 7, 1, 9, 30, tzinfo=timezone.utc).timestamp()))
 
     def test_get_heatmap_not_found(self):
         # Mock database empty case

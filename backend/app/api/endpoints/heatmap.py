@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, date as py_date
+from datetime import datetime, date as py_date, timezone
 import pandas as pd
 import numpy as np
 from typing import Optional, List, Dict, Any
@@ -181,8 +181,13 @@ def get_replay_timeline(
         DealerMetricSnapshot.timestamp <= end_dt
     ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
-    # Convert timestamps to unix epoch seconds
-    unix_timestamps = [int(ts[0].timestamp()) for ts in timestamps]
+    # Convert timestamps to unix epoch seconds, forcing UTC timezone for naive values
+    unix_timestamps = []
+    for ts in timestamps:
+        dt = ts[0]
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        unix_timestamps.append(int(dt.timestamp()))
 
     return {
         "ticker": ticker,
