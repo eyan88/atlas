@@ -34,7 +34,10 @@ def get_heatmap(
     timestamp_key_part = timestamp if timestamp else "latest"
     cache_key = f"atlas:heatmap:{ticker}:{metric}:{timestamp_key_part}:{strikeCount}"
     
-    if redis_conn:
+    # Check if redis_conn is an active Redis client (avoiding Depends wrapper during direct function calls)
+    is_redis_active = redis_conn is not None and type(redis_conn).__name__ != "Depends"
+    
+    if is_redis_active:
         try:
             cached_data = redis_conn.get(cache_key)
             if cached_data:
@@ -171,7 +174,7 @@ def get_heatmap(
         "data": data_matrix
     }
 
-    if redis_conn:
+    if is_redis_active:
         try:
             redis_conn.set(cache_key, json.dumps(result), ex=86400)
             if not timestamp:
@@ -241,7 +244,9 @@ def get_heatmap_history(
     # Cache key format: atlas:heatmap:history:{ticker}:{date}:{metric}:{strikeCount}
     cache_key = f"atlas:heatmap:history:{ticker}:{date}:{metric}:{strikeCount}"
     
-    if redis_conn:
+    is_redis_active = redis_conn is not None and type(redis_conn).__name__ != "Depends"
+    
+    if is_redis_active:
         try:
             cached_data = redis_conn.get(cache_key)
             if cached_data:
@@ -385,7 +390,7 @@ def get_heatmap_history(
         "history": history
     }
 
-    if redis_conn:
+    if is_redis_active:
         try:
             redis_conn.set(cache_key, json.dumps(result), ex=86400)
         except Exception as e:
