@@ -4,9 +4,10 @@ from sqlalchemy import func
 from datetime import datetime, date as py_date, timezone
 import pandas as pd
 import numpy as np
+import json
 from typing import Optional, List, Dict, Any
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_redis
 from app.models.metric import DealerMetricSnapshot
 from app.models.underlying import UnderlyingPriceSnapshot
 from app.services.analytics import DealerExposureEngine
@@ -20,12 +21,26 @@ def get_heatmap(
     metric: str = Query("net_gex"),
     timestamp: Optional[str] = Query(None),
     strikeCount: int = Query(20),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    redis_conn: Any = Depends(get_redis)
 ) -> Dict[str, Any]:
     """
     Retrieves the option dealer positioning heatmap snapshot matrix for the ticker.
     """
     ticker = ticker.upper()
+    metric = metric.lower()
+    
+    # Cache key format: atlas:heatmap:{ticker}:{metric}:{timestamp_str or 'latest'}:{strikeCount}
+    timestamp_key_part = timestamp if timestamp else "latest"
+    cache_key = f"atlas:heatmap:{ticker}:{metric}:{timestamp_key_part}:{strikeCount}"
+    
+    if redis_conn:
+        try:
+            cached_data = redis_conn.get(cache_key)
+            if cached_data:
+                return json.loads(cached_data)
+        except Exception as e:
+            print(f"Redis cache lookup error: {e}")
     
     # 1. Determine target timestamp
     if timestamp:
@@ -144,7 +159,7 @@ def get_heatmap(
                 
             data_matrix[r_idx][c_idx] = float(val)
 
-    return {
+    result = {
         "ticker": ticker,
         "timestamp": target_ts.isoformat(),
         "spot_price": spot_price,
@@ -155,6 +170,19 @@ def get_heatmap(
         "rows": rows,
         "data": data_matrix
     }
+
+    if redis_conn:
+        try:
+            redis_conn.set(cache_key, json.dumps(result), ex=86400)
+            if not timestamp:
+                latest_cache_key = f"atlas:heatmap:{ticker}:{metric}:latest:{strikeCount}"
+                redis_conn.set(latest_cache_key, json.dumps(result), ex=86400)
+                # Base key from architecture doc
+                redis_conn.set(f"atlas:heatmap:{ticker}:latest", json.dumps(result), ex=86400)
+        except Exception as e:
+            print(f"Redis cache write error: {e}")
+
+    return result
 
 @router.get("/replay/timeline/{ticker}")
 def get_replay_timeline(
@@ -201,12 +229,26 @@ def get_heatmap_history(
     date: str = Query(...), # YYYY-MM-DD
     metric: str = Query("net_gex"),
     strikeCount: int = Query(20),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    redis_conn: Any = Depends(get_redis)
 ) -> Dict[str, Any]:
     """
     Returns the complete dictionary of heatmap snapshots mapping unix timestamps to HeatmapSnapshots for the date.
     """
     ticker = ticker.upper()
+    metric = metric.lower()
+    
+    # Cache key format: atlas:heatmap:history:{ticker}:{date}:{metric}:{strikeCount}
+    cache_key = f"atlas:heatmap:history:{ticker}:{date}:{metric}:{strikeCount}"
+    
+    if redis_conn:
+        try:
+            cached_data = redis_conn.get(cache_key)
+            if cached_data:
+                return json.loads(cached_data)
+        except Exception as e:
+            print(f"Redis cache lookup error for history: {e}")
+            
     try:
         query_date = py_date.fromisoformat(date)
     except ValueError:
@@ -337,8 +379,16 @@ def get_heatmap_history(
             "data": data_matrix
         }
 
-    return {
+    result = {
         "ticker": ticker,
         "date": date,
         "history": history
     }
+
+    if redis_conn:
+        try:
+            redis_conn.set(cache_key, json.dumps(result), ex=86400)
+        except Exception as e:
+            print(f"Redis cache write error for history: {e}")
+
+    return result

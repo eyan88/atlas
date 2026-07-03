@@ -29,6 +29,31 @@ else:
         max_overflow=10
     )
 
+    def setup_timescaledb(engine):
+        """If using postgresql, enable TimescaleDB and convert tables to hypertables."""
+        from sqlalchemy import text
+        if engine.dialect.name == "postgresql":
+            with engine.begin() as conn:
+                try:
+                    conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
+                except Exception as e:
+                    print(f"Warning: Could not create timescaledb extension: {e}")
+                
+                for table in ['underlying_price_snapshots', 'option_chain_snapshots', 'dealer_metrics_snapshots']:
+                    # Check if already registered as a hypertable
+                    try:
+                        res = conn.execute(text(f"""
+                            SELECT 1 FROM _timescaledb_catalog.hypertable 
+                            WHERE table_name = '{table}';
+                        """)).fetchone()
+                        if not res:
+                            conn.execute(text(f"SELECT create_hypertable('{table}', 'timestamp', chunk_time_interval => INTERVAL '1 day');"))
+                            print(f"Successfully created TimescaleDB hypertable for {table}")
+                    except Exception as e:
+                        print(f"Notice: Skip hypertable check/creation for {table}: {e}")
+
+    setup_timescaledb(engine)
+
 # Session generator class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -1,12 +1,28 @@
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.endpoints import tickers, heatmap
 from app.api.websockets import feed
+from app.services.publisher import redis_mock_publisher
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: spawn background Redis mock publisher task
+    task = asyncio.create_task(redis_mock_publisher())
+    yield
+    # Shutdown: clean up background task
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Set all CORS enabled origins
