@@ -7,30 +7,26 @@ import styles from './CanvasHeatmap.module.css';
 
 type Rgb = [number, number, number];
 
-// Positive exposure (dealers long gamma — stabilizer/magnet)
-// Deep teal → green → lime → warm gold
+// Positive exposure (dealers long gamma — Parula-themed: Blue → Cyan → Green → Yellow)
 const POSITIVE_STOPS: Array<[number, Rgb]> = [
-  [0.0,  [16, 30, 42]],      // near-black teal (blends into bg)
-  [0.15, [20, 65, 60]],      // dark teal
-  [0.30, [28, 110, 72]],     // forest green
-  [0.50, [51, 170, 80]],     // green
-  [0.65, [92, 210, 90]],     // lime-green
-  [0.80, [168, 230, 68]],    // lime
-  [0.92, [220, 210, 45]],    // warm gold
-  [1.0,  [245, 225, 80]],    // bright warm gold
+  [0.0,  [35, 47, 68]],      // Slate Blue-Grey midpoint (neutral)
+  [0.15, [44, 70, 144]],     // Deep Parula Blue
+  [0.35, [29, 115, 170]],    // Bright Sky Blue
+  [0.55, [18, 155, 160]],    // Vibrant Cyan/Teal
+  [0.75, [34, 185, 110]],    // Fresh Green
+  [0.90, [150, 210, 60]],    // Lime Green
+  [1.0,  [250, 235, 40]],    // Radiant Parula Gold/Yellow
 ];
 
-// Negative exposure (dealers short gamma — volatility amplifier)
-// Deep indigo → blue-violet → violet → magenta-pink
+// Negative exposure (dealers short gamma — Viridis-themed: Purple → Violet → Orchid → Red)
 const NEGATIVE_STOPS: Array<[number, Rgb]> = [
-  [0.0,  [18, 14, 40]],      // near-black indigo (blends into bg)
-  [0.15, [30, 22, 80]],      // dark indigo
-  [0.30, [50, 30, 130]],     // indigo
-  [0.50, [80, 40, 170]],     // violet
-  [0.65, [120, 45, 195]],    // blue-violet
-  [0.80, [160, 55, 200]],    // bright violet
-  [0.92, [195, 65, 185]],    // magenta-violet
-  [1.0,  [225, 85, 175]],    // hot magenta-pink
+  [0.0,  [35, 47, 68]],      // Slate Blue-Grey midpoint (neutral)
+  [0.15, [65, 30, 100]],     // Deep Indigo/Purple
+  [0.35, [95, 25, 125]],     // Rich Violet
+  [0.55, [130, 20, 130]],    // Radiant Orchid/Magenta
+  [0.75, [170, 30, 110]],    // Deep Rose-Pink
+  [0.90, [215, 45, 95]],     // Vibrant Coral
+  [1.0,  [245, 75, 75]],     // Hot Flame Red
 ];
 
 function lerp(a: number, b: number, t: number): number {
@@ -67,7 +63,7 @@ function rampLookup(stops: Array<[number, Rgb]>, magnitude: number): Rgb {
  */
 function valueToColor(normalized: number): [number, number, number, number] {
   const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
-  const alpha = 0.22 + magnitude * 0.66; // 0.22..0.88
+  const alpha = 0.35 + magnitude * 0.55; // 0.35..0.90
 
   const stops = normalized >= 0 ? POSITIVE_STOPS : NEGATIVE_STOPS;
   const [r, g, b] = rampLookup(stops, magnitude);
@@ -76,7 +72,7 @@ function valueToColor(normalized: number): [number, number, number, number] {
 
 function textColorForCell(r: number, g: number, b: number): string {
   const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  return luminance > 140 ? 'rgba(8,10,14,0.92)' : 'rgba(240,245,255,0.88)';
+  return luminance > 130 ? '#0b0c10' : '#f9fafb';
 }
 
 /**
@@ -98,12 +94,12 @@ function normalizeMatrix(data: number[][]): number[][] {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CELL_W    = 90;   // px
-const CELL_H    = 38;   // px
-const AXIS_LEFT = 68;   // px for strike labels
-const AXIS_TOP  = 48;   // px for expiration labels
-const FONT      = "11px 'JetBrains Mono', monospace";
-const FONT_HDR  = "11px 'Inter', sans-serif";
+const CELL_W    = 106;  // px
+const CELL_H    = 42;   // px
+const AXIS_LEFT = 76;   // px for strike labels
+const AXIS_TOP  = 52;   // px for expiration labels
+const FONT      = "bold 12px 'JetBrains Mono', monospace";
+const FONT_HDR  = "bold 12px 'Inter', sans-serif";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -309,7 +305,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
             ctx.font = '10px Arial';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'top';
-            ctx.fillText('★', x + CELL_W - 4, y + 3);
+            ctx.fillText('★', x + CELL_W - 4, y + 4);
           }
 
           // Line 1: Absolute Value
@@ -321,12 +317,18 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
           else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
 
-          // Adaptive text color based on cell background luminance
-          ctx.fillStyle = textColorForCell(r_, g_, b_);
-          ctx.font = "bold 10px 'JetBrains Mono', monospace";
+          // Main text outline for high legibility
+          ctx.strokeStyle = '#090d16';
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = 'round';
+          ctx.font = "bold 11px 'JetBrains Mono', monospace";
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          ctx.fillText(label, x + CELL_W / 2, y + 6);
+          ctx.strokeText(label, x + CELL_W / 2, y + 8);
+
+          // Fill main text
+          ctx.fillStyle = textColorForCell(r_, g_, b_);
+          ctx.fillText(label, x + CELL_W / 2, y + 8);
 
           // Line 2: Percentage Change (Evolution)
           const pct = pctChanges[r][c];
@@ -339,7 +341,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           const pillW = pctTextW + 8;
           const pillH = 13;
           const pillX = x + CELL_W / 2 - pillW / 2;
-          const pillY = y + 19;
+          const pillY = y + 23;
           const pillR = 4; // border-radius
           ctx.beginPath();
           ctx.roundRect(pillX, pillY, pillW, pillH, pillR);
@@ -348,7 +350,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
 
           ctx.fillStyle = pctColorForCell(isPos);
           ctx.textAlign = 'center';
-          ctx.fillText(pctLabel, x + CELL_W / 2, y + 21);
+          ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
         }
       }
     },
