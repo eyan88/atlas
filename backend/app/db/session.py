@@ -33,14 +33,24 @@ else:
         """If using postgresql, enable TimescaleDB and convert tables to hypertables."""
         from sqlalchemy import text
         if engine.dialect.name == "postgresql":
+            # 1. Ensure the tables are created first so we don't throw relation-not-found errors
+            try:
+                from app.db.base import Base
+                Base.metadata.create_all(bind=engine)
+                print("Database schemas created/verified successfully.")
+            except Exception as e:
+                print(f"Warning: Could not create tables before TimescaleDB setup: {e}")
+
+            # 2. Enable TimescaleDB extension
             with engine.begin() as conn:
                 try:
                     conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
                 except Exception as e:
                     print(f"Warning: Could not create timescaledb extension: {e}")
                 
-                for table in ['underlying_price_snapshots', 'option_chain_snapshots', 'dealer_metrics_snapshots']:
-                    # Check if already registered as a hypertable
+            # 3. Create hypertables inside separate transactions to avoid transaction abort poisoning
+            for table in ['underlying_price_snapshots', 'option_chain_snapshots', 'dealer_metrics_snapshots']:
+                with engine.begin() as conn:
                     try:
                         res = conn.execute(text(f"""
                             SELECT 1 FROM _timescaledb_catalog.hypertable 
