@@ -2,7 +2,16 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { WsMessage } from '../types';
 
-const WS_BASE = `ws://${window.location.host}/api/v1/ws`;
+const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+let WS_BASE = '';
+if (VITE_API_BASE_URL) {
+  // Convert http/https URL to ws/wss URL
+  WS_BASE = VITE_API_BASE_URL.replace(/^http/, 'ws') + '/api/v1/ws';
+} else {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  WS_BASE = `${protocol}://${window.location.host}/api/v1/ws`;
+}
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
 /**
