@@ -7,17 +7,30 @@ import styles from './CanvasHeatmap.module.css';
 
 type Rgb = [number, number, number];
 
-const IRONBOW_STOPS: Array<[number, Rgb]> = [
-  [0.0, [38, 23, 157]],
-  [0.14, [42, 38, 176]],
-  [0.28, [47, 72, 196]],
-  [0.42, [44, 126, 208]],
-  [0.55, [51, 204, 184]],
-  [0.68, [92, 224, 170]],
-  [0.80, [194, 237, 90]],
-  [0.90, [244, 250, 60]],
-  [0.97, [255, 242, 24]],
-  [1.0, [255, 255, 180]],
+// Positive exposure (dealers long gamma — stabilizer/magnet)
+// Deep teal → green → lime → warm gold
+const POSITIVE_STOPS: Array<[number, Rgb]> = [
+  [0.0,  [16, 30, 42]],      // near-black teal (blends into bg)
+  [0.15, [20, 65, 60]],      // dark teal
+  [0.30, [28, 110, 72]],     // forest green
+  [0.50, [51, 170, 80]],     // green
+  [0.65, [92, 210, 90]],     // lime-green
+  [0.80, [168, 230, 68]],    // lime
+  [0.92, [220, 210, 45]],    // warm gold
+  [1.0,  [245, 225, 80]],    // bright warm gold
+];
+
+// Negative exposure (dealers short gamma — volatility amplifier)
+// Deep indigo → blue-violet → violet → magenta-pink
+const NEGATIVE_STOPS: Array<[number, Rgb]> = [
+  [0.0,  [18, 14, 40]],      // near-black indigo (blends into bg)
+  [0.15, [30, 22, 80]],      // dark indigo
+  [0.30, [50, 30, 130]],     // indigo
+  [0.50, [80, 40, 170]],     // violet
+  [0.65, [120, 45, 195]],    // blue-violet
+  [0.80, [160, 55, 200]],    // bright violet
+  [0.92, [195, 65, 185]],    // magenta-violet
+  [1.0,  [225, 85, 175]],    // hot magenta-pink
 ];
 
 function lerp(a: number, b: number, t: number): number {
@@ -32,30 +45,38 @@ function mixColor(a: Rgb, b: Rgb, t: number): Rgb {
   ];
 }
 
+function rampLookup(stops: Array<[number, Rgb]>, magnitude: number): Rgb {
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    const [s0, c0] = stops[i];
+    const [s1, c1] = stops[i + 1];
+    if (magnitude <= s1) {
+      const t = (magnitude - s0) / (s1 - s0 || 1);
+      return mixColor(c0, c1, Math.max(0, Math.min(1, t)));
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+
 /**
- * Maps a normalized magnitude in [0, 1] to an ironbow-style RGBA color.
+ * Maps a signed normalized value in [-1, 1] to a diverging RGBA color.
+ *
+ * Positive (long gamma)  → teal/green/gold ramp  — stabilizer/magnet zones
+ * Negative (short gamma) → indigo/violet/magenta ramp — amplifier zones
+ *
+ * Magnitude drives intensity; sign drives hue.
  */
 function valueToColor(normalized: number): [number, number, number, number] {
   const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
-  const alpha = 0.24 + magnitude * 0.62; // softer blend, 0.24..0.86
+  const alpha = 0.22 + magnitude * 0.66; // 0.22..0.88
 
-  for (let i = 0; i < IRONBOW_STOPS.length - 1; i += 1) {
-    const [startStop, startColor] = IRONBOW_STOPS[i];
-    const [endStop, endColor] = IRONBOW_STOPS[i + 1];
-    if (magnitude <= endStop) {
-      const t = (magnitude - startStop) / (endStop - startStop || 1);
-      const [r, g, b] = mixColor(startColor, endColor, Math.max(0, Math.min(1, t)));
-      return [r, g, b, alpha];
-    }
-  }
-
-  const [r, g, b] = IRONBOW_STOPS[IRONBOW_STOPS.length - 1][1];
+  const stops = normalized >= 0 ? POSITIVE_STOPS : NEGATIVE_STOPS;
+  const [r, g, b] = rampLookup(stops, magnitude);
   return [r, g, b, alpha];
 }
 
 function textColorForCell(r: number, g: number, b: number): string {
   const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  return luminance > 150 ? 'rgba(8,10,14,0.9)' : 'rgba(255,255,255,0.86)';
+  return luminance > 140 ? 'rgba(8,10,14,0.92)' : 'rgba(240,245,255,0.88)';
 }
 
 /**
@@ -65,9 +86,9 @@ function textColorForCell(r: number, g: number, b: number): string {
 function pctColorForCell(r: number, g: number, b: number, isPositive: boolean): string {
   const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
   if (isPositive) {
-    return luminance > 150 ? 'rgba(16, 120, 60, 0.95)' : 'rgba(74, 222, 128, 0.95)';
+    return luminance > 140 ? 'rgba(16, 110, 55, 0.95)' : 'rgba(74, 222, 128, 0.95)';
   } else {
-    return luminance > 150 ? 'rgba(180, 30, 30, 0.95)' : 'rgba(248, 113, 113, 0.95)';
+    return luminance > 140 ? 'rgba(170, 30, 30, 0.95)' : 'rgba(248, 113, 113, 0.95)';
   }
 }
 
