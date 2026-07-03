@@ -1,4 +1,5 @@
 import { MetricControls } from './MetricControls/MetricControls';
+import { EvolutionControls } from './EvolutionControls/EvolutionControls';
 import { CanvasHeatmap } from './CanvasHeatmap/CanvasHeatmap';
 import { useAppStore } from '../../store/useAppStore';
 import styles from './HeatmapContainer.module.css';
@@ -44,6 +45,7 @@ export function HeatmapContainer({ ticker }: HeatmapContainerProps) {
         </div>
       </div>
       <MetricControls />
+      <EvolutionControls />
       <div className={styles.viewport}>
         <CanvasHeatmap ticker={ticker} />
       </div>

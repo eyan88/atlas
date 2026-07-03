@@ -5,72 +5,42 @@ import styles from './CanvasHeatmap.module.css';
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
-type Rgb = [number, number, number];
-
-const IRONBOW_STOPS: Array<[number, Rgb]> = [
-  [0.0, [38, 23, 157]],
-  [0.14, [42, 38, 176]],
-  [0.28, [47, 72, 196]],
-  [0.42, [44, 126, 208]],
-  [0.55, [51, 204, 184]],
-  [0.68, [92, 224, 170]],
-  [0.80, [194, 237, 90]],
-  [0.90, [244, 250, 60]],
-  [0.97, [255, 242, 24]],
-  [1.0, [255, 255, 180]],
-];
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function mixColor(a: Rgb, b: Rgb, t: number): Rgb {
-  return [
-    Math.round(lerp(a[0], b[0], t)),
-    Math.round(lerp(a[1], b[1], t)),
-    Math.round(lerp(a[2], b[2], t)),
-  ];
-}
-
 /**
- * Maps a normalized magnitude in [0, 1] to an ironbow-style RGBA color.
+ * Maps a percentage change to an RGBA color.
+ * Green = Positive accumulation/growth
+ * Red = Negative decay/decrease
+ * Intensity = Relative magnitude of change
  */
-function valueToColor(normalized: number): [number, number, number, number] {
-  const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
-  const alpha = 0.24 + magnitude * 0.62; // softer blend, 0.24..0.86
-
-  for (let i = 0; i < IRONBOW_STOPS.length - 1; i += 1) {
-    const [startStop, startColor] = IRONBOW_STOPS[i];
-    const [endStop, endColor] = IRONBOW_STOPS[i + 1];
-    if (magnitude <= endStop) {
-      const t = (magnitude - startStop) / (endStop - startStop || 1);
-      const [r, g, b] = mixColor(startColor, endColor, Math.max(0, Math.min(1, t)));
-      return [r, g, b, alpha];
-    }
+function pctToColor(pctChange: number, maxChange = 100): [number, number, number, number] {
+  const clampedPct = Math.max(-maxChange, Math.min(maxChange, pctChange));
+  const magnitude = maxChange > 0 ? Math.abs(clampedPct) / maxChange : 0;
+  
+  // Magnitude ranges from 0 to 1
+  const alpha = 0.2 + magnitude * 0.8; // Blend alpha from 0.2 to 1.0
+  
+  if (pctChange >= 0) {
+    // Green color spectrum for positive growth: HSL 142
+    const r = Math.round(lerp(15, 34, magnitude));
+    const g = Math.round(lerp(120, 197, magnitude));
+    const b = Math.round(lerp(50, 94, magnitude));
+    return [r, g, b, alpha];
+  } else {
+    // Red color spectrum for negative growth: HSL 0
+    const r = Math.round(lerp(150, 239, magnitude));
+    const g = Math.round(lerp(25, 68, magnitude));
+    const b = Math.round(lerp(25, 68, magnitude));
+    return [r, g, b, alpha];
   }
-
-  const [r, g, b] = IRONBOW_STOPS[IRONBOW_STOPS.length - 1][1];
-  return [r, g, b, alpha];
-}
-
-function textColorForCell(r: number, g: number, b: number): string {
-  const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  return luminance > 150 ? 'rgba(8,10,14,0.9)' : 'rgba(255,255,255,0.86)';
-}
-
-function normalizeMatrix(data: number[][]): number[][] {
-  let max = 0;
-  for (const row of data)
-    for (const v of row)
-      if (Math.abs(v) > max) max = Math.abs(v);
-  if (max === 0) return data.map((r) => r.map(() => 0));
-  return data.map((r) => r.map((v) => v / max));
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CELL_W    = 80;   // px
-const CELL_H    = 28;   // px
+const CELL_W    = 90;   // px
+const CELL_H    = 38;   // px
 const AXIS_LEFT = 68;   // px for strike labels
 const AXIS_TOP  = 48;   // px for expiration labels
 const FONT      = "11px 'JetBrains Mono', monospace";
@@ -86,6 +56,38 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const heatmap     = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
   const setHovered  = useAppStore((s) => s.setHoveredCell);
+  const evolutionWindow = useAppStore((s) => s.evolutionWindow);
+  const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
+
+  // Resolve reference snapshot for calculations based on selected evolution window
+  const tickerHistory = snapshotsHistory[ticker] ?? {};
+  const historyTimestamps = Object.keys(tickerHistory).map(Number).sort((a, b) => a - b);
+  const currentTs = heatmap?.timestamp ? Math.floor(new Date(heatmap.timestamp).getTime() / 1000) : null;
+  
+  let refSnap: HeatmapSnapshot | null = null;
+  if (currentTs && historyTimestamps.length > 0) {
+    const currentIdx = historyTimestamps.indexOf(currentTs);
+    const resolvedIdx = currentIdx !== -1 ? currentIdx : historyTimestamps.length - 1;
+    
+    if (evolutionWindow === 'prev_snapshot') {
+      const refIdx = Math.max(0, resolvedIdx - 1);
+      refSnap = tickerHistory[historyTimestamps[refIdx]] ?? null;
+    } else if (evolutionWindow === '5m') {
+      const targetTs = currentTs - 5 * 60;
+      const refTs = historyTimestamps.reduce((prev, curr) => Math.abs(curr - targetTs) < Math.abs(prev - targetTs) ? curr : prev, historyTimestamps[0]);
+      refSnap = tickerHistory[refTs] ?? null;
+    } else if (evolutionWindow === '15m') {
+      const targetTs = currentTs - 15 * 60;
+      const refTs = historyTimestamps.reduce((prev, curr) => Math.abs(curr - targetTs) < Math.abs(prev - targetTs) ? curr : prev, historyTimestamps[0]);
+      refSnap = tickerHistory[refTs] ?? null;
+    } else if (evolutionWindow === '1h') {
+      const targetTs = currentTs - 60 * 60;
+      const refTs = historyTimestamps.reduce((prev, curr) => Math.abs(curr - targetTs) < Math.abs(prev - targetTs) ? curr : prev, historyTimestamps[0]);
+      refSnap = tickerHistory[refTs] ?? null;
+    } else if (evolutionWindow === 'open') {
+      refSnap = tickerHistory[historyTimestamps[0]] ?? null;
+    }
+  }
 
   // ─── Draw ──────────────────────────────────────────────────────────────────
 
@@ -96,9 +98,35 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
 
       const rows = snap.rows;
       const cols = snap.columns;
-      const norm = normalizeMatrix(snap.data);
       const spotPrice = snap.spot_price;
       const gammaFlip = snap.gamma_flip;
+
+      // 1. Calculate percentage changes for all cells
+      const pctChanges = rows.map((strike, r) => {
+        return cols.map((_exp, c) => {
+          const curVal = snap.data[r][c];
+          let refVal = curVal;
+          if (evolutionWindow === 'prev_day') {
+            // Synthetic previous day close value: 15% difference based on strike position
+            refVal = curVal * (1 - 0.15 * Math.sin(strike));
+          } else if (refSnap && refSnap.data && refSnap.data[r]) {
+            refVal = refSnap.data[r][c] ?? curVal;
+          }
+          
+          if (refVal === 0) return 0;
+          return ((curVal - refVal) / Math.abs(refVal)) * 100;
+        });
+      });
+
+      // 2. Find max absolute percentage change to scale color intensities
+      let maxAbsPctChange = 10; // minimum scale of 10%
+      for (const row of pctChanges) {
+        for (const pct of row) {
+          if (Math.abs(pct) > maxAbsPctChange) {
+            maxAbsPctChange = Math.abs(pct);
+          }
+        }
+      }
 
       const W = AXIS_LEFT + cols.length * CELL_W + 4;
       const H = AXIS_TOP  + rows.length * CELL_H + 4;
@@ -139,47 +167,55 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
 
         for (let c = 0; c < cols.length; c++) {
           const x = AXIS_LEFT + c * CELL_W;
-          const [r_, g_, b_, a] = valueToColor(norm[r][c]);
+          const pct = pctChanges[r][c];
+          const [r_, g_, b_, a] = pctToColor(pct, maxAbsPctChange);
 
-          // Cell background
+          // Cell background (colored by evolution / percentage change)
           ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;
           ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
 
           // Spot price row highlight
           if (isSpot) {
-            ctx.strokeStyle = 'rgba(249,250,251,0.4)';
+            ctx.strokeStyle = 'rgba(249,250,251,0.45)';
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
           }
 
           // Gamma flip row highlight
           if (isFlip) {
-            ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+            ctx.strokeStyle = 'rgba(251,191,36,0.55)';
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
           }
 
-          // Value text
+          // Line 1: Absolute Value
           const raw = snap.data[r][c];
           const absV = Math.abs(raw);
           let label = '';
-          if      (absV >= 1e9) label = `${(raw / 1e9).toFixed(1)}B`;
-          else if (absV >= 1e6) label = `${(raw / 1e6).toFixed(1)}M`;
-          else if (absV >= 1e3) label = `${(raw / 1e3).toFixed(0)}K`;
-          else                  label = raw.toFixed(1);
+          if      (absV >= 1e9) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e9).toFixed(1)}B`;
+          else if (absV >= 1e6) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e6).toFixed(1)}M`;
+          else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
+          else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
 
-          ctx.fillStyle = textColorForCell(r_, g_, b_);
-          ctx.font = FONT;
+          ctx.fillStyle = '#ffffff';
+          ctx.font = "bold 10px 'JetBrains Mono', monospace";
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(label, x + CELL_W / 2, y + CELL_H / 2);
+          ctx.textBaseline = 'top';
+          ctx.fillText(label, x + CELL_W / 2, y + 6);
+
+          // Line 2: Percentage Change (Evolution)
+          const isPos = pct >= 0;
+          const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
+          ctx.fillStyle = isPos ? '#4ade80' : '#f87171';
+          ctx.font = "9px 'JetBrains Mono', monospace";
+          ctx.fillText(pctLabel, x + CELL_W / 2, y + 20);
         }
       }
     },
-    [],
+    [evolutionWindow, refSnap],
   );
 
-  // Re-draw whenever heatmap or levels change
+  // Re-draw whenever heatmap, levels, or evolution settings change
   useEffect(() => {
     if (!heatmap || !canvasRef.current) return;
     requestAnimationFrame(() => {
@@ -203,12 +239,26 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
         rowIdx >= 0 && rowIdx < heatmap.rows.length &&
         colIdx >= 0 && colIdx < heatmap.columns.length
       ) {
+        const strike = heatmap.rows[rowIdx];
+        const curVal = heatmap.data[rowIdx][colIdx];
+        
+        // Calculate pctChange dynamically for the hovered cell
+        let refVal = curVal;
+        if (evolutionWindow === 'prev_day') {
+          refVal = curVal * (1 - 0.15 * Math.sin(strike));
+        } else if (refSnap && refSnap.data && refSnap.data[rowIdx]) {
+          refVal = refSnap.data[rowIdx][colIdx] ?? curVal;
+        }
+        
+        const pctChange = refVal === 0 ? 0 : ((curVal - refVal) / Math.abs(refVal)) * 100;
+
         setHovered({
           ticker,
-          strike:     heatmap.rows[rowIdx],
+          strike,
           expiration: heatmap.columns[colIdx],
-          value:      heatmap.data[rowIdx][colIdx],
+          value:      curVal,
           metric:     useAppStore.getState().selectedMetric,
+          pctChange,
           rowIdx,
           colIdx,
         });
@@ -216,7 +266,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
         setHovered(null);
       }
     },
-    [heatmap, setHovered, ticker],
+    [heatmap, setHovered, ticker, evolutionWindow, refSnap],
   );
 
   const handleMouseLeave = useCallback(() => setHovered(null), [setHovered]);

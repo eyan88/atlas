@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CellDetail, HeatmapSnapshot, Metric } from '../types';
+import type { CellDetail, HeatmapSnapshot, Metric, EvolutionWindow } from '../types';
 
 const MAX_OPEN_TICKERS = 5;
 
@@ -17,6 +17,15 @@ interface AppState {
 
   // Number of strike rows shown in the mock heatmap
   strikeCount: number;
+
+  // Evolution comparison window
+  evolutionWindow: EvolutionWindow;
+
+  // Cache of snapshots per ticker for dynamic evolution computation
+  snapshotsHistory: Record<string, Record<number, HeatmapSnapshot>>;
+
+  // Timestamps for the timeline slider
+  timelineTimestamps: number[];
 
   // Current replay timestamp (null = live)
   currentTimestamp: number | null;
@@ -50,6 +59,8 @@ interface AppState {
   closeTickerPane: (ticker: string) => void;
   setMetric: (metric: Metric) => void;
   setStrikeCount: (count: number) => void;
+  setEvolutionWindow: (window: EvolutionWindow) => void;
+  setTimelineData: (ticker: string, timestamps: number[], snapshots: Record<number, HeatmapSnapshot>) => void;
   setTimestamp: (ts: number | null) => void;
   togglePlay: () => void;
   setReplaySpeed: (speed: number) => void;
@@ -73,6 +84,9 @@ export const useAppStore = create<AppState>((set) => ({
   openTickers: ['SPY'],
   selectedMetric: 'net_gex',
   strikeCount: 20,
+  evolutionWindow: 'prev_snapshot',
+  snapshotsHistory: {},
+  timelineTimestamps: [],
   currentTimestamp: null,
   isPlaying: false,
   replaySpeed: 1,
@@ -119,12 +133,14 @@ export const useAppStore = create<AppState>((set) => ({
       const nextCallWall = nextActive === next ? null : state.callWall;
       const nextPutWall = nextActive === next ? null : state.putWall;
       const { [next]: _removed, ...heatmapsByTicker } = state.heatmapsByTicker;
+      const { [next]: _histRemoved, ...snapshotsHistory } = state.snapshotsHistory;
 
       return {
         activeTicker: nextActive,
         openTickers,
         heatmap: nextHeatmap,
         heatmapsByTicker,
+        snapshotsHistory,
         spotPrice: nextSpotPrice,
         gammaFlip: nextGammaFlip,
         callWall: nextCallWall,
@@ -138,7 +154,41 @@ export const useAppStore = create<AppState>((set) => ({
 
   setStrikeCount: (count) => set({ strikeCount: count }),
 
-  setTimestamp: (ts) => set({ currentTimestamp: ts }),
+  setEvolutionWindow: (window) => set({ evolutionWindow: window }),
+
+  setTimelineData: (ticker, timestamps, snapshots) =>
+    set((state) => ({
+      timelineTimestamps: timestamps,
+      snapshotsHistory: {
+        ...state.snapshotsHistory,
+        [ticker]: snapshots,
+      },
+    })),
+
+  setTimestamp: (ts) =>
+    set((state) => {
+      const nextHeatmaps = { ...state.heatmapsByTicker };
+      state.openTickers.forEach((t) => {
+        const tHistory = state.snapshotsHistory[t];
+        if (ts && tHistory && tHistory[ts]) {
+          nextHeatmaps[t] = tHistory[ts];
+        }
+      });
+
+      const activeHist = state.snapshotsHistory[state.activeTicker];
+      const nextHeatmap = ts && activeHist && activeHist[ts] ? activeHist[ts] : state.heatmap;
+
+      return {
+        currentTimestamp: ts,
+        heatmap: nextHeatmap,
+        heatmapsByTicker: nextHeatmaps,
+        spotPrice: nextHeatmap ? nextHeatmap.spot_price : state.spotPrice,
+        gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
+        callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
+        putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
+      };
+    }),
+
 
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
 
@@ -182,3 +232,4 @@ export const useAppStore = create<AppState>((set) => ({
 
   setHoveredCell: (cell) => set({ hoveredCell: cell }),
 }));
+

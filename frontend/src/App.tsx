@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer';
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
 import { useAppStore } from './store/useAppStore';
-import { generateMockHeatmap } from './api/client';
+import { generateMockTimeline } from './api/client';
 import styles from './App.module.css';
 
 // NOTE: Import and call useWebSocket() here when the backend is ready.
@@ -15,6 +15,7 @@ export function App() {
 
   const setHeatmap     = useAppStore((s) => s.setHeatmap);
   const setHeatmapForTicker = useAppStore((s) => s.setHeatmapForTicker);
+  const setTimelineData = useAppStore((s) => s.setTimelineData);
   const activeTicker   = useAppStore((s) => s.activeTicker);
   const openTickers    = useAppStore((s) => s.openTickers);
   const selectedMetric = useAppStore((s) => s.selectedMetric);
@@ -23,13 +24,20 @@ export function App() {
   // ── Bootstrap with mock data in development ──────────────────────────────
   useEffect(() => {
     openTickers.forEach((ticker, index) => {
-      const snap = generateMockHeatmap(ticker, selectedMetric, strikeCount);
+      const { timestamps, snapshots } = generateMockTimeline(ticker, selectedMetric, strikeCount);
+      setTimelineData(ticker, timestamps, snapshots);
+
+      // Default to the latest snapshot in the timeline
+      const latestTs = timestamps[timestamps.length - 1];
+      const snap = snapshots[latestTs];
+
       setHeatmapForTicker(ticker, snap);
       if (ticker === activeTicker || index === 0) {
         setHeatmap(snap);
       }
     });
-  }, [activeTicker, openTickers, selectedMetric, strikeCount, setHeatmap, setHeatmapForTicker]);
+  }, [activeTicker, openTickers, selectedMetric, strikeCount, setHeatmap, setHeatmapForTicker, setTimelineData]);
+
 
   return (
     <div className={styles.app}>
