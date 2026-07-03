@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime, timedelta, date as py_date
+from datetime import datetime, timedelta, date as py_date, timezone
 import pandas as pd
 import numpy as np
 
@@ -31,7 +31,7 @@ try:
     tickers = ["SPY", "QQQ", "IWM"]
     # Generate data for a single day: 2026-07-02
     target_date = py_date(2026, 7, 2)
-    start_time = datetime(2026, 7, 2, 9, 30, 0)
+    start_time = datetime(2026, 7, 2, 13, 30, 0, tzinfo=timezone.utc)
     
     # 20 steps, 5 minutes interval (100 minutes of data)
     steps = 20
