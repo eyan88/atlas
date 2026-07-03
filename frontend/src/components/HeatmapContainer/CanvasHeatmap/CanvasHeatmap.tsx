@@ -10,28 +10,66 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Maps a normalized absolute exposure value in [-1, 1] to a split ironbow-style color.
- * Positive exposure -> Neon Yellow (vivid/bright on high magnitude)
- * Negative exposure -> Purple/Violet (vivid/bright on high magnitude)
+ * Maps a normalized absolute exposure value in [-1, 1] to an ironbow-inspired color.
+ *
+ * Positive exposure → Warm amber/gold spectrum
+ *   Low magnitude:  dark bronze [40, 28, 8]
+ *   High magnitude: warm gold [218, 165, 32] — vivid but never blinding white/yellow
+ *
+ * Negative exposure → Cool indigo/violet spectrum
+ *   Low magnitude:  dark navy [18, 10, 46]
+ *   High magnitude: rich violet [120, 50, 200]
+ *
+ * Near-zero values sink into the dark background so the eye focuses on
+ * the nodes with the most positioning.
  */
 function valueToColor(normalized: number): [number, number, number, number] {
   const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
-  const alpha = 0.24 + magnitude * 0.76; // Softer blend at low values, full brightness at high values
+
+  // Ease-in-out curve: low values stay dim longer, high values pop
+  const t = magnitude * magnitude * (3 - 2 * magnitude); // smoothstep
+
+  // Alpha ramps from near-transparent to fully opaque
+  const alpha = 0.12 + t * 0.88;
 
   if (normalized >= 0) {
-    // Neon Yellow spectrum for positive exposure
-    // Dark gold/olive base [35, 30, 10] scaling up to bright neon yellow [255, 242, 24]
-    const r = Math.round(lerp(35, 255, magnitude));
-    const g = Math.round(lerp(30, 242, magnitude));
-    const b = Math.round(lerp(10, 24, magnitude));
+    // Warm amber/gold spectrum for positive (long) dealer exposure
+    const r = Math.round(lerp(28, 218, t));
+    const g = Math.round(lerp(20, 165, t));
+    const b = Math.round(lerp(6,   32, t));
     return [r, g, b, alpha];
   } else {
-    // Purple/Violet spectrum for negative exposure
-    // Dark indigo base [20, 12, 55] scaling up to bright vivid violet/purple [138, 43, 226]
-    const r = Math.round(lerp(20, 138, magnitude));
-    const g = Math.round(lerp(12, 43, magnitude));
-    const b = Math.round(lerp(55, 226, magnitude));
+    // Cool indigo/violet spectrum for negative (short) dealer exposure
+    const r = Math.round(lerp(16, 120, t));
+    const g = Math.round(lerp(8,   50, t));
+    const b = Math.round(lerp(40, 200, t));
     return [r, g, b, alpha];
+  }
+}
+
+/**
+ * Returns a readable text color (with optional transparency) given the cell's
+ * background RGB. Uses perceived luminance to pick white or dark text.
+ */
+function textColorForCell(r: number, g: number, b: number, opacity = 0.92): string {
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 140
+    ? `rgba(10, 10, 20, ${opacity})`   // dark text on bright backgrounds
+    : `rgba(240, 245, 255, ${opacity})`; // light text on dark backgrounds
+}
+
+/**
+ * Returns the percentage-change label color (green/red) with enough contrast
+ * against the given cell background.
+ */
+function pctColorForCell(r: number, g: number, _b: number, isPositive: boolean): string {
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * _b;
+  if (isPositive) {
+    // On bright cells use a darker emerald; on dark cells use a brighter mint
+    return lum > 140 ? 'rgba(16, 120, 60, 0.95)' : 'rgba(74, 222, 128, 0.95)';
+  } else {
+    // On bright cells use a darker crimson; on dark cells use a brighter coral
+    return lum > 140 ? 'rgba(180, 30, 30, 0.95)' : 'rgba(248, 113, 113, 0.95)';
   }
 }
 
@@ -169,10 +207,10 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           const x = AXIS_LEFT + c * CELL_W;
           const normVal = norm[r][c];
           
-          // Map absolute exposure to color (Neon Yellow for positive, Purple for negative)
+          // Map absolute exposure to color (warm gold for positive, violet for negative)
           const [r_, g_, b_, a] = valueToColor(normVal);
 
-          // Cell background (colored by absolute value)
+          // Cell background (colored by absolute dealer exposure value)
           ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;
           ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
 
@@ -199,7 +237,8 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
           else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
 
-          ctx.fillStyle = '#ffffff';
+          // Adaptive text color based on cell background luminance
+          ctx.fillStyle = textColorForCell(r_, g_, b_);
           ctx.font = "bold 10px 'JetBrains Mono', monospace";
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
@@ -209,7 +248,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           const pct = pctChanges[r][c];
           const isPos = pct >= 0;
           const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
-          ctx.fillStyle = isPos ? '#4ade80' : '#f87171';
+          ctx.fillStyle = pctColorForCell(r_, g_, b_, isPos);
           ctx.font = "9px 'JetBrains Mono', monospace";
           ctx.fillText(pctLabel, x + CELL_W / 2, y + 20);
         }
