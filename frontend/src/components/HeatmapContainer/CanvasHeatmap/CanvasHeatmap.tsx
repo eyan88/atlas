@@ -267,9 +267,23 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           const pct = pctChanges[r][c];
           const isPos = pct >= 0;
           const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
-          ctx.fillStyle = pctColorForCell(r_, g_, b_, isPos);
           ctx.font = "9px 'JetBrains Mono', monospace";
-          ctx.fillText(pctLabel, x + CELL_W / 2, y + 20);
+
+          // Translucent pill backdrop for readability
+          const pctTextW = ctx.measureText(pctLabel).width;
+          const pillW = pctTextW + 8;
+          const pillH = 13;
+          const pillX = x + CELL_W / 2 - pillW / 2;
+          const pillY = y + 19;
+          const pillR = 4; // border-radius
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, pillR);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+          ctx.fill();
+
+          ctx.fillStyle = pctColorForCell(r_, g_, b_, isPos);
+          ctx.textAlign = 'center';
+          ctx.fillText(pctLabel, x + CELL_W / 2, y + 21);
         }
       }
     },
