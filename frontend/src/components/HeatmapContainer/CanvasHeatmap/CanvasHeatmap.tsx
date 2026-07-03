@@ -5,71 +5,69 @@ import styles from './CanvasHeatmap.module.css';
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
+type Rgb = [number, number, number];
+
+const IRONBOW_STOPS: Array<[number, Rgb]> = [
+  [0.0, [38, 23, 157]],
+  [0.14, [42, 38, 176]],
+  [0.28, [47, 72, 196]],
+  [0.42, [44, 126, 208]],
+  [0.55, [51, 204, 184]],
+  [0.68, [92, 224, 170]],
+  [0.80, [194, 237, 90]],
+  [0.90, [244, 250, 60]],
+  [0.97, [255, 242, 24]],
+  [1.0, [255, 255, 180]],
+];
+
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/**
- * Maps a normalized absolute exposure value in [-1, 1] to an ironbow-inspired color.
- *
- * Positive exposure → Warm amber/gold spectrum
- *   Low magnitude:  dark bronze [40, 28, 8]
- *   High magnitude: warm gold [218, 165, 32] — vivid but never blinding white/yellow
- *
- * Negative exposure → Cool indigo/violet spectrum
- *   Low magnitude:  dark navy [18, 10, 46]
- *   High magnitude: rich violet [120, 50, 200]
- *
- * Near-zero values sink into the dark background so the eye focuses on
- * the nodes with the most positioning.
- */
-function valueToColor(normalized: number): [number, number, number, number] {
-  const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
-
-  // Ease-in-out curve: low values stay dim longer, high values pop
-  const t = magnitude * magnitude * (3 - 2 * magnitude); // smoothstep
-
-  // Alpha ramps from near-transparent to fully opaque
-  const alpha = 0.12 + t * 0.88;
-
-  if (normalized >= 0) {
-    // Warm amber/gold spectrum for positive (long) dealer exposure
-    const r = Math.round(lerp(28, 218, t));
-    const g = Math.round(lerp(20, 165, t));
-    const b = Math.round(lerp(6,   32, t));
-    return [r, g, b, alpha];
-  } else {
-    // Cool indigo/violet spectrum for negative (short) dealer exposure
-    const r = Math.round(lerp(16, 120, t));
-    const g = Math.round(lerp(8,   50, t));
-    const b = Math.round(lerp(40, 200, t));
-    return [r, g, b, alpha];
-  }
+function mixColor(a: Rgb, b: Rgb, t: number): Rgb {
+  return [
+    Math.round(lerp(a[0], b[0], t)),
+    Math.round(lerp(a[1], b[1], t)),
+    Math.round(lerp(a[2], b[2], t)),
+  ];
 }
 
 /**
- * Returns a readable text color (with optional transparency) given the cell's
- * background RGB. Uses perceived luminance to pick white or dark text.
+ * Maps a normalized magnitude in [0, 1] to an ironbow-style RGBA color.
  */
-function textColorForCell(r: number, g: number, b: number, opacity = 0.92): string {
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 140
-    ? `rgba(10, 10, 20, ${opacity})`   // dark text on bright backgrounds
-    : `rgba(240, 245, 255, ${opacity})`; // light text on dark backgrounds
+function valueToColor(normalized: number): [number, number, number, number] {
+  const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
+  const alpha = 0.24 + magnitude * 0.62; // softer blend, 0.24..0.86
+
+  for (let i = 0; i < IRONBOW_STOPS.length - 1; i += 1) {
+    const [startStop, startColor] = IRONBOW_STOPS[i];
+    const [endStop, endColor] = IRONBOW_STOPS[i + 1];
+    if (magnitude <= endStop) {
+      const t = (magnitude - startStop) / (endStop - startStop || 1);
+      const [r, g, b] = mixColor(startColor, endColor, Math.max(0, Math.min(1, t)));
+      return [r, g, b, alpha];
+    }
+  }
+
+  const [r, g, b] = IRONBOW_STOPS[IRONBOW_STOPS.length - 1][1];
+  return [r, g, b, alpha];
+}
+
+function textColorForCell(r: number, g: number, b: number): string {
+  const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+  return luminance > 150 ? 'rgba(8,10,14,0.9)' : 'rgba(255,255,255,0.86)';
 }
 
 /**
  * Returns the percentage-change label color (green/red) with enough contrast
  * against the given cell background.
  */
-function pctColorForCell(r: number, g: number, _b: number, isPositive: boolean): string {
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * _b;
+function pctColorForCell(r: number, g: number, b: number, isPositive: boolean): string {
+  const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
   if (isPositive) {
-    // On bright cells use a darker emerald; on dark cells use a brighter mint
-    return lum > 140 ? 'rgba(16, 120, 60, 0.95)' : 'rgba(74, 222, 128, 0.95)';
+    return luminance > 150 ? 'rgba(16, 120, 60, 0.95)' : 'rgba(74, 222, 128, 0.95)';
   } else {
-    // On bright cells use a darker crimson; on dark cells use a brighter coral
-    return lum > 140 ? 'rgba(180, 30, 30, 0.95)' : 'rgba(248, 113, 113, 0.95)';
+    return luminance > 150 ? 'rgba(180, 30, 30, 0.95)' : 'rgba(248, 113, 113, 0.95)';
   }
 }
 
