@@ -10,31 +10,38 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Maps a percentage change to an RGBA color.
- * Green = Positive accumulation/growth
- * Red = Negative decay/decrease
- * Intensity = Relative magnitude of change
+ * Maps a normalized absolute exposure value in [-1, 1] to a split ironbow-style color.
+ * Positive exposure -> Neon Yellow (vivid/bright on high magnitude)
+ * Negative exposure -> Purple/Violet (vivid/bright on high magnitude)
  */
-function pctToColor(pctChange: number, maxChange = 100): [number, number, number, number] {
-  const clampedPct = Math.max(-maxChange, Math.min(maxChange, pctChange));
-  const magnitude = maxChange > 0 ? Math.abs(clampedPct) / maxChange : 0;
-  
-  // Magnitude ranges from 0 to 1
-  const alpha = 0.2 + magnitude * 0.8; // Blend alpha from 0.2 to 1.0
-  
-  if (pctChange >= 0) {
-    // Green color spectrum for positive growth: HSL 142
-    const r = Math.round(lerp(15, 34, magnitude));
-    const g = Math.round(lerp(120, 197, magnitude));
-    const b = Math.round(lerp(50, 94, magnitude));
+function valueToColor(normalized: number): [number, number, number, number] {
+  const magnitude = Math.max(0, Math.min(1, Math.abs(normalized)));
+  const alpha = 0.24 + magnitude * 0.76; // Softer blend at low values, full brightness at high values
+
+  if (normalized >= 0) {
+    // Neon Yellow spectrum for positive exposure
+    // Dark gold/olive base [35, 30, 10] scaling up to bright neon yellow [255, 242, 24]
+    const r = Math.round(lerp(35, 255, magnitude));
+    const g = Math.round(lerp(30, 242, magnitude));
+    const b = Math.round(lerp(10, 24, magnitude));
     return [r, g, b, alpha];
   } else {
-    // Red color spectrum for negative growth: HSL 0
-    const r = Math.round(lerp(150, 239, magnitude));
-    const g = Math.round(lerp(25, 68, magnitude));
-    const b = Math.round(lerp(25, 68, magnitude));
+    // Purple/Violet spectrum for negative exposure
+    // Dark indigo base [20, 12, 55] scaling up to bright vivid violet/purple [138, 43, 226]
+    const r = Math.round(lerp(20, 138, magnitude));
+    const g = Math.round(lerp(12, 43, magnitude));
+    const b = Math.round(lerp(55, 226, magnitude));
     return [r, g, b, alpha];
   }
+}
+
+function normalizeMatrix(data: number[][]): number[][] {
+  let max = 0;
+  for (const row of data)
+    for (const v of row)
+      if (Math.abs(v) > max) max = Math.abs(v);
+  if (max === 0) return data.map((r) => r.map(() => 0));
+  return data.map((r) => r.map((v) => v / max));
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -101,7 +108,10 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
       const spotPrice = snap.spot_price;
       const gammaFlip = snap.gamma_flip;
 
-      // 1. Calculate percentage changes for all cells
+      // Normalize absolute exposures for color intensities
+      const norm = normalizeMatrix(snap.data);
+
+      // Calculate percentage changes for display labels
       const pctChanges = rows.map((strike, r) => {
         return cols.map((_exp, c) => {
           const curVal = snap.data[r][c];
@@ -117,16 +127,6 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           return ((curVal - refVal) / Math.abs(refVal)) * 100;
         });
       });
-
-      // 2. Find max absolute percentage change to scale color intensities
-      let maxAbsPctChange = 10; // minimum scale of 10%
-      for (const row of pctChanges) {
-        for (const pct of row) {
-          if (Math.abs(pct) > maxAbsPctChange) {
-            maxAbsPctChange = Math.abs(pct);
-          }
-        }
-      }
 
       const W = AXIS_LEFT + cols.length * CELL_W + 4;
       const H = AXIS_TOP  + rows.length * CELL_H + 4;
@@ -167,10 +167,12 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
 
         for (let c = 0; c < cols.length; c++) {
           const x = AXIS_LEFT + c * CELL_W;
-          const pct = pctChanges[r][c];
-          const [r_, g_, b_, a] = pctToColor(pct, maxAbsPctChange);
+          const normVal = norm[r][c];
+          
+          // Map absolute exposure to color (Neon Yellow for positive, Purple for negative)
+          const [r_, g_, b_, a] = valueToColor(normVal);
 
-          // Cell background (colored by evolution / percentage change)
+          // Cell background (colored by absolute value)
           ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;
           ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
 
@@ -204,6 +206,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
           ctx.fillText(label, x + CELL_W / 2, y + 6);
 
           // Line 2: Percentage Change (Evolution)
+          const pct = pctChanges[r][c];
           const isPos = pct >= 0;
           const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
           ctx.fillStyle = isPos ? '#4ade80' : '#f87171';
@@ -215,7 +218,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
     [evolutionWindow, refSnap],
   );
 
-  // Re-draw whenever heatmap, levels, or evolution settings change
+  // Re-draw whenever heatmap or levels change
   useEffect(() => {
     if (!heatmap || !canvasRef.current) return;
     requestAnimationFrame(() => {
