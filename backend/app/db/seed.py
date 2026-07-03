@@ -73,7 +73,7 @@ try:
                 id=spot_id_counter,
                 timestamp=ts,
                 ticker=ticker,
-                price=spot
+                price=float(spot)
             )
             spot_id_counter += 1
             db.add(spot_snapshot)
@@ -98,18 +98,18 @@ try:
                         id=metric_id_counter,
                         timestamp=ts,
                         ticker=ticker,
-                        strike=strike,
+                        strike=float(strike),
                         expiration=exp,
-                        net_gex=gex,
-                        net_dex=dex,
-                        net_vanna=gex * 0.001,
-                        net_charm=-dex * 0.0005,
+                        net_gex=float(gex),
+                        net_dex=float(dex),
+                        net_vanna=float(gex * 0.001),
+                        net_charm=float(-dex * 0.0005),
                         call_oi=1500 + int(np.random.randint(100, 1000)),
                         put_oi=1200 + int(np.random.randint(100, 1000)),
                         call_volume=int(np.random.randint(10, 200)),
                         put_volume=int(np.random.randint(10, 200)),
-                        call_iv=0.22 + np.random.random() * 0.05,
-                        put_iv=0.24 + np.random.random() * 0.05
+                        call_iv=float(0.22 + np.random.random() * 0.05),
+                        put_iv=float(0.24 + np.random.random() * 0.05)
                     )
                     metric_id_counter += 1
                     db.add(metric_snap)
