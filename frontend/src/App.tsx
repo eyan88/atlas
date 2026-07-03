@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar/Sidebar';
 import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer';
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
 import { useAppStore } from './store/useAppStore';
-import { generateMockTimeline } from './api/client';
+import { api } from './api/client';
 import styles from './App.module.css';
 
 // NOTE: Import and call useWebSocket() here when the backend is ready.
@@ -21,22 +21,80 @@ export function App() {
   const selectedMetric = useAppStore((s) => s.selectedMetric);
   const strikeCount    = useAppStore((s) => s.strikeCount);
 
-  // ── Bootstrap with mock data in development ──────────────────────────────
+  const currentTimestamp    = useAppStore((s) => s.currentTimestamp);
+  const snapshotsHistory    = useAppStore((s) => s.snapshotsHistory);
+
+  // 1. Fetch timeline and initial latest snapshot on mount / ticker change
   useEffect(() => {
-    openTickers.forEach((ticker, index) => {
-      const { timestamps, snapshots } = generateMockTimeline(ticker, selectedMetric, strikeCount);
-      setTimelineData(ticker, timestamps, snapshots);
+    openTickers.forEach(async (ticker, index) => {
+      try {
+        // Query timeline for the target seeded date '2026-07-02'
+        const timeline = await api.getTimeline(ticker, '2026-07-02');
+        const timestamps = timeline.timestamps;
+        
+        if (timestamps.length === 0) return;
 
-      // Default to the latest snapshot in the timeline
-      const latestTs = timestamps[timestamps.length - 1];
-      const snap = snapshots[latestTs];
+        // Fetch latest snapshot
+        const latestTs = timestamps[timestamps.length - 1];
+        const latestIso = new Date(latestTs * 1000).toISOString();
+        const snap = await api.getHeatmap(ticker, {
+          metric: selectedMetric,
+          timestamp: latestIso,
+          strikeCount
+        });
 
-      setHeatmapForTicker(ticker, snap);
-      if (ticker === activeTicker || index === 0) {
-        setHeatmap(snap);
+        // Store in local cache history
+        setTimelineData(ticker, timestamps, { [latestTs]: snap });
+        setHeatmapForTicker(ticker, snap);
+        if (ticker === activeTicker || index === 0) {
+          setHeatmap(snap);
+        }
+      } catch (err) {
+        console.error("Failed to fetch initial heatmap data:", err);
       }
     });
-  }, [activeTicker, openTickers, selectedMetric, strikeCount, setHeatmap, setHeatmapForTicker, setTimelineData]);
+  }, [openTickers, selectedMetric, strikeCount, setTimelineData, setHeatmapForTicker, setHeatmap, activeTicker]);
+
+  // 2. Load historical snapshots on-demand when scrubbing/playing
+  useEffect(() => {
+    if (!currentTimestamp) return;
+
+    openTickers.forEach(async (ticker) => {
+      try {
+        // Check if already in cache history
+        const cached = snapshotsHistory[ticker]?.[currentTimestamp];
+        if (cached) {
+          // If cached, just set it
+          setHeatmapForTicker(ticker, cached);
+          if (ticker === activeTicker) {
+            setHeatmap(cached);
+          }
+          return;
+        }
+
+        // Fetch snapshot for current timestamp
+        const isoString = new Date(currentTimestamp * 1000).toISOString();
+        const snap = await api.getHeatmap(ticker, {
+          metric: selectedMetric,
+          timestamp: isoString,
+          strikeCount
+        });
+
+        // Add to cache history
+        setTimelineData(ticker, useAppStore.getState().timelineTimestamps, {
+          ...snapshotsHistory[ticker],
+          [currentTimestamp]: snap
+        });
+
+        setHeatmapForTicker(ticker, snap);
+        if (ticker === activeTicker) {
+          setHeatmap(snap);
+        }
+      } catch (err) {
+        console.error(`Failed to fetch heatmap for timestamp ${currentTimestamp}:`, err);
+      }
+    });
+  }, [currentTimestamp, openTickers, selectedMetric, strikeCount, activeTicker, snapshotsHistory, setTimelineData, setHeatmapForTicker, setHeatmap]);
 
 
   return (

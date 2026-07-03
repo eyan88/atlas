@@ -77,10 +77,11 @@ def get_heatmap(
     if spot_record:
         spot_price = float(spot_record.price)
     else:
-        # Fallback to closest forward in time if no prior
+        # Fallback to closest forward in time (first snapshot after target_ts)
         spot_record = db.query(UnderlyingPriceSnapshot).filter(
-            UnderlyingPriceSnapshot.ticker == ticker
-        ).order_by(func.abs(func.extract('epoch', UnderlyingPriceSnapshot.timestamp) - target_ts.timestamp())).first()
+            UnderlyingPriceSnapshot.ticker == ticker,
+            UnderlyingPriceSnapshot.timestamp >= target_ts
+        ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).first()
         if spot_record:
             spot_price = float(spot_record.price)
 
