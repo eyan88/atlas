@@ -2,7 +2,16 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { WsMessage } from '../types';
 
-const WS_BASE = `ws://${window.location.host}/api/v1/ws`;
+const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+let WS_BASE = '';
+if (VITE_API_BASE_URL) {
+  // Convert http/https URL to ws/wss URL
+  WS_BASE = VITE_API_BASE_URL.replace(/^http/, 'ws') + '/api/v1/ws';
+} else {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  WS_BASE = `${protocol}://${window.location.host}/api/v1/ws`;
+}
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
 /**
@@ -19,12 +28,23 @@ export function useWebSocket() {
   const setHeatmap    = useAppStore((s) => s.setHeatmap);
   const applyDiff     = useAppStore((s) => s.applyDiff);
   const setWsConnected = useAppStore((s) => s.setWsConnected);
-  const updateMarketLevels = useAppStore((s) => s.updateMarketLevels);
+
+  const currentTimestamp = useAppStore((s) => s.currentTimestamp);
+  const isLive = currentTimestamp === null;
 
   const wsRef       = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    if (!isLive) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setWsConnected(false);
+      return;
+    }
+
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
@@ -45,21 +65,7 @@ export function useWebSocket() {
           if (msg.type === 'INIT') {
             setHeatmap(msg.payload);
           } else if (msg.type === 'PATCH') {
-            const p = msg.payload;
-            updateMarketLevels(p.spot_price, p.gamma_flip, p.call_wall, p.put_wall);
-            // Full snapshot replacement for now; future: apply cell-level diffs
-            applyDiff({
-              ticker: p.ticker,
-              timestamp: p.timestamp,
-              spot_price: p.spot_price,
-              gamma_flip: p.gamma_flip,
-              call_wall: p.call_wall,
-              put_wall: p.put_wall,
-              // preserve existing columns/rows/data until diff engine is implemented
-              columns: [],
-              rows: [],
-              data: [],
-            });
+            applyDiff(msg.payload);
           }
         } catch {
           // Ignore non-JSON frames (e.g. pong)
@@ -83,5 +89,5 @@ export function useWebSocket() {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       wsRef.current?.close();
     };
-  }, [activeTicker]); // reconnect whenever the active ticker changes
+  }, [activeTicker, isLive]); // reconnect whenever the active ticker changes
 }

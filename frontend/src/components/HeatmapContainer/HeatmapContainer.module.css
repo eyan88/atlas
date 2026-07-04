@@ -88,3 +88,19 @@
   overflow: auto;
   padding: 8px;
 }
+
+.badgeSpot {
+  border-left: 3px solid #f9fafb !important;
+}
+
+.badgeFlip {
+  border-left: 3px solid #fbbf24 !important;
+}
+
+.badgeCall {
+  border-left: 3px solid #34d399 !important;
+}
+
+.badgePut {
+  border-left: 3px solid #f87171 !important;
+}

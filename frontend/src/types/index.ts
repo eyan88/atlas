@@ -54,6 +54,7 @@ export interface CellDetail {
   expiration: string;
   value: number;
   metric: Metric;
+  pctChange: number;
   /** Column index in the matrix */
   colIdx: number;
   /** Row index in the matrix */
@@ -99,3 +100,23 @@ export interface ReplayTimeline {
   date: string;
   timestamps: number[];  // Unix seconds
 }
+
+// ─── Evolution Settings ───────────────────────────────────────────────────────
+
+export type EvolutionWindow =
+  | 'prev_snapshot'
+  | '5m'
+  | '15m'
+  | '1h'
+  | 'open'
+  | 'prev_day';
+
+export const EVOLUTION_WINDOW_LABELS: Record<EvolutionWindow, string> = {
+  prev_snapshot: 'Prev Snapshot',
+  '5m': 'Last 5 Minutes',
+  '15m': 'Last 15 Minutes',
+  '1h': 'Last Hour',
+  open: 'Since Open',
+  prev_day: 'Prev Day',
+};
+

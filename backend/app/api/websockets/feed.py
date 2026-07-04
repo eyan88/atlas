@@ -1,0 +1,157 @@
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from sqlalchemy.orm import Session
+import asyncio
+import json
+import random
+from datetime import datetime, timezone
+import numpy as np
+
+from app.api.deps import get_db
+from app.models.metric import DealerMetricSnapshot
+from app.models.underlying import UnderlyingPriceSnapshot
+from app.api.endpoints.heatmap import get_heatmap
+
+router = APIRouter()
+
+@router.websocket("/{ticker}")
+async def websocket_endpoint(websocket: WebSocket, ticker: str, db: Session = Depends(get_db)):
+    await websocket.accept()
+    ticker = ticker.upper()
+    
+    # 1. Fetch and send the initial full snapshot (INIT)
+    try:
+        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=20, db=db)
+        await websocket.send_json({
+            "type": "INIT",
+            "payload": init_data
+        })
+    except Exception as e:
+        await websocket.send_json({
+            "type": "ERROR",
+            "message": f"Failed to load initial snapshot: {str(e)}"
+        })
+        await websocket.close()
+        return
+
+    # 2. Establish connection to Redis Pub/Sub
+    import redis.asyncio as aioredis
+    from app.core.config import settings
+    
+    redis_conn = None
+    pubsub = None
+    try:
+        redis_conn = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        # Verify connectivity
+        await redis_conn.ping()
+        pubsub = redis_conn.pubsub()
+        await pubsub.subscribe(f"atlas:realtime:{ticker}")
+        print(f"WebSocket client connected and subscribed to Redis channel: atlas:realtime:{ticker}")
+    except Exception as e:
+        print(f"Warning: Redis unreachable, falling back to local simulation updates. Error: {e}")
+        if pubsub:
+            await pubsub.close()
+        if redis_conn:
+            await redis_conn.aclose()
+        pubsub = None
+        redis_conn = None
+
+    if pubsub:
+        # ─── Case A: Redis Pub/Sub Mode ──────────────────────────────────────
+        async def redis_listener():
+            try:
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        payload = json.loads(message["data"])
+                        await websocket.send_json({
+                            "type": "PATCH",
+                            "payload": payload
+                        })
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                print(f"Error in Redis Pub/Sub listener: {e}")
+
+        # Run Pub/Sub listener concurrently in background task
+        listener_task = asyncio.create_task(redis_listener())
+        try:
+            while True:
+                # Listen to incoming messages from client (e.g. heartbeat pings)
+                data = await websocket.receive_text()
+                if data == "ping":
+                    await websocket.send_text("pong")
+        except WebSocketDisconnect:
+            pass
+        finally:
+            listener_task.cancel()
+            try:
+                await pubsub.unsubscribe(f"atlas:realtime:{ticker}")
+                await pubsub.close()
+                await redis_conn.aclose()
+            except Exception:
+                pass
+    else:
+        # ─── Case B: Fallback Simulation Mode ─────────────────────────────────
+        current_spot = init_data["spot_price"] or 100.0
+        current_flip = init_data["gamma_flip"]
+        current_call = init_data["call_wall"]
+        current_put = init_data["put_wall"]
+        columns = init_data["columns"]
+        rows = init_data["rows"]
+
+        try:
+            while True:
+                try:
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
+                    if data == "ping":
+                        await websocket.send_text("pong")
+                except asyncio.TimeoutError:
+                    pass
+
+                # Mutate levels slightly
+                price_change = random.uniform(-0.15, 0.15)
+                current_spot += price_change
+                current_spot = round(current_spot, 2)
+
+                if current_flip is not None:
+                    current_flip = round(current_flip + random.choice([-0.5, 0.0, 0.5]), 2)
+                if current_call is not None:
+                    current_call = round(current_call + random.choice([-0.5, 0.0, 0.5]), 2)
+                if current_put is not None:
+                    current_put = round(current_put + random.choice([-0.5, 0.0, 0.5]), 2)
+
+                diffs = []
+                if rows and columns:
+                    sampled_strikes = random.sample(rows, min(len(rows), 3))
+                    sampled_exps = random.sample(columns, min(len(columns), 3))
+                    
+                    for k in sampled_strikes:
+                        for e in sampled_exps:
+                            is_positive = k > current_spot
+                            gex_base = 5e8 if is_positive else -5e8
+                            gex_val = gex_base * random.uniform(0.5, 1.5)
+                            
+                            diffs.append({
+                                "k": float(k),
+                                "e": str(e),
+                                "g": float(gex_val),
+                                "oi": int(random.randint(1000, 3000)),
+                                "v": int(random.randint(50, 500))
+                            })
+
+                payload = {
+                    "ticker": ticker,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "spot_price": current_spot,
+                    "gamma_flip": current_flip,
+                    "call_wall": current_call,
+                    "put_wall": current_put,
+                    "diffs": diffs
+                }
+
+                await websocket.send_json({
+                    "type": "PATCH",
+                    "payload": payload
+                })
+
+        except WebSocketDisconnect:
+            pass
