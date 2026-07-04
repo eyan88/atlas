@@ -41,10 +41,17 @@ class Settings(BaseModel):
     # Redis Configuration
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     
+    # Data Provider Selection (mock, polygon, thetadata)
+    DATA_PROVIDER: str = os.getenv("DATA_PROVIDER", "mock")
+
     # Polygon Data Ingestion Configuration
     POLYGON_API_KEY: str = os.getenv("POLYGON_API_KEY", "")
     POLYGON_MAX_RETRIES: int = int(os.getenv("POLYGON_MAX_RETRIES", "3"))
     POLYGON_BACKOFF_FACTOR: float = float(os.getenv("POLYGON_BACKOFF_FACTOR", "0.5"))
+
+    # ThetaData Configuration
+    THETADATA_USERNAME: str = os.getenv("THETADATA_USERNAME", "")
+    THETADATA_PASSWORD: str = os.getenv("THETADATA_PASSWORD", "")
     
     # Scheduling Parameters
     INGEST_INTERVAL_MINUTES: int = int(os.getenv("INGEST_INTERVAL_MINUTES", "1"))
