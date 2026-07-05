@@ -48,16 +48,17 @@ async def realtime_live_publisher():
     try:
         while True:
             # Poll every 60 seconds
-            await asyncio.sleep(60.0) 
+            await asyncio.sleep(60.0)
+            # Dynamically discover which tickers have active websocket listeners
+            active_channels = await r.pubsub_channels("atlas:realtime:*")
+            
+            if not active_channels:
+                continue # No one is watching anything, skip polling
+                
+            tickers = [ch.split(":")[-1] for ch in active_channels]
+            
             for ticker in tickers:
                 try:
-                    # Check if any active WebSocket clients are listening for this ticker
-                    channel_name = f"atlas:realtime:{ticker}"
-                    # pubsub_numsub returns [(channel, count)]
-                    subs = await r.pubsub_numsub(channel_name)
-                    if not subs or subs[0][1] == 0:
-                        continue  # Skip expensive API calls for inactive panels
-                        
                     await asyncio.sleep(1.0) # stagger requests
                     
                     option_quotes = await asyncio.to_thread(provider.get_option_chain, ticker)

@@ -155,13 +155,13 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => {
       const next = ticker.trim().toUpperCase();
       const remaining = state.openTickers.filter((t) => t !== next);
-      const openTickers = remaining.length > 0 ? remaining : ['SPY'];
-      const nextActive = state.activeTicker === next ? openTickers[openTickers.length - 1] : state.activeTicker;
-      const nextHeatmap = nextActive === next ? null : state.heatmapsByTicker[nextActive] ?? null;
-      const nextSpotPrice = nextActive === next ? null : state.spotPrice;
-      const nextGammaFlip = nextActive === next ? null : state.gammaFlip;
-      const nextCallWall = nextActive === next ? null : state.callWall;
-      const nextPutWall = nextActive === next ? null : state.putWall;
+      const openTickers = remaining;
+      const nextActive = state.activeTicker === next ? (openTickers.length > 0 ? openTickers[openTickers.length - 1] : '') : state.activeTicker;
+      const nextHeatmap = nextActive ? (state.heatmapsByTicker[nextActive] ?? null) : null;
+      const nextSpotPrice = nextHeatmap ? nextHeatmap.spot_price : null;
+      const nextGammaFlip = nextHeatmap ? nextHeatmap.gamma_flip : null;
+      const nextCallWall = nextHeatmap ? nextHeatmap.call_wall : null;
+      const nextPutWall = nextHeatmap ? nextHeatmap.put_wall : null;
       const { [next]: _removed, ...heatmapsByTicker } = state.heatmapsByTicker;
       const { [next]: _histRemoved, ...snapshotsHistory } = state.snapshotsHistory;
 
@@ -257,13 +257,28 @@ export const useAppStore = create<AppState>((set) => ({
 
   applyDiff: (payload) =>
     set((state) => {
-      const current = state.heatmapsByTicker[payload.ticker] || state.heatmap;
-      if (!current) return state;
+      let current = state.heatmapsByTicker[payload.ticker];
+      if (!current && state.activeTicker === payload.ticker) {
+        current = state.heatmap;
+      }
 
-      // Clone existing data grid
-      const nextData = current.data.map((row) => [...row]);
-      const rows = current.rows;
-      const columns = current.columns;
+      let rows: number[];
+      let columns: string[];
+      let nextData: number[][];
+
+      if (!current) {
+        // Bootstrap a new snapshot from scratch using the diff payload
+        const rSet = new Set<number>();
+        const cSet = new Set<string>();
+        payload.diffs.forEach(d => { rSet.add(d.k); cSet.add(d.e); });
+        rows = Array.from(rSet).sort((a, b) => b - a); // descending
+        columns = Array.from(cSet).sort();
+        nextData = Array(rows.length).fill(0).map(() => Array(columns.length).fill(0));
+      } else {
+        rows = current.rows;
+        columns = current.columns;
+        nextData = current.data.map((row) => [...row]);
+      }
 
       const rowMap = new Map(rows.map((r, i) => [r, i]));
       const colMap = new Map(columns.map((c, i) => [c, i]));
@@ -272,8 +287,7 @@ export const useAppStore = create<AppState>((set) => ({
         const rIdx = rowMap.get(diff.k);
         const cIdx = colMap.get(diff.e);
         if (rIdx !== undefined && cIdx !== undefined) {
-          // Select metric value depending on what is active
-          let val = diff.g; // default 'net_gex'
+          let val = diff.g; 
           if (state.selectedMetric === 'net_dex') val = diff.d ?? diff.oi; 
           else if (state.selectedMetric === 'vanna') val = diff.va ?? (diff.g * 0.001);
           else if (state.selectedMetric === 'charm') val = diff.ch ?? (-diff.oi * 0.0005);
@@ -285,23 +299,25 @@ export const useAppStore = create<AppState>((set) => ({
         }
       });
 
-      const nextSnapshot: HeatmapSnapshot = {
-        ...current,
+      const nextSnapshot = {
+        ticker: payload.ticker,
         timestamp: payload.timestamp,
-        spot_price: payload.spot_price,
-        gamma_flip: payload.gamma_flip,
-        call_wall: payload.call_wall,
-        put_wall: payload.put_wall,
+        spot_price: payload.spot_price ?? (current ? current.spot_price : null),
+        gamma_flip: payload.gamma_flip ?? (current ? current.gamma_flip : null),
+        call_wall: payload.call_wall ?? (current ? current.call_wall : null),
+        put_wall: payload.put_wall ?? (current ? current.put_wall : null),
+        rows,
+        columns,
         data: nextData,
       };
 
       return {
         heatmap: payload.ticker === state.activeTicker ? nextSnapshot : state.heatmap,
         heatmapsByTicker: { ...state.heatmapsByTicker, [payload.ticker]: nextSnapshot },
-        spotPrice: payload.ticker === state.activeTicker ? payload.spot_price : state.spotPrice,
-        gammaFlip: payload.ticker === state.activeTicker ? payload.gamma_flip : state.gammaFlip,
-        callWall: payload.ticker === state.activeTicker ? payload.call_wall : state.callWall,
-        putWall: payload.ticker === state.activeTicker ? payload.put_wall : state.putWall,
+        spotPrice: payload.ticker === state.activeTicker ? nextSnapshot.spot_price : state.spotPrice,
+        gammaFlip: payload.ticker === state.activeTicker ? nextSnapshot.gamma_flip : state.gammaFlip,
+        callWall: payload.ticker === state.activeTicker ? nextSnapshot.call_wall : state.callWall,
+        putWall: payload.ticker === state.activeTicker ? nextSnapshot.put_wall : state.putWall,
       };
     }),
 
