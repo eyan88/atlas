@@ -49,6 +49,9 @@ interface AppState {
   // Heatmap matrix data per open ticker pane
   heatmapsByTicker: Record<string, HeatmapSnapshot | null>;
 
+  // Loading state for timeline fetches
+  isLoadingHistory: boolean;
+
   // WebSocket connection state
   wsConnected: boolean;
 
@@ -73,12 +76,13 @@ interface AppState {
     call: number | null,
     put: number | null,
   ) => void;
-  setHeatmap: (snapshot: HeatmapSnapshot) => void;
-  setHeatmapForTicker: (ticker: string, snapshot: HeatmapSnapshot) => void;
+  setHeatmap: (snapshot: HeatmapSnapshot | null) => void;
+  setHeatmapForTicker: (ticker: string, snapshot: HeatmapSnapshot | null) => void;
   applyDiff: (payload: WsPatchPayload) => void;
   setWsConnected: (connected: boolean) => void;
   setHoveredCell: (cell: CellDetail | null) => void;
   setSelectedDate: (date: string) => void;
+  setIsLoadingHistory: (loading: boolean) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -87,7 +91,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeTicker: 'SPY',
   openTickers: ['SPY'],
   selectedMetric: 'net_gex',
-  strikeCount: 20,
+  strikeCount: 40,
   evolutionWindow: 'prev_snapshot',
   snapshotsHistory: {},
   timelineTimestamps: [],
@@ -102,6 +106,7 @@ export const useAppStore = create<AppState>((set) => ({
   heatmap: null,
   heatmapsByTicker: {},
   wsConnected: false,
+  isLoadingHistory: false,
   hoveredCell: null,
 
   setTicker: (ticker) =>
@@ -178,6 +183,8 @@ export const useAppStore = create<AppState>((set) => ({
   setMetric: (metric) => set({ selectedMetric: metric }),
 
   setStrikeCount: (count) => set({ strikeCount: count }),
+
+  setIsLoadingHistory: (loading) => set({ isLoadingHistory: loading }),
 
   setEvolutionWindow: (window) => set({ evolutionWindow: window }),
 

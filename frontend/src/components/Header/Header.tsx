@@ -94,7 +94,7 @@ export function Header() {
           onChange={(e) => setStrikeCount(Number(e.target.value))}
           aria-label="Number of strikes"
         >
-          {[10, 20, 30, 40, 50].map((n) => (
+          {[10, 20, 30, 40, 50, 60].map((n) => (
             <option key={n} value={n}>
               {n}
             </option>
