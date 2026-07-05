@@ -33,8 +33,8 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
 
     try:
         from thetadatadx import Credentials, Config, ThetaDataDx, all_greeks
-    except ImportError:
-        print("Error: The 'thetadatadx' library is not installed. Install with: pip install thetadatadx[pandas]")
+    except ImportError as e:
+        print(f"Error: The 'thetadatadx' library is not installed or failed to load. Details: {e}")
         return
 
     print(f"==================================================")
