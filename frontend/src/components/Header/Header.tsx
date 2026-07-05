@@ -99,6 +99,7 @@ export function Header() {
               {n}
             </option>
           ))}
+        </select>
       </label>
 
       <label className={styles.strikeControl} title="Select historical session date">
