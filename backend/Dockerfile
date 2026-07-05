@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+# Force fresh install (bust Docker layer cache)
+ARG CACHEBUST=2
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Final runtime container
