@@ -200,6 +200,49 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
       const spotPrice = snap.spot_price;
       const gammaFlip = snap.gamma_flip;
 
+      // Find the row indices closest to each level
+      let closestSpotIdx = -1;
+      let closestFlipIdx = -1;
+      let closestCallIdx = -1;
+      let closestPutIdx = -1;
+
+      let minSpotDist = Infinity;
+      let minFlipDist = Infinity;
+      let minCallDist = Infinity;
+      let minPutDist = Infinity;
+
+      for (let r = 0; r < rows.length; r++) {
+        const strike = rows[r];
+        if (spotPrice !== null) {
+          const dist = Math.abs(strike - spotPrice);
+          if (dist < minSpotDist) {
+            minSpotDist = dist;
+            closestSpotIdx = r;
+          }
+        }
+        if (gammaFlip !== null) {
+          const dist = Math.abs(strike - gammaFlip);
+          if (dist < minFlipDist) {
+            minFlipDist = dist;
+            closestFlipIdx = r;
+          }
+        }
+        if (snap.call_wall !== null) {
+          const dist = Math.abs(strike - snap.call_wall);
+          if (dist < minCallDist) {
+            minCallDist = dist;
+            closestCallIdx = r;
+          }
+        }
+        if (snap.put_wall !== null) {
+          const dist = Math.abs(strike - snap.put_wall);
+          if (dist < minPutDist) {
+            minPutDist = dist;
+            closestPutIdx = r;
+          }
+        }
+      }
+
       // Normalize absolute exposures for color intensities
       const norm = normalizeMatrixPerColumn(snap.data);
 
@@ -288,10 +331,10 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
       for (let r = 0; r < rows.length; r++) {
         const y    = AXIS_TOP + r * CELL_H;
         const strike = rows[r];
-        const isSpot = spotPrice !== null && Math.abs(strike - spotPrice) < 0.5;
-        const isFlip = gammaFlip !== null && Math.abs(strike - gammaFlip) < 0.5;
-        const isCall = snap.call_wall !== null && Math.abs(strike - snap.call_wall) < 0.5;
-        const isPut = snap.put_wall !== null && Math.abs(strike - snap.put_wall) < 0.5;
+        const isSpot = r === closestSpotIdx;
+        const isFlip = r === closestFlipIdx;
+        const isCall = r === closestCallIdx;
+        const isPut = r === closestPutIdx;
 
         // Strike label
         if (isSpot) {
