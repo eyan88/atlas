@@ -14,8 +14,9 @@ from app.models.underlying import UnderlyingPriceSnapshot
 
 def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
     """
-    Downloads EOD quotes and volume for the target date from ThetaData,
-    runs local Rust Greeks calculations (Method B), and saves them to
+    Downloads EOD quotes and volume for the target date from ThetaData
+    using the thetadatadx SDK (Rust-based, no Java required),
+    runs local Black-Scholes Greeks calculations, and saves them to
     the database under the EOD timestamp (4:00 PM ET).
     """
     is_external_db = db is not None
@@ -31,16 +32,9 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
         return
 
     try:
-        from thetadata import ThetaClient
-        client = ThetaClient(email=username, password=password, dataframe_type="pandas")
+        from thetadatadx import Credentials, Config, ThetaDataDx, all_greeks
     except ImportError:
-        print("Error: The 'thetadata' library is not installed.")
-        return
-
-    try:
-        from thetadatadx import all_greeks
-    except ImportError:
-        print("Error: The 'thetadatadx' library is required for Method B calculations.")
+        print("Error: The 'thetadatadx' library is not installed. Install with: pip install thetadatadx[pandas]")
         return
 
     print(f"==================================================")
@@ -48,27 +42,49 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
     print(f"==================================================")
 
     try:
+        # Initialize ThetaDataDx client (REST-based, no Java Terminal needed)
+        creds = Credentials(username, password)
+        client = ThetaDataDx(creds, Config.production())
+
+        # Format date as YYYYMMDD string for the thetadatadx API
+        date_str = backfill_date.strftime("%Y%m%d")
+
         # 1. Retrieve the closing stock price
         print("Fetching underlying close price...")
-        df_stock = client.stock_history_eod(
-            symbol=ticker,
-            start_date=backfill_date,
-            end_date=backfill_date
-        )
-        if df_stock.empty:
+        eod_ticks = client.stock_history_eod(ticker, date_str, date_str)
+        eod_list = list(eod_ticks)
+        if not eod_list:
             print(f"No pricing data found for {ticker} on {backfill_date}. Is the market closed?")
             return
 
-        spot_price = float(df_stock["close"].iloc[-1])
+        spot_price = float(eod_list[-1].close)
         print(f"Spot Close Price: ${spot_price:.2f}")
 
         # 2. Get active option expirations on that day
         print("Fetching option expirations...")
-        df_exp = client.option_list_expirations(symbol=ticker)
-        df_exp['exp_date'] = pd.to_datetime(df_exp['expiration']).dt.date
+        exp_list = list(client.option_list_expirations(ticker))
         
-        # Sort expirations expiring on or after the target date
-        expirations = df_exp[df_exp['exp_date'] >= backfill_date]['exp_date'].sort_values().tolist()
+        # Filter expirations on or after the target date
+        expirations = []
+        for exp in exp_list:
+            # exp is typically a date string like "20260710" or a date object
+            if hasattr(exp, 'date'):
+                exp_date = exp.date if isinstance(exp.date, date) else date.fromisoformat(str(exp.date))
+            elif isinstance(exp, str):
+                exp_date = date(int(exp[:4]), int(exp[4:6]), int(exp[6:8]))
+            elif isinstance(exp, date):
+                exp_date = exp
+            else:
+                # Try converting to string first
+                exp_str = str(exp)
+                if len(exp_str) == 8 and exp_str.isdigit():
+                    exp_date = date(int(exp_str[:4]), int(exp_str[4:6]), int(exp_str[6:8]))
+                else:
+                    continue
+            if exp_date >= backfill_date:
+                expirations.append(exp_date)
+        
+        expirations.sort()
         print(f"Found {len(expirations)} total active expirations.")
 
         # Define snapshot timestamp as 4:00 PM ET (20:00 UTC) on the target date
@@ -105,14 +121,30 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
         # 4. Ingest the nearest 10 expirations (Value/Free tier limits)
         count = 0
         for exp in expirations[:10]:
+            exp_str = exp.strftime("%Y%m%d")
             print(f"Processing expiration: {exp}...")
             try:
-                df_opt = client.option_history_eod(
-                    start_date=backfill_date,
-                    end_date=backfill_date,
+                opt_ticks = client.option_history_eod(
                     symbol=ticker,
-                    expiration=exp
+                    start_date=date_str,
+                    end_date=date_str,
+                    expiration=exp_str
                 )
+                opt_list = list(opt_ticks)
+                if not opt_list:
+                    continue
+
+                # Build a DataFrame from the ticks for easier processing
+                rows = []
+                for tick in opt_list:
+                    rows.append({
+                        "strike": float(tick.strike) if hasattr(tick, 'strike') else float(getattr(tick, 'strike_price', 0)),
+                        "right": str(getattr(tick, 'right', getattr(tick, 'contract_type', ''))).upper(),
+                        "bid": float(getattr(tick, 'bid', 0)),
+                        "ask": float(getattr(tick, 'ask', 0)),
+                        "volume": int(getattr(tick, 'volume', 0)),
+                    })
+                df_opt = pd.DataFrame(rows)
                 if df_opt.empty:
                     continue
 
@@ -125,8 +157,8 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                     strike_df = df_opt[df_opt["strike"] == strike]
                     
                     # Split Call/Put contracts
-                    call_row = strike_df[strike_df["right"].astype(str).str.upper().str.contains("C|CALL")]
-                    put_row = strike_df[strike_df["right"].astype(str).str.upper().str.contains("P|PUT")]
+                    call_row = strike_df[strike_df["right"].str.contains("C|CALL")]
+                    put_row = strike_df[strike_df["right"].str.contains("P|PUT")]
                     
                     # Greeks parameters
                     multiplier = 100.0
@@ -156,7 +188,6 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                                 right="C"
                             )
                             call_iv = float(g.iv)
-                            # Free tier: we use daily volume as a proxy for positioning
                             call_gex = float(vol * g.gamma * gex_factor)
                             call_dex = float(vol * g.delta * dex_factor)
                             call_vanna = float(vol * g.vanna * vanna_factor)
