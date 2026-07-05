@@ -32,7 +32,7 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
         return
 
     try:
-        from thetadatadx import Credentials, Config, ThetaDataDx, all_greeks
+        from thetadatadx import Credentials, Config, ThetaDataDxClient, all_greeks
     except ImportError as e:
         print(f"Error: The 'thetadatadx' library is not installed or failed to load. Details: {e}")
         return
@@ -44,7 +44,7 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
     try:
         # Initialize ThetaDataDx client (REST-based, no Java Terminal needed)
         creds = Credentials(username, password)
-        client = ThetaDataDx(creds, Config.production())
+        client = ThetaDataDxClient(creds, Config.production())
 
         # Format date as YYYYMMDD string for the thetadatadx API
         date_str = backfill_date.strftime("%Y%m%d")
