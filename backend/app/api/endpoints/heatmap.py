@@ -212,6 +212,22 @@ def get_replay_timeline(
         DealerMetricSnapshot.timestamp <= end_dt
     ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
+    # If no snapshots exist for this ticker on this date, trigger on-the-fly backfill
+    if not timestamps:
+        from app.core.config import settings
+        if settings.DATA_PROVIDER == "thetadata":
+            try:
+                from app.db.backfill_eod import run_backfill
+                run_backfill(ticker=ticker, backfill_date=query_date, db=db)
+                # Re-query timestamps
+                timestamps = db.query(DealerMetricSnapshot.timestamp).filter(
+                    DealerMetricSnapshot.ticker == ticker,
+                    DealerMetricSnapshot.timestamp >= start_dt,
+                    DealerMetricSnapshot.timestamp <= end_dt
+                ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
+            except Exception as e:
+                print(f"On-the-fly backfill failed for {ticker} date {date}: {e}")
+
     # Convert timestamps to unix epoch seconds, forcing UTC timezone for naive values
     unix_timestamps = []
     for ts in timestamps:

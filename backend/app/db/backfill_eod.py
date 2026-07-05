@@ -12,13 +12,15 @@ from app.db.session import SessionLocal
 from app.models.metric import DealerMetricSnapshot
 from app.models.underlying import UnderlyingPriceSnapshot
 
-def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3)):
+def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
     """
     Downloads EOD quotes and volume for the target date from ThetaData,
     runs local Rust Greeks calculations (Method B), and saves them to
     the database under the EOD timestamp (4:00 PM ET).
     """
-    db = SessionLocal()
+    is_external_db = db is not None
+    if not is_external_db:
+        db = SessionLocal()
 
     # Load credentials
     username = os.getenv("THETADATA_USERNAME") or os.getenv("THETADATA_EMAIL")
@@ -221,7 +223,8 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3)):
         db.rollback()
         print(f"Backfill error: {e}")
     finally:
-        db.close()
+        if not is_external_db:
+            db.close()
 
 if __name__ == "__main__":
     # Default: Backfill July 2, 2026 (July 3rd was closed for Independence Day holiday)
