@@ -27,6 +27,7 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 export function useWebSocket() {
   const activeTicker  = useAppStore((s) => s.activeTicker);
   const setHeatmap    = useAppStore((s) => s.setHeatmap);
+  const setHeatmapForTicker = useAppStore((s) => s.setHeatmapForTicker);
   const applyDiff     = useAppStore((s) => s.applyDiff);
   const setWsConnected = useAppStore((s) => s.setWsConnected);
 
@@ -66,6 +67,7 @@ export function useWebSocket() {
           try {
             const msg = JSON.parse(event.data) as WsMessage;
             if (msg.type === 'INIT') {
+              setHeatmapForTicker(activeTicker, msg.payload);
               setHeatmap(msg.payload);
             } else if (msg.type === 'PATCH') {
               applyDiff(msg.payload);
