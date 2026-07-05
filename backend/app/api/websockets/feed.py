@@ -90,68 +90,13 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, db: Session = De
             except Exception:
                 pass
     else:
-        # ─── Case B: Fallback Simulation Mode ─────────────────────────────────
-        current_spot = init_data["spot_price"] or 100.0
-        current_flip = init_data["gamma_flip"]
-        current_call = init_data["call_wall"]
-        current_put = init_data["put_wall"]
-        columns = init_data["columns"]
-        rows = init_data["rows"]
-
+        # ─── Case B: No Redis – Passive Hold (Production Safe) ────────────────
+        # No active publisher is running. Keep the WebSocket alive for heartbeat
+        # only. Do NOT simulate or mutate prices – the INIT snapshot is sufficient.
         try:
             while True:
-                try:
-                    data = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
-                    if data == "ping":
-                        await websocket.send_text("pong")
-                except asyncio.TimeoutError:
-                    pass
-
-                # Mutate levels slightly
-                price_change = random.uniform(-0.15, 0.15)
-                current_spot += price_change
-                current_spot = round(current_spot, 2)
-
-                if current_flip is not None:
-                    current_flip = round(current_flip + random.choice([-0.5, 0.0, 0.5]), 2)
-                if current_call is not None:
-                    current_call = round(current_call + random.choice([-0.5, 0.0, 0.5]), 2)
-                if current_put is not None:
-                    current_put = round(current_put + random.choice([-0.5, 0.0, 0.5]), 2)
-
-                diffs = []
-                if rows and columns:
-                    sampled_strikes = random.sample(rows, min(len(rows), 3))
-                    sampled_exps = random.sample(columns, min(len(columns), 3))
-                    
-                    for k in sampled_strikes:
-                        for e in sampled_exps:
-                            is_positive = k > current_spot
-                            gex_base = 5e8 if is_positive else -5e8
-                            gex_val = gex_base * random.uniform(0.5, 1.5)
-                            
-                            diffs.append({
-                                "k": float(k),
-                                "e": str(e),
-                                "g": float(gex_val),
-                                "oi": int(random.randint(1000, 3000)),
-                                "v": int(random.randint(50, 500))
-                            })
-
-                payload = {
-                    "ticker": ticker,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "spot_price": current_spot,
-                    "gamma_flip": current_flip,
-                    "call_wall": current_call,
-                    "put_wall": current_put,
-                    "diffs": diffs
-                }
-
-                await websocket.send_json({
-                    "type": "PATCH",
-                    "payload": payload
-                })
-
+                data = await websocket.receive_text()
+                if data == "ping":
+                    await websocket.send_text("pong")
         except WebSocketDisconnect:
             pass
