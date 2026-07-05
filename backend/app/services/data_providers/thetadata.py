@@ -194,6 +194,7 @@ class ThetaDataProvider(BaseDataProvider):
         # Limit to 90 days out (to avoid Free Tier paywall on LEAPS) and max 20 expirations
         valid_expirations = [e for e in expirations if e <= max_date][:20]
         
+        _denied_logged = set()
         for exp in valid_expirations:
             try:
                 # Query option snapshot containing raw quotes
@@ -305,8 +306,10 @@ class ThetaDataProvider(BaseDataProvider):
             except Exception as e:
                 error_msg = str(e)
                 if "PERMISSION_DENIED" in error_msg:
-                    print(f"Notice: ThetaData Free Tier limit reached at exp {exp}. Halting chain fetch.")
-                    break
+                    if exp not in _denied_logged:
+                        print(f"Notice: ThetaData Free Tier limit restricts exp {exp}. Skipping.")
+                        _denied_logged.add(exp)
+                    continue
                 # Log warning and proceed with the remaining expirations
                 print(f"Warning: Failed to fetch option snapshot for {ticker} exp {exp}: {e}")
                 continue
