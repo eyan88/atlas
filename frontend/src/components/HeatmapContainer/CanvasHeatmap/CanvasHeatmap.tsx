@@ -7,17 +7,6 @@ import styles from './CanvasHeatmap.module.css';
 
 type Rgb = [number, number, number];
 
-// Sequential Parula-themed diverging colormap stops (Violet [-1.0] -> Cyan/Sky Blue [0.0] -> Radiant Gold [1.0])
-const COLOR_STOPS: Array<[number, Rgb]> = [
-  [-1.0,  [88, 28, 135]],     // Vivid Deep Purple (maximum short GEX)
-  [-0.6,  [109, 40, 217]],    // Vivid Violet
-  [-0.2,  [14, 165, 233]],    // Sky-themed Blue
-  [0.0,   [6, 182, 212]],     // Cyan / Sky Blue (neutral GEX)
-  [0.3,   [16, 185, 129]],    // Emerald Green
-  [0.6,   [132, 204, 22]],    // Lime Green
-  [1.0,   [250, 235, 40]],    // Radiant Gold (maximum long GEX)
-];
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
@@ -30,37 +19,87 @@ function mixColor(a: Rgb, b: Rgb, t: number): Rgb {
   ];
 }
 
-function rampLookup(stops: Array<[number, Rgb]>, magnitude: number): Rgb {
-  for (let i = 0; i < stops.length - 1; i += 1) {
+// ─── Per-column contrast color system ────────────────────────────────────────
+//
+// The color intent:
+//   • The dominant positive gamma node in each expiry column → neon yellow
+//   • Other positive cells → green shades proportional to their magnitude relative to the column peak
+//   • Non-significant cells (near zero) → muted dark purple
+//   • The dominant negative gamma node → deep vivid purple
+//   • Other negative cells → purple shades proportional to their magnitude relative to the column trough
+//
+// This makes the "walls" and significant nodes pop while everything else recedes.
+
+// Positive ramp: muted teal/green (low significance) → emerald → lime → neon yellow (dominant)
+const POS_RAMP: Array<[number, Rgb]> = [
+  [0.0,  [30, 58, 74]],       // Dark muted teal (near-zero positive → blends into background)
+  [0.15, [20, 100, 90]],      // Deep teal-green
+  [0.35, [16, 145, 100]],     // Medium emerald
+  [0.55, [34, 180, 85]],      // Vivid green
+  [0.75, [120, 210, 40]],     // Lime green
+  [0.90, [200, 235, 30]],     // Yellow-lime
+  [1.0,  [250, 245, 50]],     // Neon yellow (dominant positive node)
+];
+
+// Negative ramp: muted dark purple (low significance) → medium violet → vivid deep purple (dominant)
+const NEG_RAMP: Array<[number, Rgb]> = [
+  [0.0,  [35, 25, 60]],       // Very dark muted purple (near-zero negative → blends into background)
+  [0.15, [50, 30, 85]],       // Dark plum
+  [0.35, [70, 35, 120]],      // Medium-dark purple
+  [0.55, [95, 40, 160]],      // Medium violet
+  [0.75, [120, 45, 200]],     // Vivid violet
+  [0.90, [105, 30, 185]],     // Deep vivid purple
+  [1.0,  [88, 28, 155]],      // Rich deep purple (dominant negative node)
+];
+
+function rampLookup(stops: Array<[number, Rgb]>, t: number): Rgb {
+  const clamped = Math.max(0, Math.min(1, t));
+  for (let i = 0; i < stops.length - 1; i++) {
     const [s0, c0] = stops[i];
     const [s1, c1] = stops[i + 1];
-    if (magnitude <= s1) {
-      const t = (magnitude - s0) / (s1 - s0 || 1);
-      return mixColor(c0, c1, Math.max(0, Math.min(1, t)));
+    if (clamped <= s1) {
+      const frac = (clamped - s0) / (s1 - s0 || 1);
+      return mixColor(c0, c1, Math.max(0, Math.min(1, frac)));
     }
   }
   return stops[stops.length - 1][1];
 }
 
 /**
- * Maps a signed normalized value in [-1, 1] to a diverging RGBA color.
+ * Maps a per-column normalized value to an RGBA color.
  *
- * Positive (long gamma)  → teal/green/gold ramp  — stabilizer/magnet zones
- * Negative (short gamma) → indigo/violet/magenta ramp — amplifier zones
+ * @param normalized  — value in [-1, 1] where the sign indicates direction
+ *                      and the magnitude indicates how dominant this cell is
+ *                      relative to the peak/trough in its expiry column.
  *
- * Magnitude drives intensity; sign drives hue.
+ * Positive values ramp through green → neon yellow.
+ * Negative values ramp through dark purple → vivid purple.
+ * Near-zero values of either sign settle into dark muted tones.
  */
 function valueToColor(normalized: number): [number, number, number, number] {
   const val = Math.max(-1, Math.min(1, normalized));
-  const alpha = 0.55 + Math.abs(val) * 0.35; // 0.55..0.90
+  const mag = Math.abs(val);
 
-  const [r, g, b] = rampLookup(COLOR_STOPS, val);
-  return [r, g, b, alpha];
+  // Alpha: near-zero cells are more transparent, dominant cells are opaque
+  const alpha = 0.45 + mag * 0.50; // range: 0.45 → 0.95
+
+  let rgb: Rgb;
+  if (val >= 0) {
+    // Use a power curve to push contrast toward the dominant node
+    // This makes the top node much brighter while mid-range stays greener
+    const curved = Math.pow(mag, 0.65);
+    rgb = rampLookup(POS_RAMP, curved);
+  } else {
+    const curved = Math.pow(mag, 0.65);
+    rgb = rampLookup(NEG_RAMP, curved);
+  }
+
+  return [rgb[0], rgb[1], rgb[2], alpha];
 }
 
 function textColorForCell(r: number, g: number, b: number): string {
   const luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-  return luminance > 165 ? '#0b0c10' : '#f9fafb';
+  return luminance > 140 ? '#0b0c10' : '#f0f1f3';
 }
 
 /**
@@ -71,13 +110,30 @@ function pctColorForCell(isPositive: boolean): string {
   return isPositive ? 'rgba(90, 235, 140, 0.95)' : 'rgba(255, 120, 120, 0.95)';
 }
 
-function normalizeMatrix(data: number[][]): number[][] {
-  let max = 0;
-  for (const row of data)
-    for (const v of row)
-      if (Math.abs(v) > max) max = Math.abs(v);
-  if (max === 0) return data.map((r) => r.map(() => 0));
-  return data.map((r) => r.map((v) => v / max));
+/**
+ * Normalizes the data matrix PER COLUMN (per expiry).
+ * Each column is independently scaled so that its peak absolute value maps to ±1.
+ * This ensures each expiry's dominant node gets the full extreme color
+ * regardless of whether another expiry has a larger absolute value.
+ */
+function normalizeMatrixPerColumn(data: number[][]): number[][] {
+  if (data.length === 0) return [];
+  const numCols = data[0].length;
+  const numRows = data.length;
+
+  // Find max absolute value per column
+  const colMax = new Array(numCols).fill(0);
+  for (let c = 0; c < numCols; c++) {
+    for (let r = 0; r < numRows; r++) {
+      const abs = Math.abs(data[r][c]);
+      if (abs > colMax[c]) colMax[c] = abs;
+    }
+  }
+
+  // Normalize each cell by its column's max
+  return data.map((row) =>
+    row.map((v, c) => (colMax[c] === 0 ? 0 : v / colMax[c]))
+  );
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -145,7 +201,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
       const gammaFlip = snap.gamma_flip;
 
       // Normalize absolute exposures for color intensities
-      const norm = normalizeMatrix(snap.data);
+      const norm = normalizeMatrixPerColumn(snap.data);
 
       // Find the expiry-specific Call Wall and Put Wall index for each column (expiration)
       const colCallWallRows = new Array(cols.length).fill(-1);
