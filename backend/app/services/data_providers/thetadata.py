@@ -188,10 +188,13 @@ class ThetaDataProvider(BaseDataProvider):
             )
 
         today = date.today()
-
+        max_date = today + timedelta(days=90)
+        
         # 4. Iterate through expirations to compile quotes
-        # We limit to the first 25 expirations for performance
-        for exp in expirations[:25]:
+        # Limit to 90 days out (to avoid Free Tier paywall on LEAPS) and max 20 expirations
+        valid_expirations = [e for e in expirations if e <= max_date][:20]
+        
+        for exp in valid_expirations:
             try:
                 # Query option snapshot containing raw quotes
                 df_quote = self.client.option_snapshot_quote(
@@ -300,6 +303,10 @@ class ThetaDataProvider(BaseDataProvider):
                         charm=charm
                     ))
             except Exception as e:
+                error_msg = str(e)
+                if "PERMISSION_DENIED" in error_msg:
+                    print(f"Notice: ThetaData Free Tier limit reached at exp {exp}. Halting chain fetch.")
+                    break
                 # Log warning and proceed with the remaining expirations
                 print(f"Warning: Failed to fetch option snapshot for {ticker} exp {exp}: {e}")
                 continue
