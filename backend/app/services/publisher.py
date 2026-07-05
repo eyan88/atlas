@@ -89,31 +89,39 @@ async def redis_mock_publisher():
         pass
     except Exception as e:
         print(f"Background Redis mock publisher encountered error: {e}")
-    finally:
-        await r.aclose()
-        print("Redis mock publisher closed.")
-
-async def thetadata_live_publisher():
+async def realtime_live_publisher():
     """
-    Background loop that polls ThetaData every 60 seconds (Value tier safe) 
+    Background loop that polls the configured data provider every 60 seconds
     for the options chain, calculates Greeks, and streams the diffs.
     """
+    from app.services.analytics import DealerExposureEngine
+    import pandas as pd
+    
+    provider_name = settings.DATA_PROVIDER.lower()
+    provider = None
+    
     try:
-        from app.services.data_providers.thetadata import ThetaDataProvider
-        from app.services.analytics import DealerExposureEngine
-        import pandas as pd
-        provider = ThetaDataProvider()
-        engine = DealerExposureEngine()
+        if provider_name == "thetadata":
+            from app.services.data_providers.thetadata import ThetaDataProvider
+            provider = ThetaDataProvider()
+        elif provider_name == "polygon":
+            from app.services.data_providers.polygon import PolygonDataProvider
+            provider = PolygonDataProvider()
+        else:
+            print(f"Provider {provider_name} not configured for live streaming. Falling back to mock publisher.")
+            await redis_mock_publisher()
+            return
     except Exception as e:
-        print(f"Failed to initialize ThetaData live publisher: {e}")
-        print("Ensure THETADATA_USERNAME and THETADATA_PASSWORD are set. Falling back to mock publisher.")
+        print(f"Failed to initialize {provider_name} live publisher: {e}")
+        print("Falling back to mock publisher.")
         await redis_mock_publisher()
         return
 
+    engine = DealerExposureEngine()
     r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     tickers = ["SPY", "QQQ", "IWM"]
     
-    print("Starting background ThetaData live publisher task (polling every 60s)...")
+    print(f"Starting background {provider_name.upper()} live publisher task (polling every 60s)...")
     try:
         await r.ping()
         print("Connected to Redis for live Pub/Sub publishing.")
@@ -124,7 +132,7 @@ async def thetadata_live_publisher():
 
     try:
         while True:
-            # Poll every 60 seconds (Value tier safe)
+            # Poll every 60 seconds
             await asyncio.sleep(60.0) 
             for ticker in tickers:
                 try:
@@ -208,12 +216,12 @@ async def thetadata_live_publisher():
                     
                     await r.publish(f"atlas:realtime:{ticker}", json.dumps(payload))
                 except Exception as e:
-                    print(f"ThetaData live publisher loop error for {ticker}: {e}")
+                    print(f"{provider_name.upper()} live publisher loop error for {ticker}: {e}")
                     
     except asyncio.CancelledError:
         pass
     except Exception as e:
-        print(f"Background ThetaData live publisher encountered error: {e}")
+        print(f"Background {provider_name.upper()} live publisher encountered error: {e}")
     finally:
         await r.aclose()
-        print("ThetaData live publisher closed.")
+        print(f"{provider_name.upper()} live publisher closed.")
