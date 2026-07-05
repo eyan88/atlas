@@ -34,15 +34,13 @@ class ThetaDataProvider(BaseDataProvider):
         }
         # Naming could be username or email depending on library version
         if self.username:
-            client_kwargs["username"] = self.username
+            client_kwargs["email"] = self.username
         if self.password:
             client_kwargs["password"] = self.password
 
         try:
             from thetadata import ThetaClient
             self.client = ThetaClient(**client_kwargs)
-            # Connect automatically
-            self.client.connect()
         except ImportError:
             raise ImportError(
                 "The 'thetadata' library is required to use ThetaDataProvider. "
@@ -117,9 +115,11 @@ class ThetaDataProvider(BaseDataProvider):
         except Exception as e:
             raise ThetaDataAPIError(f"Failed to fetch underlying spot price for Greeks calculations: {e}") from e
 
-        # 2. Get all active expirations
+        # 2. Get all active expirations (future or today)
         try:
-            expirations = self.client.get_expirations(root=ticker)
+            df_exp = self.client.option_list_expirations(symbol=ticker)
+            df_exp['exp_date'] = pd.to_datetime(df_exp['expiration']).dt.date
+            expirations = df_exp[df_exp['exp_date'] >= date.today()]['exp_date'].sort_values().tolist()
         except Exception as e:
             raise ThetaDataAPIError(f"Failed to fetch expirations for {ticker}: {e}") from e
 
@@ -142,18 +142,48 @@ class ThetaDataProvider(BaseDataProvider):
         for exp in expirations[:25]:
             try:
                 # Query option snapshot containing raw quotes
-                df = self.client.option_snapshot(
+                df_quote = self.client.option_snapshot_quote(
                     symbol=ticker,
                     expiration=exp
                 )
-                if df is None or df.empty:
+                if df_quote is None or df_quote.empty:
                     continue
 
-                # Lowercase columns to handle naming variations
+                # Query open interest snapshot
+                try:
+                    df_oi = self.client.option_snapshot_open_interest(
+                        symbol=ticker,
+                        expiration=exp
+                    )
+                except Exception:
+                    df_oi = pd.DataFrame()
+
+                # Lowercase columns to handle naming variations and perform merge
+                df_quote.columns = [c.lower() for c in df_quote.columns]
+                
+                # Determine type column name
+                q_right_col = "right" if "right" in df_quote.columns else ("option_type" if "option_type" in df_quote.columns else "type")
+                if q_right_col in df_quote.columns:
+                    df_quote["right_norm"] = df_quote[q_right_col].astype(str).str.upper()
+                else:
+                    df_quote["right_norm"] = "C"
+
+                if not df_oi.empty:
+                    df_oi.columns = [c.lower() for c in df_oi.columns]
+                    oi_right_col = "right" if "right" in df_oi.columns else ("option_type" if "option_type" in df_oi.columns else "type")
+                    if oi_right_col in df_oi.columns:
+                        df_oi["right_norm"] = df_oi[oi_right_col].astype(str).str.upper()
+                    else:
+                        df_oi["right_norm"] = "C"
+
+                    df = pd.merge(df_quote, df_oi, on=["strike", "right_norm"], how="left", suffixes=("", "_oi"))
+                else:
+                    df = df_quote
+                    df["open_interest"] = 0
+
                 cols = {c.lower(): c for c in df.columns}
                 
                 strike_col = cols.get("strike")
-                right_col = cols.get("right") or cols.get("option_type") or cols.get("type")
                 oi_col = cols.get("open_interest") or cols.get("openinterest") or cols.get("oi")
                 volume_col = cols.get("volume") or cols.get("vol")
                 bid_col = cols.get("bid")
@@ -167,13 +197,12 @@ class ThetaDataProvider(BaseDataProvider):
                     if strike is None:
                         continue
 
-                    raw_right = str(row[right_col]).upper() if right_col else "C"
-                    option_type = "C" if "C" in raw_right or "CALL" in raw_right else "P"
+                    option_type = "C" if "C" in str(row["right_norm"]) or "CALL" in str(row["right_norm"]).upper() else "P"
 
-                    open_interest = int(row[oi_col]) if oi_col else 0
-                    volume = int(row[volume_col]) if volume_col else 0
-                    bid = float(row[bid_col]) if bid_col else 0.0
-                    ask = float(row[ask_col]) if ask_col else 0.0
+                    open_interest = int(row[oi_col]) if oi_col and pd.notna(row[oi_col]) else 0
+                    volume = int(row[volume_col]) if volume_col and pd.notna(row[volume_col]) else 0
+                    bid = float(row[bid_col]) if bid_col and pd.notna(row[bid_col]) else 0.0
+                    ask = float(row[ask_col]) if ask_col and pd.notna(row[ask_col]) else 0.0
                     mid_price = (bid + ask) / 2.0
 
                     # Calculate Greeks locally using Method B (Rust-backed Black-Scholes solver)
