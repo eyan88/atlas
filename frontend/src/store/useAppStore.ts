@@ -110,7 +110,17 @@ export const useAppStore = create<AppState>((set) => ({
       const openTickers = state.openTickers.includes(next)
         ? state.openTickers
         : [...state.openTickers, next];
-      return { activeTicker: next, openTickers, heatmap: null, currentTimestamp: null };
+      const nextHeatmap = state.heatmapsByTicker[next] ?? null;
+      return {
+        activeTicker: next,
+        openTickers,
+        heatmap: nextHeatmap,
+        spotPrice: nextHeatmap ? nextHeatmap.spot_price : null,
+        gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : null,
+        callWall: nextHeatmap ? nextHeatmap.call_wall : null,
+        putWall: nextHeatmap ? nextHeatmap.put_wall : null,
+        currentTimestamp: state.currentTimestamp,
+      };
     }),
 
   openTickerPane: (ticker) =>
@@ -123,7 +133,17 @@ export const useAppStore = create<AppState>((set) => ({
       const openTickers = isAlreadyOpen
         ? state.openTickers
         : [next, ...state.openTickers];
-      return { activeTicker: next, openTickers, heatmap: null, currentTimestamp: null };
+      const nextHeatmap = state.heatmapsByTicker[next] ?? null;
+      return {
+        activeTicker: next,
+        openTickers,
+        heatmap: nextHeatmap,
+        spotPrice: nextHeatmap ? nextHeatmap.spot_price : null,
+        gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : null,
+        callWall: nextHeatmap ? nextHeatmap.call_wall : null,
+        putWall: nextHeatmap ? nextHeatmap.put_wall : null,
+        currentTimestamp: state.currentTimestamp,
+      };
     }),
 
   closeTickerPane: (ticker) =>
