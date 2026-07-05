@@ -41,7 +41,7 @@ export function useWebSocket() {
   useEffect(() => {
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
-    if (!isLive) {
+    if (!isLive || !activeTicker) {
       if (wsRef.current) {
         wsRef.current.onclose = null; // Unbind handler to prevent reconnect
         wsRef.current.close();

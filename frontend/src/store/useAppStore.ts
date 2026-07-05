@@ -88,8 +88,8 @@ interface AppState {
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useAppStore = create<AppState>((set) => ({
-  activeTicker: 'SPY',
-  openTickers: ['SPY'],
+  activeTicker: '',
+  openTickers: [],
   selectedMetric: 'net_gex',
   strikeCount: 40,
   evolutionWindow: 'prev_snapshot',
