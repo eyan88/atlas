@@ -67,7 +67,29 @@ class ThetaDataProvider(BaseDataProvider):
             except Exception:
                 pass
 
-        # 2. Fallback: query recent 1-minute quotes to retrieve the latest print
+        # 2. Try stock_snapshot_trade (requires standard subscription)
+        if hasattr(self.client, "stock_snapshot_trade"):
+            try:
+                df = self.client.stock_snapshot_trade(symbol=ticker)
+                if df is not None and not df.empty:
+                    price = None
+                    for col in ["price", "last", "close", "ask", "bid"]:
+                        for c in df.columns:
+                            if c.lower() == col.lower():
+                                price = df[c].iloc[-1]
+                                break
+                        if price is not None:
+                            break
+                    if price is not None:
+                        return DomainUnderlyingQuote(
+                            ticker=ticker,
+                            price=float(price),
+                            timestamp_utc=int(time.time()),
+                        )
+            except Exception:
+                pass
+
+        # 3. Fallback: query recent 1-minute quotes (requires standard subscription)
         today = date.today()
         for offset in range(3): # look back up to 2 days for weekend/market-close support
             target_date = today - timedelta(days=offset)
@@ -81,8 +103,11 @@ class ThetaDataProvider(BaseDataProvider):
                     # Find price in common column names
                     price = None
                     for col in ["price", "last", "close", "ask", "bid"]:
-                        if col in df.columns:
-                            price = df[col].iloc[-1]
+                        for c in df.columns:
+                            if c.lower() == col.lower():
+                                price = df[c].iloc[-1]
+                                break
+                        if price is not None:
                             break
                     
                     if price is not None:
@@ -95,6 +120,33 @@ class ThetaDataProvider(BaseDataProvider):
                             ticker=ticker,
                             price=float(price),
                             timestamp_utc=ts
+                        )
+            except Exception:
+                continue
+
+        # 4. Deep Fallback: query stock_history_eod (works on FREE plan)
+        for offset in range(5): # look back up to 4 days to cover long weekends
+            target_date = today - timedelta(days=offset)
+            try:
+                df = self.client.stock_history_eod(
+                    symbol=ticker,
+                    start_date=target_date,
+                    end_date=target_date
+                )
+                if df is not None and not df.empty:
+                    price = None
+                    for col in ["close", "last_trade", "open", "high", "low", "bid", "ask"]:
+                        for c in df.columns:
+                            if c.lower() == col.lower():
+                                price = df[c].iloc[-1]
+                                break
+                        if price is not None:
+                            break
+                    if price is not None:
+                        return DomainUnderlyingQuote(
+                            ticker=ticker,
+                            price=float(price),
+                            timestamp_utc=int(time.time())
                         )
             except Exception:
                 continue
