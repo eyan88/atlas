@@ -20,6 +20,7 @@ export function App() {
   const selectedMetric = useAppStore((s) => s.selectedMetric);
   const strikeCount    = useAppStore((s) => s.strikeCount);
   const selectedDate   = useAppStore((s) => s.selectedDate);
+  const setTimestamp   = useAppStore((s) => s.setTimestamp);
 
   // 1. Preload the complete date timeline and history snapshots on mount / ticker change / date change
   useEffect(() => {
@@ -53,13 +54,14 @@ export function App() {
           setHeatmapForTicker(ticker, snap);
           if (ticker === activeTicker || index === 0) {
             setHeatmap(snap);
+            setTimestamp(latestTs);
           }
         }
       } catch (err) {
         console.error("Failed to fetch heatmap timeline history:", err);
       }
     });
-  }, [openTickers, selectedMetric, strikeCount, selectedDate, setTimelineData, setHeatmapForTicker, setHeatmap, activeTicker]);
+  }, [openTickers, selectedMetric, strikeCount, selectedDate, setTimelineData, setHeatmapForTicker, setHeatmap, setTimestamp, activeTicker]);
 
 
   return (
