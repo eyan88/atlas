@@ -27,6 +27,9 @@ interface AppState {
   // Timestamps for the timeline slider
   timelineTimestamps: number[];
 
+  // Selected date for replay timeline (e.g. '2026-07-02')
+  selectedDate: string;
+
   // Current replay timestamp (null = live)
   currentTimestamp: number | null;
 
@@ -75,6 +78,7 @@ interface AppState {
   applyDiff: (payload: WsPatchPayload) => void;
   setWsConnected: (connected: boolean) => void;
   setHoveredCell: (cell: CellDetail | null) => void;
+  setSelectedDate: (date: string) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -87,6 +91,7 @@ export const useAppStore = create<AppState>((set) => ({
   evolutionWindow: 'prev_snapshot',
   snapshotsHistory: {},
   timelineTimestamps: [],
+  selectedDate: '2026-07-02',
   currentTimestamp: null,
   isPlaying: false,
   replaySpeed: 1,
@@ -194,6 +199,8 @@ export const useAppStore = create<AppState>((set) => ({
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
 
   setReplaySpeed: (speed) => set({ replaySpeed: speed }),
+
+  setSelectedDate: (date) => set({ selectedDate: date }),
 
   updateMarketLevels: (spot, flip, call, put) =>
     set({ spotPrice: spot, gammaFlip: flip, callWall: call, putWall: put }),

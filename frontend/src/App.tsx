@@ -19,20 +19,25 @@ export function App() {
   const openTickers    = useAppStore((s) => s.openTickers);
   const selectedMetric = useAppStore((s) => s.selectedMetric);
   const strikeCount    = useAppStore((s) => s.strikeCount);
+  const selectedDate   = useAppStore((s) => s.selectedDate);
 
-  // 1. Preload the complete date timeline and history snapshots on mount / ticker change
+  // 1. Preload the complete date timeline and history snapshots on mount / ticker change / date change
   useEffect(() => {
     openTickers.forEach(async (ticker, index) => {
       try {
-        // Query timeline for the target seeded date '2026-07-02'
-        const timeline = await api.getTimeline(ticker, '2026-07-02');
+        // Query timeline for the target date
+        const timeline = await api.getTimeline(ticker, selectedDate);
         const timestamps = timeline.timestamps;
         
-        if (timestamps.length === 0) return;
+        if (timestamps.length === 0) {
+          // If no history on this date, clear timeline but don't crash
+          setTimelineData(ticker, [], {});
+          return;
+        }
 
         // Fetch the full history matrix of snapshots in a single bulk request
         const historyData = await api.getHeatmapHistory(ticker, {
-          date: '2026-07-02',
+          date: selectedDate,
           metric: selectedMetric,
           strikeCount
         });
@@ -54,7 +59,7 @@ export function App() {
         console.error("Failed to fetch heatmap timeline history:", err);
       }
     });
-  }, [openTickers, selectedMetric, strikeCount, setTimelineData, setHeatmapForTicker, setHeatmap, activeTicker]);
+  }, [openTickers, selectedMetric, strikeCount, selectedDate, setTimelineData, setHeatmapForTicker, setHeatmap, activeTicker]);
 
 
   return (

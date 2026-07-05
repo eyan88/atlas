@@ -8,6 +8,8 @@ export function Header() {
   const setStrikeCount = useAppStore((s) => s.setStrikeCount);
   const wsConnected   = useAppStore((s) => s.wsConnected);
   const openTickers   = useAppStore((s) => s.openTickers);
+  const selectedDate   = useAppStore((s) => s.selectedDate);
+  const setSelectedDate = useAppStore((s) => s.setSelectedDate);
   const [tickerInput, setTickerInput] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -97,7 +99,18 @@ export function Header() {
               {n}
             </option>
           ))}
-        </select>
+      </label>
+
+      <label className={styles.strikeControl} title="Select historical session date">
+        <span className={styles.strikeLabel}>Date</span>
+        <input
+          type="date"
+          className={styles.strikeSelect}
+          style={{ width: '120px' }}
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          aria-label="Historical date"
+        />
       </label>
 
       {/* Connection Status */}
