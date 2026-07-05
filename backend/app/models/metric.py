@@ -17,5 +17,5 @@ class DealerMetricSnapshot(Base):
     put_oi = Column(Integer, nullable=False)
     call_volume = Column(Integer, nullable=False)
     put_volume = Column(Integer, nullable=False)
-    call_iv = Column(Numeric(8, 6))
-    put_iv = Column(Numeric(8, 6))
+    call_iv = Column(Numeric(12, 6))
+    put_iv = Column(Numeric(12, 6))

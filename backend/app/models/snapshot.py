@@ -12,7 +12,7 @@ class OptionChainSnapshot(Base):
     ask = Column(Numeric(10, 2))
     open_interest = Column(Integer, nullable=False)
     volume = Column(Integer, nullable=False)
-    implied_volatility = Column(Numeric(8, 6))
+    implied_volatility = Column(Numeric(12, 6))
     delta = Column(Numeric(8, 6))
     gamma = Column(Numeric(10, 8))
     vanna = Column(Numeric(10, 8))

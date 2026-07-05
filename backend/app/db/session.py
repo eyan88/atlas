@@ -41,6 +41,17 @@ else:
             except Exception as e:
                 print(f"Warning: Could not create tables before TimescaleDB setup: {e}")
 
+            # 1.5. Run ALTER TABLE to fix IV precision for existing instances
+            with engine.begin() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE dealer_metrics_snapshots ALTER COLUMN call_iv TYPE numeric(12, 6);"))
+                    conn.execute(text("ALTER TABLE dealer_metrics_snapshots ALTER COLUMN put_iv TYPE numeric(12, 6);"))
+                    conn.execute(text("ALTER TABLE option_chain_snapshots ALTER COLUMN implied_volatility TYPE numeric(12, 6);"))
+                    print("Successfully verified/altered IV numeric columns.")
+                except Exception as e:
+                    print(f"Warning: Could not alter table IV types: {e}")
+
+
             # 2. Enable TimescaleDB extension
             with engine.begin() as conn:
                 try:
