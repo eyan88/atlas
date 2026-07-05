@@ -14,13 +14,13 @@ from app.api.endpoints.heatmap import get_heatmap
 router = APIRouter()
 
 @router.websocket("/{ticker}")
-async def websocket_endpoint(websocket: WebSocket, ticker: str, db: Session = Depends(get_db)):
+async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int = 40, db: Session = Depends(get_db)):
     await websocket.accept()
     ticker = ticker.upper()
     
     # 1. Fetch and send the initial full snapshot (INIT)
     try:
-        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=20, db=db)
+        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db)
         await websocket.send_json({
             "type": "INIT",
             "payload": init_data

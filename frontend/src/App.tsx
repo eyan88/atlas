@@ -39,10 +39,19 @@ export function App() {
           if (timestamps.length === 0) {
             // If no history on this date, clear timeline but don't crash
             setTimelineData(ticker, [], {});
-            setHeatmapForTicker(ticker, null);
-            if (ticker === activeTicker || index === 0) {
-              setHeatmap(null);
-              setTimestamp(null);
+            
+            // Only clear the heatmap if this is a historical date.
+            // If it's live mode (today), the WebSocket INIT will provide the baseline
+            // heatmap (e.g., from yesterday's close) and we should retain it.
+            const todayStr = new Date().toISOString().split('T')[0];
+            const isLive = selectedDate === todayStr;
+            
+            if (!isLive) {
+              setHeatmapForTicker(ticker, null);
+              if (ticker === activeTicker || index === 0) {
+                setHeatmap(null);
+                setTimestamp(null);
+              }
             }
             return;
           }

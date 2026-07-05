@@ -50,7 +50,8 @@ export function useWebSocket() {
       setWsConnected(false);
     } else {
       const connect = () => {
-        const ws = new WebSocket(`${WS_BASE}/${activeTicker}`);
+        const state = useAppStore.getState();
+        const ws = new WebSocket(`${WS_BASE}/${activeTicker}?strikeCount=${state.strikeCount}`);
         wsRef.current = ws;
 
         ws.onopen = () => {
