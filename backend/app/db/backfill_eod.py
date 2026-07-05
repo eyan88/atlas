@@ -121,7 +121,12 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
 
                 # Group by strike
                 strikes = df_opt["strike"].unique()
-                for strike in strikes:
+                
+                # Filter to nearest 60 strikes around spot price to speed up execution
+                sorted_strikes = sorted(strikes, key=lambda s: abs(s - spot_price))
+                target_strikes = sorted_strikes[:60]
+                
+                for strike in target_strikes:
                     strike_df = df_opt[df_opt["strike"] == strike]
                     
                     # Split Call/Put contracts
