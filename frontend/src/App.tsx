@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import type { HeatmapSnapshot } from './types';
 import { Header } from './components/Header/Header';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer';
@@ -43,12 +44,20 @@ export function App() {
           strikeCount
         });
 
+        // Normalize history keys: backend returns string keys ("1751500800")
+        // but timeline returns numeric timestamps (1751500800).
+        // Re-key the history dict with numbers so lookups match.
+        const normalizedHistory: Record<number, HeatmapSnapshot> = {};
+        for (const [key, value] of Object.entries(historyData.history)) {
+          normalizedHistory[Number(key)] = value;
+        }
+
         // Store the preloaded snapshots in local history cache
-        setTimelineData(ticker, timestamps, historyData.history);
+        setTimelineData(ticker, timestamps, normalizedHistory);
 
         // Default to the latest snapshot in the timeline
         const latestTs = timestamps[timestamps.length - 1];
-        const snap = historyData.history[latestTs];
+        const snap = normalizedHistory[latestTs];
 
         if (snap) {
           setHeatmapForTicker(ticker, snap);
