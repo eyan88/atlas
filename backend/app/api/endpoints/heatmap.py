@@ -165,13 +165,13 @@ def get_heatmap(
     result = {
         "ticker": ticker,
         "timestamp": target_ts.isoformat(),
-        "spot_price": spot_price,
-        "gamma_flip": gamma_flip if not np.isnan(gamma_flip) else None,
-        "call_wall": call_wall if not np.isnan(call_wall) else None,
-        "put_wall": put_wall if not np.isnan(put_wall) else None,
+        "spot_price": float(spot_price) if spot_price is not None else None,
+        "gamma_flip": float(gamma_flip) if (gamma_flip is not None and not np.isnan(gamma_flip)) else None,
+        "call_wall": float(call_wall) if (call_wall is not None and not np.isnan(call_wall)) else None,
+        "put_wall": float(put_wall) if (put_wall is not None and not np.isnan(put_wall)) else None,
         "columns": columns,
-        "rows": rows,
-        "data": data_matrix
+        "rows": [float(r) for r in rows],
+        "data": [[float(x) for x in row] for row in data_matrix]
     }
 
     if is_redis_active:
@@ -353,7 +353,7 @@ def get_heatmap_history(
             ts_df_filtered = ts_df[ts_df["strike"].isin(target_strikes)]
 
         # Extract unique strikes (descending) and expirations (ascending)
-        rows = sorted(list(ts_df_filtered["strike"].unique()), reverse=True)
+        rows = sorted([float(x) for x in ts_df_filtered["strike"].unique()], reverse=True)
         columns = sorted(list(ts_df_filtered["expiration"].unique()))
 
         row_map = {strike: i for i, strike in enumerate(rows)}
@@ -391,10 +391,10 @@ def get_heatmap_history(
         history[str(ts_unix)] = {
             "ticker": ticker,
             "timestamp": dt.isoformat(),
-            "spot_price": spot_price,
-            "gamma_flip": gamma_flip if not np.isnan(gamma_flip) else None,
-            "call_wall": call_wall if not np.isnan(call_wall) else None,
-            "put_wall": put_wall if not np.isnan(put_wall) else None,
+            "spot_price": float(spot_price) if spot_price is not None else None,
+            "gamma_flip": float(gamma_flip) if (gamma_flip is not None and not np.isnan(gamma_flip)) else None,
+            "call_wall": float(call_wall) if (call_wall is not None and not np.isnan(call_wall)) else None,
+            "put_wall": float(put_wall) if (put_wall is not None and not np.isnan(put_wall)) else None,
             "columns": columns,
             "rows": rows,
             "data": data_matrix
