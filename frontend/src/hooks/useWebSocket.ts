@@ -39,6 +39,8 @@ export function useWebSocket() {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
     if (!isLive) {
       if (wsRef.current) {
         wsRef.current.onclose = null; // Unbind handler to prevent reconnect
@@ -46,82 +48,83 @@ export function useWebSocket() {
         wsRef.current = null;
       }
       setWsConnected(false);
-      return;
-    }
+    } else {
+      const connect = () => {
+        const ws = new WebSocket(`${WS_BASE}/${activeTicker}`);
+        wsRef.current = ws;
 
-    let reconnectTimer: ReturnType<typeof setTimeout>;
+        ws.onopen = () => {
+          setWsConnected(true);
+          // Heartbeat ping every 30 s
+          heartbeatRef.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) ws.send('ping');
+          }, HEARTBEAT_INTERVAL_MS);
+        };
 
-    function connect() {
-      const ws = new WebSocket(`${WS_BASE}/${activeTicker}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setWsConnected(true);
-        // Heartbeat ping every 30 s
-        heartbeatRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) ws.send('ping');
-        }, HEARTBEAT_INTERVAL_MS);
-      };
-
-      ws.onmessage = (event: MessageEvent<string>) => {
-        try {
-          const msg = JSON.parse(event.data) as WsMessage;
-          if (msg.type === 'INIT') {
-            setHeatmap(msg.payload);
-          } else if (msg.type === 'PATCH') {
-            applyDiff(msg.payload);
-            
-            // Check if we need to re-center the strikes viewport
-            const state = useAppStore.getState();
-            const currentHeatmap = state.heatmap;
-            if (currentHeatmap && currentHeatmap.rows && currentHeatmap.rows.length > 0) {
-              const rows = currentHeatmap.rows;
-              const midStrike = rows[Math.floor(rows.length / 2)];
-              const spot = msg.payload.spot_price;
-              const distance = Math.abs(spot - midStrike);
-              const threshold = activeTicker.toUpperCase() === 'SPX' ? 25.0 : 4.0;
+        ws.onmessage = (event: MessageEvent<string>) => {
+          try {
+            const msg = JSON.parse(event.data) as WsMessage;
+            if (msg.type === 'INIT') {
+              setHeatmap(msg.payload);
+            } else if (msg.type === 'PATCH') {
+              applyDiff(msg.payload);
               
-              if (distance > threshold) {
-                api.getHeatmap(activeTicker, {
-                  metric: state.selectedMetric,
-                  strikeCount: state.strikeCount
-                }).then((snap) => {
-                  setHeatmap(snap);
-                }).catch((err) => {
-                  console.error("Failed to re-center heatmap snapshot:", err);
-                });
+              // Check if we need to re-center the strikes viewport
+              const state = useAppStore.getState();
+              const currentHeatmap = state.heatmap;
+              if (currentHeatmap && currentHeatmap.rows && currentHeatmap.rows.length > 0) {
+                const rows = currentHeatmap.rows;
+                const midStrike = rows[Math.floor(rows.length / 2)];
+                const spot = msg.payload.spot_price;
+                const distance = Math.abs(spot - midStrike);
+                const threshold = activeTicker.toUpperCase() === 'SPX' ? 25.0 : 4.0;
+                
+                if (distance > threshold) {
+                  api.getHeatmap(activeTicker, {
+                    metric: state.selectedMetric,
+                    strikeCount: state.strikeCount
+                  }).then((snap) => {
+                    setHeatmap(snap);
+                  }).catch((err) => {
+                    console.error("Failed to re-center heatmap snapshot:", err);
+                  });
+                }
               }
             }
+          } catch {
+            // Ignore non-JSON frames (e.g. pong)
           }
-        } catch {
-          // Ignore non-JSON frames (e.g. pong)
-        }
+        };
+
+        ws.onerror = () => setWsConnected(false);
+
+        ws.onclose = () => {
+          setWsConnected(false);
+          if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+          
+          // Only reconnect if the store is still in LIVE mode
+          const currentState = useAppStore.getState();
+          const stillLive = currentState.currentTimestamp === null && currentState.selectedDate === todayStr;
+          if (stillLive) {
+            reconnectTimer = setTimeout(connect, 3000);
+          }
+        };
       };
 
-      ws.onerror = () => setWsConnected(false);
-
-      ws.onclose = () => {
-        setWsConnected(false);
-        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-        // Only reconnect if the store is still in LIVE mode
-        const currentState = useAppStore.getState();
-        const stillLive = currentState.currentTimestamp === null;
-        if (stillLive) {
-          reconnectTimer = setTimeout(connect, 3000);
-        }
-      };
+      connect();
     }
-
-    connect();
 
     return () => {
       clearTimeout(reconnectTimer);
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
       if (wsRef.current) {
         wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [activeTicker, isLive]); // reconnect whenever the active ticker changes
+  }, [activeTicker, isLive, todayStr]); // reconnect when active ticker, live state, or today date updates
 }
