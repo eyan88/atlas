@@ -5,12 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.endpoints import tickers, heatmap
 from app.api.websockets import feed
-from app.services.publisher import redis_mock_publisher
+from app.services.publisher import thetadata_live_publisher
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: spawn background Redis mock publisher task
-    task = asyncio.create_task(redis_mock_publisher())
+    # Startup: spawn background live publisher task
+    task = asyncio.create_task(thetadata_live_publisher())
     yield
     # Shutdown: clean up background task
     task.cancel()

@@ -274,10 +274,11 @@ export const useAppStore = create<AppState>((set) => ({
         if (rIdx !== undefined && cIdx !== undefined) {
           // Select metric value depending on what is active
           let val = diff.g; // default 'net_gex'
-          if (state.selectedMetric === 'net_dex') val = diff.oi; // placeholder/simulated
-          else if (state.selectedMetric === 'vanna') val = diff.g * 0.001;
-          else if (state.selectedMetric === 'charm') val = -diff.oi * 0.0005;
-          else if (state.selectedMetric === 'call_oi' || state.selectedMetric === 'put_oi') val = diff.oi;
+          if (state.selectedMetric === 'net_dex') val = diff.d ?? diff.oi; 
+          else if (state.selectedMetric === 'vanna') val = diff.va ?? (diff.g * 0.001);
+          else if (state.selectedMetric === 'charm') val = diff.ch ?? (-diff.oi * 0.0005);
+          else if (state.selectedMetric === 'call_oi') val = diff.coi ?? diff.oi;
+          else if (state.selectedMetric === 'put_oi') val = diff.poi ?? diff.oi;
           else if (state.selectedMetric === 'volume') val = diff.v;
 
           nextData[rIdx][cIdx] = val;

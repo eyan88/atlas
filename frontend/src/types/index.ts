@@ -72,7 +72,12 @@ export interface CellDiff {
   k: number;   // strike
   e: string;   // expiration date ISO
   g: number;   // net_gex
-  oi: number;  // total OI
+  d?: number;  // net_dex
+  va?: number; // vanna
+  ch?: number; // charm
+  coi?: number;// call_oi
+  poi?: number;// put_oi
+  oi: number;  // total OI (legacy/mock)
   v: number;   // volume
 }
 
