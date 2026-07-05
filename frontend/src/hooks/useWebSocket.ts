@@ -31,7 +31,9 @@ export function useWebSocket() {
   const setWsConnected = useAppStore((s) => s.setWsConnected);
 
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
-  const isLive = currentTimestamp === null;
+  const selectedDate = useAppStore((s) => s.selectedDate);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isLive = currentTimestamp === null && selectedDate === todayStr;
 
   const wsRef       = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);

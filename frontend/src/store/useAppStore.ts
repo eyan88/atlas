@@ -91,7 +91,7 @@ export const useAppStore = create<AppState>((set) => ({
   evolutionWindow: 'prev_snapshot',
   snapshotsHistory: {},
   timelineTimestamps: [],
-  selectedDate: '2026-07-02',
+  selectedDate: new Date().toISOString().split('T')[0],
   currentTimestamp: null,
   isPlaying: false,
   replaySpeed: 1,
@@ -203,17 +203,20 @@ export const useAppStore = create<AppState>((set) => ({
       const activeHist = state.snapshotsHistory[state.activeTicker];
       const nextHeatmap = ts && activeHist && activeHist[ts] ? activeHist[ts] : state.heatmap;
 
-      return {
-        currentTimestamp: ts,
-        heatmap: nextHeatmap,
-        heatmapsByTicker: nextHeatmaps,
-        spotPrice: nextHeatmap ? nextHeatmap.spot_price : state.spotPrice,
-        gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
-        callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
-        putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
-        isPlaying: ts === null ? false : state.isPlaying,
-      };
-    }),
+       const todayStr = new Date().toISOString().split('T')[0];
+
+       return {
+         currentTimestamp: ts,
+         heatmap: nextHeatmap,
+         heatmapsByTicker: nextHeatmaps,
+         spotPrice: nextHeatmap ? nextHeatmap.spot_price : state.spotPrice,
+         gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
+         callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
+         putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
+         isPlaying: ts === null ? false : state.isPlaying,
+         selectedDate: ts === null ? todayStr : state.selectedDate,
+       };
+     }),
 
 
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
