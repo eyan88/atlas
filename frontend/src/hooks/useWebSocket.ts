@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { WsMessage } from '../types';
+import { api } from '../api/client';
 
 const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -66,6 +67,28 @@ export function useWebSocket() {
             setHeatmap(msg.payload);
           } else if (msg.type === 'PATCH') {
             applyDiff(msg.payload);
+            
+            // Check if we need to re-center the strikes viewport
+            const state = useAppStore.getState();
+            const currentHeatmap = state.heatmap;
+            if (currentHeatmap && currentHeatmap.rows && currentHeatmap.rows.length > 0) {
+              const rows = currentHeatmap.rows;
+              const midStrike = rows[Math.floor(rows.length / 2)];
+              const spot = msg.payload.spot_price;
+              const distance = Math.abs(spot - midStrike);
+              const threshold = activeTicker.toUpperCase() === 'SPX' ? 25.0 : 4.0;
+              
+              if (distance > threshold) {
+                api.getHeatmap(activeTicker, {
+                  metric: state.selectedMetric,
+                  strikeCount: state.strikeCount
+                }).then((snap) => {
+                  setHeatmap(snap);
+                }).catch((err) => {
+                  console.error("Failed to re-center heatmap snapshot:", err);
+                });
+              }
+            }
           }
         } catch {
           // Ignore non-JSON frames (e.g. pong)
