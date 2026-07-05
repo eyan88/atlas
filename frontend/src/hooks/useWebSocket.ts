@@ -39,6 +39,7 @@ export function useWebSocket() {
   useEffect(() => {
     if (!isLive) {
       if (wsRef.current) {
+        wsRef.current.onclose = null; // Unbind handler to prevent reconnect
         wsRef.current.close();
         wsRef.current = null;
       }
@@ -100,8 +101,12 @@ export function useWebSocket() {
       ws.onclose = () => {
         setWsConnected(false);
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-        // Reconnect after 3 s
-        reconnectTimer = setTimeout(connect, 3000);
+        // Only reconnect if the store is still in LIVE mode
+        const currentState = useAppStore.getState();
+        const stillLive = currentState.currentTimestamp === null;
+        if (stillLive) {
+          reconnectTimer = setTimeout(connect, 3000);
+        }
       };
     }
 
@@ -110,7 +115,11 @@ export function useWebSocket() {
     return () => {
       clearTimeout(reconnectTimer);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-      wsRef.current?.close();
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [activeTicker, isLive]); // reconnect whenever the active ticker changes
 }
