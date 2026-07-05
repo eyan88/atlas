@@ -239,20 +239,20 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       heatmap: snapshot,
       heatmapsByTicker: { ...state.heatmapsByTicker, [state.activeTicker]: snapshot },
-      spotPrice: snapshot.spot_price,
-      gammaFlip: snapshot.gamma_flip,
-      callWall: snapshot.call_wall,
-      putWall: snapshot.put_wall,
+      spotPrice: snapshot ? snapshot.spot_price : null,
+      gammaFlip: snapshot ? snapshot.gamma_flip : null,
+      callWall: snapshot ? snapshot.call_wall : null,
+      putWall: snapshot ? snapshot.put_wall : null,
     })),
 
   setHeatmapForTicker: (ticker, snapshot) =>
     set((state) => ({
       heatmap: ticker === state.activeTicker ? snapshot : state.heatmap,
       heatmapsByTicker: { ...state.heatmapsByTicker, [ticker]: snapshot },
-      spotPrice: ticker === state.activeTicker ? snapshot.spot_price : state.spotPrice,
-      gammaFlip: ticker === state.activeTicker ? snapshot.gamma_flip : state.gammaFlip,
-      callWall: ticker === state.activeTicker ? snapshot.call_wall : state.callWall,
-      putWall: ticker === state.activeTicker ? snapshot.put_wall : state.putWall,
+      spotPrice: ticker === state.activeTicker ? (snapshot ? snapshot.spot_price : null) : state.spotPrice,
+      gammaFlip: ticker === state.activeTicker ? (snapshot ? snapshot.gamma_flip : null) : state.gammaFlip,
+      callWall: ticker === state.activeTicker ? (snapshot ? snapshot.call_wall : null) : state.callWall,
+      putWall: ticker === state.activeTicker ? (snapshot ? snapshot.put_wall : null) : state.putWall,
     })),
 
   applyDiff: (payload) =>
