@@ -25,14 +25,43 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int
             "type": "INIT",
             "payload": init_data
         })
+    except HTTPException as e:
+        if e.status_code == 404:
+            from app.core.config import settings
+            from app.db.backfill_eod import run_backfill
+            from datetime import date, timedelta
+            
+            if settings.DATA_PROVIDER == "thetadata":
+                print(f"Bootstrapping historical data for novel ticker {ticker}...")
+                success = False
+                for offset in range(1, 8): # Look back up to a week
+                    target_date = date.today() - timedelta(days=offset)
+                    try:
+                        run_backfill(ticker=ticker, backfill_date=target_date, db=db)
+                        target_ts = db.query(DealerMetricSnapshot.timestamp).filter(DealerMetricSnapshot.ticker == ticker).first()
+                        if target_ts:
+                            success = True
+                            break
+                    except Exception as err:
+                        print(f"Bootstrap step failed for {target_date}: {err}")
+                
+                if success:
+                    try:
+                        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db)
+                        await websocket.send_json({"type": "INIT", "payload": init_data})
+                    except Exception as inner_e:
+                        await websocket.send_json({"type": "ERROR", "message": f"Failed after bootstrap: {str(inner_e)}"})
+                else:
+                    await websocket.send_json({"type": "ERROR", "message": "Failed to bootstrap any historical data for this ticker."})
+            else:
+                await websocket.send_json({"type": "ERROR", "message": "No historical data and not configured to bootstrap."})
+        else:
+            await websocket.send_json({"type": "ERROR", "message": f"Failed to load initial snapshot: {str(e)}"})
     except Exception as e:
         await websocket.send_json({
             "type": "ERROR",
             "message": f"Failed to load initial snapshot: {str(e)}"
         })
-        # Do NOT close the websocket here. We want to keep it open so it can
-        # subscribe to Redis and receive the first PATCH payload, which the frontend
-        # will use to dynamically bootstrap the heatmap from scratch!
 
     # 2. Establish connection to Redis Pub/Sub
     import redis.asyncio as aioredis
