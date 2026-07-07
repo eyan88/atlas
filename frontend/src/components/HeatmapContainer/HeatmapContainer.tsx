@@ -15,7 +15,19 @@ export function HeatmapContainer({ ticker }: HeatmapContainerProps) {
   return (
     <section className={styles.container}>
       <div className={styles.titleBar}>
-        <span className={styles.title}>{ticker}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <span className={styles.title}>{ticker}</span>
+          {snapshot?.timestamp && (
+            <span className={styles.timestamp}>
+              {new Date(snapshot.timestamp).toLocaleString(undefined, { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric', 
+                minute: '2-digit' 
+              })}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           className={styles.closeBtn}

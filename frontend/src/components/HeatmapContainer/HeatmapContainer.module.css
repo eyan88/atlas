@@ -64,6 +64,15 @@
   color: var(--text-primary);
 }
 
+.timestamp {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+
 .closeBtn {
   display: grid;
   place-items: center;
