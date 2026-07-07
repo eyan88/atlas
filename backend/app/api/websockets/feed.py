@@ -30,8 +30,9 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int
             "type": "ERROR",
             "message": f"Failed to load initial snapshot: {str(e)}"
         })
-        await websocket.close()
-        return
+        # Do NOT close the websocket here. We want to keep it open so it can
+        # subscribe to Redis and receive the first PATCH payload, which the frontend
+        # will use to dynamically bootstrap the heatmap from scratch!
 
     # 2. Establish connection to Redis Pub/Sub
     import redis.asyncio as aioredis
