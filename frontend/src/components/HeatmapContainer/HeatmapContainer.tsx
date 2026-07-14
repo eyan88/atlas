@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import { MetricControls } from './MetricControls/MetricControls';
 import { EvolutionControls } from './EvolutionControls/EvolutionControls';
 import { CanvasHeatmap } from './CanvasHeatmap/CanvasHeatmap';
@@ -12,6 +13,26 @@ interface HeatmapContainerProps {
 export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapContainerProps) {
   const closeTickerPane = useAppStore((s) => s.closeTickerPane);
   const snapshot = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize scrolling across all compass viewports
+  useEffect(() => {
+    if (!isCompassMode || !viewportRef.current) return;
+    const vp = viewportRef.current;
+
+    const handleScroll = () => {
+      const allViewports = document.querySelectorAll('.compass-viewport');
+      allViewports.forEach((otherVp) => {
+        if (otherVp !== vp && otherVp.scrollTop !== vp.scrollTop) {
+          otherVp.scrollTop = vp.scrollTop;
+        }
+      });
+    };
+
+    vp.addEventListener('scroll', handleScroll, { passive: true });
+    return () => vp.removeEventListener('scroll', handleScroll);
+  }, [isCompassMode]);
 
   return (
     <section className={styles.container}>
@@ -59,7 +80,10 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
       </div>
       <MetricControls />
       <EvolutionControls />
-      <div className={styles.viewport}>
+      <div 
+        ref={viewportRef}
+        className={`${styles.viewport} ${isCompassMode ? 'compass-viewport' : ''}`}
+      >
         <CanvasHeatmap ticker={ticker} isCompassMode={isCompassMode} />
       </div>
     </section>
