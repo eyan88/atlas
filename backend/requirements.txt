@@ -17,7 +17,6 @@ msgpack>=1.0.5
 # Data Providers
 python-dotenv
 thetadata==1.0.9
-thetadatadx==12.0.0
 
 # Analytics & Calculation
 numpy>=1.24.0
