@@ -38,9 +38,9 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
         return
 
     try:
-        from thetadatadx import all_greeks
+        from app.services.data_providers.thetadata import compute_all_greeks
     except ImportError:
-        print("Error: The 'thetadatadx' library is required for Method B calculations.")
+        print("Error: The 'compute_all_greeks' function is required for Method C calculations.")
         return
 
     print(f"==================================================")
@@ -151,7 +151,7 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                         vol = int(call_row["volume"].iloc[0])
                         call_vol = vol
                         try:
-                            g = all_greeks(
+                            g = compute_all_greeks(
                                 spot=spot_price,
                                 strike=float(strike),
                                 rate=0.05,
@@ -177,7 +177,7 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                         vol = int(put_row["volume"].iloc[0])
                         put_vol = vol
                         try:
-                            g = all_greeks(
+                            g = compute_all_greeks(
                                 spot=spot_price,
                                 strike=float(strike),
                                 rate=0.05,
