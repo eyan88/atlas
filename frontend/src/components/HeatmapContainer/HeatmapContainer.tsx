@@ -35,7 +35,7 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
   }, [isCompassMode]);
 
   return (
-    <section className={styles.container}>
+    <section className={`${styles.container} ${isCompassMode ? styles.compassContainer : ''}`}>
       <div className={styles.titleBar}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
           <span className={styles.title}>{ticker}</span>
@@ -82,7 +82,7 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
       <EvolutionControls />
       <div 
         ref={viewportRef}
-        className={`${styles.viewport} ${isCompassMode ? 'compass-viewport' : ''}`}
+        className={`${styles.viewport} ${isCompassMode ? `compass-viewport ${styles.compassViewport}` : ''}`}
       >
         <CanvasHeatmap ticker={ticker} isCompassMode={isCompassMode} />
       </div>

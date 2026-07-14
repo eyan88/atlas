@@ -11,6 +11,10 @@
   overflow: hidden;
 }
 
+.compassContainer {
+  min-width: max-content;
+}
+
 .titleBar {
   display: flex;
   align-items: center;
@@ -96,6 +100,10 @@
   min-height: 0;
   overflow: auto;
   padding: 8px;
+}
+
+.compassViewport {
+  overflow-x: hidden;
 }
 
 .badgeSpot {

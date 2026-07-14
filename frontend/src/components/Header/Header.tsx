@@ -48,6 +48,7 @@ export function Header() {
     const next = value.trim().toUpperCase();
     if (!next) return;
     openTickerPane(next);
+    setActiveTab('heatmap');
     setRecentSearches((current) => [next, ...current.filter((ticker) => ticker !== next)].slice(0, 8));
     setTickerInput('');
     setIsSearchOpen(false);
