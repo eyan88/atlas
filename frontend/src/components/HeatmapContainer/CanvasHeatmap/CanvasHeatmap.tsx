@@ -138,8 +138,7 @@ function normalizeMatrixPerColumn(data: number[][]): number[][] {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CELL_W    = 106;  // px
-const CELL_H    = 42;   // px
+// Constants moved to component scope for dynamic sizing based on mode
 const AXIS_LEFT = 76;   // px for strike labels
 const AXIS_TOP  = 52;   // px for expiration labels
 const FONT      = "12px 'Inter', sans-serif";
@@ -158,6 +157,9 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
   const setHovered  = useAppStore((s) => s.setHoveredCell);
   const evolutionWindow = useAppStore((s) => s.evolutionWindow);
   const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
+
+  const CELL_W = isCompassMode ? 160 : 106;
+  const CELL_H = isCompassMode ? 26 : 42;
 
   // Resolve reference snapshot for calculations based on selected evolution window
   const tickerHistory = snapshotsHistory[ticker] ?? {};
@@ -428,37 +430,67 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
 
           // Fill main text
-          ctx.fillStyle = textColorForCell(r_, g_, b_);
-          ctx.font = "11px 'Inter', sans-serif";
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(label, x + CELL_W / 2, y + 8);
+          
+          if (isCompassMode) {
+            // Side by side
+            ctx.fillStyle = textColorForCell(r_, g_, b_);
+            ctx.font = "11px 'Inter', sans-serif";
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, x + CELL_W / 2 - 2, y + CELL_H / 2);
+            
+            const pct = pctChanges[r][c];
+            const isPos = pct >= 0;
+            const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
+            ctx.font = "9px 'Inter', sans-serif";
+            
+            const pctTextW = ctx.measureText(pctLabel).width;
+            const pillW = pctTextW + 8;
+            const pillH = 13;
+            const pillX = x + CELL_W / 2 + 6;
+            const pillY = y + CELL_H / 2 - pillH / 2;
+            
+            ctx.beginPath();
+            ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+            ctx.fill();
+            
+            ctx.fillStyle = pctColorForCell(isPos);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pctLabel, pillX + pillW / 2, y + CELL_H / 2 + 1);
+          } else {
+            // Top and bottom
+            ctx.fillStyle = textColorForCell(r_, g_, b_);
+            ctx.font = "11px 'Inter', sans-serif";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(label, x + CELL_W / 2, y + 8);
 
-          // Line 2: Percentage Change (Evolution)
-          const pct = pctChanges[r][c];
-          const isPos = pct >= 0;
-          const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
-          ctx.font = "9px 'Inter', sans-serif";
+            const pct = pctChanges[r][c];
+            const isPos = pct >= 0;
+            const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
+            ctx.font = "9px 'Inter', sans-serif";
+            
+            const pctTextW = ctx.measureText(pctLabel).width;
+            const pillW = pctTextW + 8;
+            const pillH = 13;
+            const pillX = x + CELL_W / 2 - pillW / 2;
+            const pillY = y + 23;
+            
+            ctx.beginPath();
+            ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+            ctx.fill();
 
-          // Translucent pill backdrop for readability
-          const pctTextW = ctx.measureText(pctLabel).width;
-          const pillW = pctTextW + 8;
-          const pillH = 13;
-          const pillX = x + CELL_W / 2 - pillW / 2;
-          const pillY = y + 23;
-          const pillR = 4; // border-radius
-          ctx.beginPath();
-          ctx.roundRect(pillX, pillY, pillW, pillH, pillR);
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-          ctx.fill();
-
-          ctx.fillStyle = pctColorForCell(isPos);
-          ctx.textAlign = 'center';
-          ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
+            ctx.fillStyle = pctColorForCell(isPos);
+            ctx.textAlign = 'center';
+            ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
+          }
         }
       }
     },
-    [evolutionWindow, refSnap],
+    [evolutionWindow, refSnap, isCompassMode, CELL_W, CELL_H],
   );
 
 
@@ -510,7 +542,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         setHovered(null);
       }
     },
-    [displaySnap, displayRefSnap, ticker, setHovered],
+    [displaySnap, displayRefSnap, ticker, setHovered, CELL_W, CELL_H],
   );
 
   const handleMouseLeave = useCallback(() => setHovered(null), [setHovered]);
