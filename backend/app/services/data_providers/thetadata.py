@@ -153,7 +153,7 @@ class ThetaDataProvider(BaseDataProvider):
 
         raise ThetaDataAPIError(f"Could not retrieve stock price for {ticker} from ThetaData.")
 
-    def get_option_chain(self, ticker: str) -> List[DomainOptionQuote]:
+    def get_option_chain(self, ticker: str, spot_price: float = None) -> List[DomainOptionQuote]:
         """
         Fetches the complete active option chain snapshot and calculates Greeks locally (Method B)
         using the native Rust-backed Black-Scholes solver from thetadatadx.
@@ -161,11 +161,12 @@ class ThetaDataProvider(BaseDataProvider):
         option_quotes: List[DomainOptionQuote] = []
 
         # 1. Fetch spot price of the underlying for Greeks calculation inputs
-        try:
-            spot_quote = self.get_underlying_quote(ticker)
-            spot_price = spot_quote.price
-        except Exception as e:
-            raise ThetaDataAPIError(f"Failed to fetch underlying spot price for Greeks calculations: {e}") from e
+        if spot_price is None:
+            try:
+                spot_quote = self.get_underlying_quote(ticker)
+                spot_price = spot_quote.price
+            except Exception as e:
+                raise ThetaDataAPIError(f"Failed to fetch underlying spot price for Greeks calculations: {e}") from e
 
         # 2. Get all active expirations (future or today)
         try:

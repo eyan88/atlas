@@ -61,8 +61,9 @@ async def realtime_live_publisher():
                 try:
                     await asyncio.sleep(1.0) # stagger requests
                     
-                    option_quotes = await asyncio.to_thread(provider.get_option_chain, ticker)
-                    spot_price = (await asyncio.to_thread(provider.get_underlying_quote, ticker)).price
+                    spot_quote = await asyncio.to_thread(provider.get_underlying_quote, ticker)
+                    spot_price = spot_quote.price
+                    option_quotes = await asyncio.to_thread(provider.get_option_chain, ticker, spot_price)
                     
                     if not option_quotes:
                         continue
