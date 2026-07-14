@@ -6,9 +6,10 @@ import styles from './HeatmapContainer.module.css';
 
 interface HeatmapContainerProps {
   ticker: string;
+  isCompassMode?: boolean;
 }
 
-export function HeatmapContainer({ ticker }: HeatmapContainerProps) {
+export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapContainerProps) {
   const closeTickerPane = useAppStore((s) => s.closeTickerPane);
   const snapshot = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
 
@@ -59,7 +60,7 @@ export function HeatmapContainer({ ticker }: HeatmapContainerProps) {
       <MetricControls />
       <EvolutionControls />
       <div className={styles.viewport}>
-        <CanvasHeatmap ticker={ticker} />
+        <CanvasHeatmap ticker={ticker} isCompassMode={isCompassMode} />
       </div>
     </section>
   );

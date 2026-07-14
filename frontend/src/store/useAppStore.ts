@@ -5,7 +5,11 @@ const MAX_OPEN_TICKERS = 5;
 
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
+export type AppTab = 'heatmap' | 'compass';
+
 interface AppState {
+  activeTab: AppTab;
+
   // Active symbol
   activeTicker: string;
 
@@ -60,6 +64,7 @@ interface AppState {
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
+  setActiveTab: (tab: AppTab) => void;
   setTicker: (ticker: string) => void;
   openTickerPane: (ticker: string) => void;
   closeTickerPane: (ticker: string) => void;
@@ -88,6 +93,7 @@ interface AppState {
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useAppStore = create<AppState>((set) => ({
+  activeTab: 'heatmap',
   activeTicker: '',
   openTickers: [],
   selectedMetric: 'net_gex',
@@ -108,6 +114,9 @@ export const useAppStore = create<AppState>((set) => ({
   wsConnected: false,
   isLoadingHistory: false,
   hoveredCell: null,
+  // ─── Actions ────────────────────────────────────────────────────────────────
+  
+  setActiveTab: (tab) => set({ activeTab: tab }),
 
   setTicker: (ticker) =>
     set((state) => {

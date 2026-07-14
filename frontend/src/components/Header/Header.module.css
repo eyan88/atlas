@@ -28,6 +28,38 @@
   margin-top: 2px;
 }
 
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(22, 27, 34, 0.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  margin-left: 12px;
+}
+.tab {
+  padding: 4px 12px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tab:hover {
+  color: var(--text-primary);
+}
+.tabActive {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.1) inset;
+}
+
 .searchTrigger {
   display: flex;
   align-items: center;

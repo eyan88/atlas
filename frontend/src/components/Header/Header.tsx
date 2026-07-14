@@ -3,6 +3,8 @@ import { useAppStore } from '../../store/useAppStore';
 import styles from './Header.module.css';
 
 export function Header() {
+  const activeTab = useAppStore((s) => s.activeTab);
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
   const openTickerPane = useAppStore((s) => s.openTickerPane);
   const strikeCount   = useAppStore((s) => s.strikeCount);
   const setStrikeCount = useAppStore((s) => s.setStrikeCount);
@@ -72,6 +74,22 @@ export function Header() {
         <span className={styles.brandLogo}>◈</span>
         <span className={styles.brandName}>ATLAS</span>
         <span className={styles.brandTagline}>Dealer Positioning</span>
+      </div>
+
+      {/* Tabs */}
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${activeTab === 'heatmap' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('heatmap')}
+        >
+          Heatmaps
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'compass' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('compass')}
+        >
+          Compass
+        </button>
       </div>
 
       {/* Ticker Search */}

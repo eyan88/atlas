@@ -16,6 +16,7 @@ export function App() {
   const setHeatmap     = useAppStore((s) => s.setHeatmap);
   const setHeatmapForTicker = useAppStore((s) => s.setHeatmapForTicker);
   const setTimelineData = useAppStore((s) => s.setTimelineData);
+  const activeTab      = useAppStore((s) => s.activeTab);
   const activeTicker   = useAppStore((s) => s.activeTicker);
   const openTickers    = useAppStore((s) => s.openTickers);
   const selectedMetric = useAppStore((s) => s.selectedMetric);
@@ -30,7 +31,9 @@ export function App() {
     const fetchAll = async () => {
       setIsLoadingHistory(true);
       
-      await Promise.all(openTickers.map(async (ticker, index) => {
+      const tickersToFetch = activeTab === 'compass' ? ['SPY', 'QQQ', 'IWM'] : openTickers;
+
+      await Promise.all(tickersToFetch.map(async (ticker, index) => {
         try {
           // Query timeline for the target date
           const timeline = await api.getTimeline(ticker, selectedDate);
@@ -94,8 +97,7 @@ export function App() {
     };
     
     fetchAll();
-  }, [openTickers, selectedMetric, strikeCount, selectedDate, setTimelineData, setHeatmapForTicker, setHeatmap, setTimestamp, activeTicker, setIsLoadingHistory]);
-
+  }, [openTickers, activeTab, selectedMetric, strikeCount, selectedDate, setTimelineData, setHeatmapForTicker, setHeatmap, setTimestamp, activeTicker, setIsLoadingHistory]);
 
   return (
     <div className={styles.app}>
@@ -108,9 +110,17 @@ export function App() {
           </div>
         )}
         <div className={styles.paneStrip}>
-          {openTickers.map((ticker) => (
-            <HeatmapContainer key={ticker} ticker={ticker} />
-          ))}
+          {activeTab === 'heatmap' ? (
+            openTickers.map((ticker) => (
+              <HeatmapContainer key={ticker} ticker={ticker} />
+            ))
+          ) : (
+            <>
+              <HeatmapContainer key="SPY-compass" ticker="SPY" isCompassMode />
+              <HeatmapContainer key="QQQ-compass" ticker="QQQ" isCompassMode />
+              <HeatmapContainer key="IWM-compass" ticker="IWM" isCompassMode />
+            </>
+          )}
         </div>
         <Sidebar />
       </div>

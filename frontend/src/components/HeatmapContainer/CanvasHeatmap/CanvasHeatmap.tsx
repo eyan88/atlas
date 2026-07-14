@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { HeatmapSnapshot } from '../../../types';
 import styles from './CanvasHeatmap.module.css';
@@ -149,9 +149,10 @@ const FONT_HDR  = "12px 'Inter', sans-serif";
 
 interface CanvasHeatmapProps {
   ticker: string;
+  isCompassMode?: boolean;
 }
 
-export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
+export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const heatmap     = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
   const setHovered  = useAppStore((s) => s.setHoveredCell);
@@ -187,6 +188,28 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
       refSnap = tickerHistory[historyTimestamps[0]] ?? null;
     }
   }
+
+  // ─── Compass Mode Slicing ────────────────────────────────────────────────────
+  
+  const displaySnap = useMemo(() => {
+    if (!heatmap) return null;
+    if (!isCompassMode) return heatmap;
+    return {
+      ...heatmap,
+      columns: heatmap.columns.slice(0, 1),
+      data: heatmap.data.map(row => [row[0]]),
+    };
+  }, [heatmap, isCompassMode]);
+
+  const displayRefSnap = useMemo(() => {
+    if (!refSnap) return null;
+    if (!isCompassMode) return refSnap;
+    return {
+      ...refSnap,
+      columns: refSnap.columns.slice(0, 1),
+      data: refSnap.data.map(row => [row[0]]),
+    };
+  }, [refSnap, isCompassMode]);
 
   // ─── Draw ──────────────────────────────────────────────────────────────────
 
@@ -438,58 +461,56 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
     [evolutionWindow, refSnap],
   );
 
+
   // Re-draw whenever heatmap or levels change
   useEffect(() => {
-    if (!heatmap || !canvasRef.current) return;
-    requestAnimationFrame(() => {
-      if (canvasRef.current) draw(heatmap, canvasRef.current);
-    });
-  }, [heatmap, draw]);
+    if (!displaySnap || !canvasRef.current) return;
+    draw(displaySnap, canvasRef.current);
+  }, [displaySnap, displayRefSnap, draw]);
 
-  // ─── Mouse interaction ────────────────────────────────────────────────────
+  // ─── Interaction ─────────────────────────────────────────────────────────────
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!heatmap || !canvasRef.current) return;
-      const rect   = canvasRef.current.getBoundingClientRect();
+      if (!displaySnap) return;
+      const rect = e.currentTarget.getBoundingClientRect();
       const mx     = e.clientX - rect.left;
       const my     = e.clientY - rect.top;
 
-      const colIdx = Math.floor((mx - AXIS_LEFT) / CELL_W);
-      const rowIdx = Math.floor((my - AXIS_TOP)  / CELL_H);
+      const cIdx = Math.floor((mx - AXIS_LEFT) / CELL_W);
+      const rIdx = Math.floor((my - AXIS_TOP)  / CELL_H);
 
       if (
-        rowIdx >= 0 && rowIdx < heatmap.rows.length &&
-        colIdx >= 0 && colIdx < heatmap.columns.length
+        cIdx >= 0 &&
+        cIdx < displaySnap.columns.length &&
+        rIdx >= 0 &&
+        rIdx < displaySnap.rows.length
       ) {
-        const strike = heatmap.rows[rowIdx];
-        const curVal = heatmap.data[rowIdx][colIdx];
+        const value = displaySnap.data[rIdx][cIdx];
         
-        // Calculate pctChange dynamically for the hovered cell
-        let refVal = curVal;
-        if (evolutionWindow === 'prev_day') {
-          refVal = curVal * (1 - 0.15 * Math.sin(strike));
-        } else if (refSnap && refSnap.data && refSnap.data[rowIdx]) {
-          refVal = refSnap.data[rowIdx][colIdx] ?? curVal;
+        // Find reference value for absolute/percent change
+        let refValue = null;
+        if (displayRefSnap && displayRefSnap.data[rIdx] && displayRefSnap.data[rIdx][cIdx] !== undefined) {
+          refValue = displayRefSnap.data[rIdx][cIdx];
         }
-        
-        const pctChange = refVal === 0 ? 0 : ((curVal - refVal) / Math.abs(refVal)) * 100;
+
+        const pctChange = (refValue !== null && refValue !== 0) ? ((value - refValue) / Math.abs(refValue)) * 100 : 0;
 
         setHovered({
           ticker,
-          strike,
-          expiration: heatmap.columns[colIdx],
-          value:      curVal,
-          metric:     useAppStore.getState().selectedMetric,
+          metric: useAppStore.getState().selectedMetric,
+          strike: displaySnap.rows[rIdx],
+          expiration: displaySnap.columns[cIdx],
+          value,
           pctChange,
-          rowIdx,
-          colIdx,
+          rowIdx: rIdx,
+          colIdx: cIdx
         });
       } else {
         setHovered(null);
       }
     },
-    [heatmap, setHovered, ticker, evolutionWindow, refSnap],
+    [displaySnap, displayRefSnap, ticker, setHovered],
   );
 
   const handleMouseLeave = useCallback(() => setHovered(null), [setHovered]);
