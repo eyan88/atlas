@@ -182,10 +182,10 @@ class ThetaDataProvider(BaseDataProvider):
         # 3. Retrieve local Greeks calculator
         try:
             from thetadatadx import all_greeks
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "The 'thetadatadx' library is required to calculate Greeks locally (Method B). "
-                "Install it using 'pip install thetadatadx'."
+                f"The 'thetadatadx' library is required to calculate Greeks locally (Method B). "
+                f"Install it using 'pip install thetadatadx'. Original error: {e}"
             )
 
         today = date.today()
