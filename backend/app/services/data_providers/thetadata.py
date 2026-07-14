@@ -1,7 +1,7 @@
 import os
 import time
 from datetime import date, timedelta
-from typing import List
+from typing import List, Optional
 import asyncio
 import pandas as pd
 import numpy as np
