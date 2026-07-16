@@ -282,21 +282,30 @@ export function GammaFlow() {
           {/* Top Bar for View Toggles and Ticker Add controls */}
           <div className={styles.topBar}>
             
-            {/* View Toggle Pill Group */}
-            <div className={styles.viewToggleGroup}>
+            {/* View Toggle Pill Group / Back Button */}
+            {viewMode === 'focus' ? (
               <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'dashboard' ? styles.viewToggleBtnActive : ''}`}
+                className={styles.backBtn}
                 onClick={() => setViewMode('dashboard')}
               >
-                Grid Board
+                ← Back to Grid
               </button>
-              <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'focus' ? styles.viewToggleBtnActive : ''}`}
-                onClick={() => setViewMode('focus')}
-              >
-                Detail Focus
-              </button>
-            </div>
+            ) : (
+              <div className={styles.viewToggleGroup}>
+                <button
+                  className={`${styles.viewToggleBtn} ${styles.viewToggleBtnActive}`}
+                  onClick={() => setViewMode('dashboard')}
+                >
+                  Grid Board
+                </button>
+                <button
+                  className={styles.viewToggleBtn}
+                  onClick={() => setViewMode('focus')}
+                >
+                  Detail Focus
+                </button>
+              </div>
+            )}
 
             {/* Dashboard Specific Top Controls */}
             {viewMode === 'dashboard' && (
