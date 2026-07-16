@@ -35,13 +35,6 @@ function formatUSD(value: number): string {
   return `${sign}$${abs.toFixed(2)}`;
 }
 
-function formatVolume(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
-  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(2)}M`;
-  if (abs >= 1e3) return `${sign}${(abs / 1e3).toFixed(1)}K`;
-  return `${sign}${abs.toFixed(0)}`;
-}
 
 export function GammaFlow() {
   const activeTicker = useAppStore((s) => s.activeTicker);
@@ -237,13 +230,13 @@ export function GammaFlow() {
     );
   };
 
-  // Add Widget (up to 4 widgets total)
-  const handleAddWidget = () => {
-    if (widgets.length >= MAX_WIDGETS) return;
+  // Add Widget Selector Change (max 4 widgets total)
+  const handleAddWidgetSelect = (ticker: string) => {
+    if (widgets.length >= MAX_WIDGETS || !ticker) return;
     const newId = `w_${Date.now()}`;
     const nextWidget: Widget = {
       id: newId,
-      ticker: AVAILABLE_TICKERS[widgets.length % AVAILABLE_TICKERS.length],
+      ticker: ticker,
       type: 'heatmap',
     };
     setWidgets((current) => [...current, nextWidget]);
@@ -270,7 +263,6 @@ export function GammaFlow() {
     : netFlowHistory;
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
-  const isNetVolumePositive = netFlow ? netFlow.net_volume >= 0 : false;
 
   return (
     <div className={styles.container}>
@@ -283,10 +275,14 @@ export function GammaFlow() {
 
       {/* Main Container Wrapper */}
       <div className={styles.tabContentWrapper}>
-        {/* Sidebar Controls */}
-        <aside className={styles.sidebar}>
-          <div className={styles.controlSection}>
-            <h3 className={styles.sectionTitle}>Dashboard View</h3>
+        
+        {/* Workspace occupies full width */}
+        <main className={styles.workspace}>
+          
+          {/* Top Bar for View Toggles and Ticker Add controls */}
+          <div className={styles.topBar}>
+            
+            {/* View Toggle Pill Group */}
             <div className={styles.viewToggleGroup}>
               <button
                 className={`${styles.viewToggleBtn} ${viewMode === 'dashboard' ? styles.viewToggleBtnActive : ''}`}
@@ -301,12 +297,29 @@ export function GammaFlow() {
                 Detail Focus
               </button>
             </div>
-          </div>
 
-          {viewMode === 'focus' && (
-            <>
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Active Ticker</h3>
+            {/* Dashboard Specific Top Controls */}
+            {viewMode === 'dashboard' && (
+              <div className={styles.topControlGroup}>
+                <span className={styles.topControlLabel}>Add Ticker Widget:</span>
+                <select
+                  className={styles.cardSelector}
+                  value=""
+                  onChange={(e) => handleAddWidgetSelect(e.target.value)}
+                  disabled={widgets.length >= MAX_WIDGETS}
+                >
+                  <option value="" disabled>Select Ticker ({widgets.length}/{MAX_WIDGETS})</option>
+                  {AVAILABLE_TICKERS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Focus View Ticker Pill Group */}
+            {viewMode === 'focus' && (
+              <div className={styles.topControlGroup}>
+                <span className={styles.topControlLabel}>Focus Ticker:</span>
                 <div className={styles.tickerList}>
                   {openTickers.map((t) => (
                     <button
@@ -319,74 +332,30 @@ export function GammaFlow() {
                   ))}
                 </div>
               </div>
+            )}
 
-              {/* Live Net Flow Summary */}
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Live Net Flow</h3>
-                {netFlow ? (
-                  <div className={styles.flowMetrics}>
-                    <div className={styles.metricCard}>
-                      <div className={styles.metricLabel}>Net Call Premium</div>
-                      <div className={`${styles.metricVal} ${styles.positive}`}>
-                        ▲ {formatUSD(netFlow.net_call_prem)}
-                      </div>
-                    </div>
-
-                    <div className={styles.metricCard}>
-                      <div className={styles.metricLabel}>Net Put Premium</div>
-                      <div className={`${styles.metricVal} ${styles.negative}`}>
-                        ▼ {formatUSD(netFlow.net_put_prem)}
-                      </div>
-                    </div>
-
-                    <div className={styles.metricCard}>
-                      <div className={styles.metricLabel}>Net Premium Flow</div>
-                      <div className={`${styles.metricVal} ${isNetPremiumPositive ? styles.positive : styles.negative}`}>
-                        {isNetPremiumPositive ? '▲ +' : '▼ '}{formatUSD(netFlow.net_premium)}
-                      </div>
-                    </div>
-
-                    <div className={styles.metricCard}>
-                      <div className={styles.metricLabel}>Net Volume Flow</div>
-                      <div className={`${styles.metricVal} ${isNetVolumePositive ? styles.positive : styles.negative}`}>
-                        {isNetVolumePositive ? '▲ +' : '▼ '}{formatVolume(netFlow.net_volume)} contracts
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className={styles.placeholderText}>Awaiting live flow updates...</p>
-                )}
+            {/* Focus View Compact Live Stats Panel */}
+            {viewMode === 'focus' && netFlow && (
+              <div className={styles.topStatsPanel}>
+                <div className={styles.statMetric}>
+                  <span className={styles.statLabel}>Net Call Prem</span>
+                  <span className={`${styles.statVal} ${styles.positive}`}>▲ {formatUSD(netFlow.net_call_prem)}</span>
+                </div>
+                <div className={styles.statMetric}>
+                  <span className={styles.statLabel}>Net Put Prem</span>
+                  <span className={`${styles.statVal} ${styles.negative}`}>▼ {formatUSD(netFlow.net_put_prem)}</span>
+                </div>
+                <div className={styles.statMetric}>
+                  <span className={styles.statLabel}>Net Premium</span>
+                  <span className={`${styles.statVal} ${isNetPremiumPositive ? styles.positive : styles.negative}`}>
+                    {isNetPremiumPositive ? '▲ +' : '▼ '}{formatUSD(netFlow.net_premium)}
+                  </span>
+                </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
 
-          {viewMode === 'dashboard' && (
-            <>
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Dashboard Actions</h3>
-                <button
-                  className={styles.addWidgetBtn}
-                  onClick={handleAddWidget}
-                  disabled={widgets.length >= MAX_WIDGETS}
-                >
-                  + Add Grid Item ({widgets.length}/{MAX_WIDGETS})
-                </button>
-              </div>
-
-              <div className={styles.controlSection}>
-                <h3 className={styles.sectionTitle}>Dashboard Instructions</h3>
-                <p className={styles.sidebarHint}>
-                  • Drag widget cards by the ☰ handle to rearrange them.<br />
-                  • Change tickers or chart types using card dropdowns.<br />
-                  • Click anywhere on a card's body to open detailed Focus View.
-                </p>
-              </div>
-            </>
-          )}
-        </aside>
-
-        {/* Main Charts Workspace */}
-        <main className={styles.workspace}>
+          {/* Core Content Area */}
           {loading ? (
             <div className={styles.loaderContainer}>
               <div className={styles.spinner} />
@@ -399,7 +368,7 @@ export function GammaFlow() {
           ) : viewMode === 'focus' ? (
             /* Focus View Content */
             <div className={styles.chartsGrid}>
-              {/* Top: Dealer GEX Heatmap Chart */}
+              {/* Top: GEX Heatmap Chart */}
               <section className={styles.chartWrapper}>
                 <div className={styles.chartHeader}>
                   <h2 className={styles.chartTitle}>Dealer Gamma Exposure Profile (Intraday Heatmap) — {currentTicker}</h2>

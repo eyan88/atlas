@@ -80,11 +80,11 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
         const val = matrix[`${ts}:${strike}`] || 0;
         const pct = val / maxGexAbs; // ranges -1 to 1
 
-        // Color Stop: Red for negative GEX, Green for positive, transparency at center
-        const opacity = Math.abs(pct);
+        // Boosted non-linear scale to make low/mid-range exposure levels vivid and clear
+        const boostedOpacity = Math.pow(Math.abs(pct), 0.75);
         ctx.fillStyle = pct >= 0
-          ? `rgba(16, 185, 129, ${opacity * 0.8})` // Green (#10b981)
-          : `rgba(239, 68, 68, ${opacity * 0.8})`;  // Red (#ef4444)
+          ? `rgba(0, 230, 118, ${boostedOpacity * 0.95})` // Vivid Neon Emerald Green
+          : `rgba(255, 61, 0, ${boostedOpacity * 0.95})`;  // Vivid Coral Crimson Red
 
         const y = getRowY(yIdx) - cellHeight / 2;
         ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5); // Add 0.5px to prevent rendering seams

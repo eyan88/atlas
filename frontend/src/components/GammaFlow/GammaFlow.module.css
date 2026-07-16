@@ -28,32 +28,45 @@
   min-height: 0;
 }
 
-/* Sidebar Styles */
-.sidebar {
-  width: 280px;
-  background: #0f111a;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 20px;
+/* Sidebar Removed - Workspace occupies full width */
+.workspace {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
   overflow-y: auto;
-  flex-shrink: 0;
+  gap: 20px;
 }
 
-.controlSection {
+/* Top Bar Dashboard Controls */
+.topBar {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(22, 24, 38, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 18px;
+  border-radius: 8px;
+  gap: 16px;
+  flex-wrap: wrap;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-.sectionTitle {
-  font-size: 10px;
+.topControlGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topControlLabel {
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   color: var(--text-secondary);
-  margin-bottom: 4px;
 }
 
 /* View toggle group button */
@@ -63,6 +76,7 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 3px;
   border-radius: 8px;
+  min-width: 180px;
 }
 
 .viewToggleBtn {
@@ -72,7 +86,7 @@
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 600;
-  padding: 6px 0;
+  padding: 5px 0;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -91,17 +105,17 @@
 .tickerList {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tickerBtn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-secondary);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -117,120 +131,37 @@
   color: #38bdf8 !important;
 }
 
-/* Sidebar Add Widget Button */
-.addWidgetBtn {
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px dashed rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+/* Compact Top Stats Panel */
+.topStatsPanel {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
+  gap: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 20px;
 }
 
-.addWidgetBtn:hover:not(:disabled) {
-  background: rgba(56, 189, 248, 0.18);
-  border-color: #38bdf8;
-}
-
-.addWidgetBtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
-}
-
-.flowMetrics {
+.statMetric {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: flex-start;
 }
 
-.metricCard {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  padding: 10px 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.metricLabel {
+.statLabel {
   font-size: 9px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.metricVal {
-  font-size: 14px;
+.statVal {
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: -0.01em;
 }
 
-.positive { color: #4ade80; }
-.negative { color: #f87171; }
-
-.placeholderText {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-style: italic;
-}
-
-.sidebarHint {
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
-
-/* Workspace Styles */
-.workspace {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.loaderContainer, .errorContainer {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid rgba(56, 189, 248, 0.1);
-  border-top-color: #38bdf8;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.errorMsg {
-  font-size: 14px;
-  font-weight: 600;
-  color: #f87171;
-}
+.positive { color: #00e676; } /* Vivid Neon Emerald */
+.negative { color: #ff3d00; } /* Vivid Coral Crimson */
 
 /* Grid Dashboard View */
 .dashboardGrid {
@@ -356,6 +287,37 @@
 .footerVal {
   font-size: 11px;
   font-weight: 700;
+}
+
+/* Loader / Error placeholders */
+.loaderContainer, .errorContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.1);
+  border-top-color: #38bdf8;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.errorMsg {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f87171;
 }
 
 /* Focus View Styles */
