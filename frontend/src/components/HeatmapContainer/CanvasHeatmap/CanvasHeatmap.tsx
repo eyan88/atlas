@@ -139,7 +139,6 @@ function normalizeMatrixPerColumn(data: number[][]): number[][] {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 // Constants moved to component scope for dynamic sizing based on mode
-const AXIS_LEFT = 76;   // px for strike labels
 const AXIS_TOP  = 52;   // px for expiration labels
 const FONT      = "12px 'Inter', sans-serif";
 const FONT_HDR  = "12px 'Inter', sans-serif";
@@ -160,6 +159,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
 
   const CELL_W = isCompassMode ? 160 : 106;
   const CELL_H = isCompassMode ? 26 : 42;
+  const axisLeft = isCompassMode ? 0 : 76;
 
   // Resolve reference snapshot for calculations based on selected evolution window
   const tickerHistory = snapshotsHistory[ticker] ?? {};
@@ -329,7 +329,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         });
       });
 
-      const W = AXIS_LEFT + cols.length * CELL_W + 4;
+      const W = axisLeft + cols.length * CELL_W + 4;
       const H = AXIS_TOP  + rows.length * CELL_H + 4;
 
       // Resize canvas
@@ -347,7 +347,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       ctx.textBaseline = 'middle';
 
       for (let c = 0; c < cols.length; c++) {
-        const x = AXIS_LEFT + c * CELL_W + CELL_W / 2;
+        const x = axisLeft + c * CELL_W + CELL_W / 2;
         const label = cols[c].slice(5); // "MM-DD"
         ctx.fillText(label, x, AXIS_TOP / 2);
       }
@@ -361,25 +361,8 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         const isCall = r === closestCallIdx;
         const isPut = r === closestPutIdx;
 
-        // Strike label
-        if (isSpot) {
-          ctx.fillStyle = '#f9fafb'; // White
-        } else if (isFlip) {
-          ctx.fillStyle = '#fbbf24'; // Amber/Gold
-        } else if (isCall) {
-          ctx.fillStyle = '#34d399'; // Mint Green
-        } else if (isPut) {
-          ctx.fillStyle = '#f87171'; // Coral Red
-        } else {
-          ctx.fillStyle = '#6b7280'; // Gray
-        }
-        ctx.font = FONT;
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(strike.toFixed(0), AXIS_LEFT - 6, y + CELL_H / 2);
-
         for (let c = 0; c < cols.length; c++) {
-          const x = AXIS_LEFT + c * CELL_W;
+          const x = axisLeft + c * CELL_W;
           const normVal = norm[r][c];
           
           // Map absolute exposure to color (warm gold for positive, violet for negative)
@@ -488,6 +471,29 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
             ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
           }
         }
+
+
+        // Strike label (drawn after cell backgrounds)
+        if (isSpot) {
+          ctx.fillStyle = '#f9fafb'; // White
+        } else if (isFlip) {
+          ctx.fillStyle = '#fbbf24'; // Amber/Gold
+        } else if (isCall) {
+          ctx.fillStyle = '#34d399'; // Mint Green
+        } else if (isPut) {
+          ctx.fillStyle = '#f87171'; // Coral Red
+        } else {
+          ctx.fillStyle = '#6b7280'; // Gray
+        }
+        ctx.font = FONT;
+        ctx.textBaseline = 'middle';
+        if (isCompassMode) {
+          ctx.textAlign = 'left';
+          ctx.fillText(strike.toFixed(0), axisLeft + 4, y + CELL_H / 2);
+        } else {
+          ctx.textAlign = 'right';
+          ctx.fillText(strike.toFixed(0), axisLeft - 6, y + CELL_H / 2);
+        }
       }
     },
     [evolutionWindow, refSnap, isCompassMode, CELL_W, CELL_H],
@@ -509,7 +515,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       const mx     = e.clientX - rect.left;
       const my     = e.clientY - rect.top;
 
-      const cIdx = Math.floor((mx - AXIS_LEFT) / CELL_W);
+      const cIdx = Math.floor((mx - axisLeft) / CELL_W);
       const rIdx = Math.floor((my - AXIS_TOP)  / CELL_H);
 
       if (
