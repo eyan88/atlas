@@ -60,7 +60,7 @@ class Settings(BaseModel):
     SUPPORTED_TICKERS: List[str] = ["SPY", "QQQ", "IWM"]
 
     # External Gamma Flow API URL
-    GAMMA_FLOW_API_URL: str = os.getenv("GAMMA_FLOW_API_URL", "http://localhost:8000")
+    GAMMA_FLOW_API_URL: str = os.getenv("GAMMA_FLOW_API_URL", "https://dashboard.houy.dev/api")
 
     @field_validator("SUPPORTED_TICKERS", mode="before")
     @classmethod
