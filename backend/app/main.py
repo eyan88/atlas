@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.endpoints import tickers, heatmap
+from app.api.endpoints import tickers, heatmap, gamma_flow
 from app.api.websockets import feed
 from app.services.publisher import realtime_live_publisher
 
@@ -64,3 +64,11 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/ws",
     tags=["websockets"]
 )
+
+# Gamma Flow router mounted at /api/v1/gamma-flow
+app.include_router(
+    gamma_flow.router,
+    prefix=f"{settings.API_V1_STR}/gamma-flow",
+    tags=["gamma-flow"]
+)
+

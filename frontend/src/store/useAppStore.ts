@@ -5,7 +5,7 @@ const MAX_OPEN_TICKERS = 5;
 
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
-export type AppTab = 'heatmap' | 'compass';
+export type AppTab = 'heatmap' | 'compass' | 'gamma-flow';
 
 interface AppState {
   activeTab: AppTab;

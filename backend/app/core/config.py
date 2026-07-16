@@ -59,6 +59,9 @@ class Settings(BaseModel):
     # List of active tickers to track
     SUPPORTED_TICKERS: List[str] = ["SPY", "QQQ", "IWM"]
 
+    # External Gamma Flow API URL
+    GAMMA_FLOW_API_URL: str = os.getenv("GAMMA_FLOW_API_URL", "http://localhost:8000")
+
     @field_validator("SUPPORTED_TICKERS", mode="before")
     @classmethod
     def parse_tickers(cls, v):

@@ -1,0 +1,238 @@
+.container {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: #0d0f14;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  width: 280px;
+  background: #0f111a;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.controlSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionTitle {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.tickerList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tickerBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tickerBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.tickerBtnActive {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+.flowMetrics {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metricCard {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.metricLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.metricVal {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.positive {
+  color: #4ade80;
+}
+
+.negative {
+  color: #f87171;
+}
+
+.placeholderText {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Workspace Styles */
+.workspace {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.loaderContainer, .errorContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.1);
+  border-top-color: #38bdf8;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.errorMsg {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f87171;
+}
+
+.errorHint {
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 480px;
+}
+
+.chartsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+}
+
+.chartWrapper {
+  background: #0f111a;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Top chart takes slightly more space */
+.chartsGrid > .chartWrapper:first-child {
+  flex: 1.3;
+  min-height: 340px;
+}
+
+.chartsGrid > .chartWrapper:last-child {
+  flex: 1;
+  min-height: 220px;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.chartTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.spotBadge {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.legendItem {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.bgPositive { background: #4ade80; }
+.bgNegative { background: #f87171; }
+
+.chartBody {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
