@@ -182,6 +182,27 @@
 
 /* Level badges */
 /* Status */
+.sidebarToggle {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: all 0.2s;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.sidebarToggle:hover {
+  background: var(--bg-surface);
+  border-color: var(--accent);
+}
+
 .status { display: flex; align-items: center; gap: 6px; }
 .statusDot {
   width: 7px; height: 7px;

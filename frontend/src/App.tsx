@@ -29,6 +29,7 @@ export function App() {
   const setTimestamp   = useAppStore((s) => s.setTimestamp);
   const isLoadingHistory = useAppStore((s) => s.isLoadingHistory);
   const setIsLoadingHistory = useAppStore((s) => s.setIsLoadingHistory);
+  const isSidebarOpen  = useAppStore((s) => s.isSidebarOpen);
 
   // 1. Preload the complete date timeline and history snapshots on mount / ticker change / date change
   useEffect(() => {
@@ -169,7 +170,7 @@ export function App() {
             )}
           </div>
         </div>
-        <Sidebar />
+        {isSidebarOpen && <Sidebar />}
       </div>
       <TimelineControls />
     </div>

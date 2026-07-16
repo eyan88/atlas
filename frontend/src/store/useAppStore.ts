@@ -62,6 +62,8 @@ interface AppState {
   // Currently hovered / selected cell (drives Sidebar inspector)
   hoveredCell: CellDetail | null;
 
+  isSidebarOpen: boolean;
+
   // ─── Actions ────────────────────────────────────────────────────────────────
 
   setActiveTab: (tab: AppTab) => void;
@@ -88,6 +90,7 @@ interface AppState {
   setHoveredCell: (cell: CellDetail | null) => void;
   setSelectedDate: (date: string) => void;
   setIsLoadingHistory: (loading: boolean) => void;
+  toggleSidebar: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -114,8 +117,10 @@ export const useAppStore = create<AppState>((set) => ({
   wsConnected: false,
   isLoadingHistory: false,
   hoveredCell: null,
+  isSidebarOpen: true,
   // ─── Actions ────────────────────────────────────────────────────────────────
   
+  toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setActiveTab: (tab) => set({ activeTab: tab }),
 
   setTicker: (ticker) =>

@@ -12,6 +12,8 @@ export function Header() {
   const openTickers   = useAppStore((s) => s.openTickers);
   const selectedDate   = useAppStore((s) => s.selectedDate);
   const setSelectedDate = useAppStore((s) => s.setSelectedDate);
+  const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const [tickerInput, setTickerInput] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -132,6 +134,15 @@ export function Header() {
           aria-label="Historical date"
         />
       </label>
+
+      <button
+        type="button"
+        className={styles.sidebarToggle}
+        onClick={toggleSidebar}
+        title="Toggle Inspector Panel"
+      >
+        {isSidebarOpen ? 'Hide Inspector' : 'Show Inspector'}
+      </button>
 
       {/* Connection Status */}
       <div className={styles.status}>
