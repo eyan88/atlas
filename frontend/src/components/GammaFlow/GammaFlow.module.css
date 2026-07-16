@@ -205,7 +205,7 @@
 /* Grid Dashboard View */
 .dashboardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 20px;
   padding-bottom: 40px;
 }
@@ -214,20 +214,19 @@
   background: #0f111a;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
-  padding: 16px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: 280px;
-  cursor: pointer;
+  height: 320px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
 .dashboardCard:hover {
-  transform: translateY(-4px);
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .cardHeader {
@@ -236,12 +235,41 @@
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding-bottom: 8px;
+  gap: 8px;
 }
 
-.cardTicker {
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+.cardLeftControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cardGrip {
+  cursor: grab;
+  color: var(--text-secondary);
+  font-size: 12px;
+  user-select: none;
+  padding: 2px 4px;
+}
+
+.cardGrip:active {
+  cursor: grabbing;
+}
+
+.cardSelector {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+.cardSelector option {
+  background: #0f111a;
   color: var(--text-primary);
 }
 

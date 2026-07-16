@@ -7,9 +7,25 @@ import { GammaHeatmap } from './GammaHeatmap';
 import styles from './GammaFlow.module.css';
 
 const REFRESH_INTERVAL_MS = 5000;
-const DASHBOARD_TICKERS = ["SPY", "QQQ", "IWM", "NVDA", "AAPL", "TSLA", "MSFT"];
+const AVAILABLE_TICKERS = ["SPY", "QQQ", "IWM", "NVDA", "AAPL", "TSLA", "MSFT"];
 
 type ViewMode = 'dashboard' | 'focus';
+type ChartType = 'heatmap' | 'net_flow' | 'bar_chart';
+
+interface Widget {
+  id: string;
+  ticker: string;
+  type: ChartType;
+}
+
+const DEFAULT_WIDGETS: Widget[] = [
+  { id: 'w1', ticker: 'QQQ', type: 'heatmap' },
+  { id: 'w2', ticker: 'QQQ', type: 'net_flow' },
+  { id: 'w3', ticker: 'SPY', type: 'heatmap' },
+  { id: 'w4', ticker: 'SPY', type: 'net_flow' },
+  { id: 'w5', ticker: 'NVDA', type: 'heatmap' },
+  { id: 'w6', ticker: 'TSLA', type: 'bar_chart' },
+];
 
 function formatUSD(value: number): string {
   const abs = Math.abs(value);
@@ -36,6 +52,9 @@ export function GammaFlow() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(activeTicker);
 
+  // Widget state for Dashboard Grid
+  const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
+
   // States for Focus view
   const [spot, setSpot] = useState<number>(0);
   const [netFlow, setNetFlow] = useState<NetFlowData | null>(null);
@@ -45,11 +64,13 @@ export function GammaFlow() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // States for Grid Dashboard view
+  // States for Grid Dashboard view data cache
   const [dashboardData, setDashboardData] = useState<Record<string, {
     spot: number;
     strikes: GammaStrike[];
     netFlow: NetFlowData | null;
+    netFlowHistory: NetFlowData[];
+    gammaHistory: GammaStrike[];
   }>>({});
 
   // Sync with main app store active ticker if it changes
@@ -100,7 +121,6 @@ export function GammaFlow() {
     fetchData();
     fetchHistory();
 
-    // Start polling loop
     timerId = setInterval(fetchData, REFRESH_INTERVAL_MS);
 
     return () => {
@@ -109,7 +129,7 @@ export function GammaFlow() {
     };
   }, [currentTicker, viewMode]);
 
-  // Fetch Dashboard Grid Data
+  // Fetch Dashboard Grid Data (Batch requests for active tickers)
   useEffect(() => {
     if (viewMode !== 'dashboard') return;
 
@@ -118,18 +138,26 @@ export function GammaFlow() {
 
     const fetchAllDashboardData = async () => {
       try {
+        const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
         const results: typeof dashboardData = {};
         let mockActive = false;
 
-        await Promise.all(DASHBOARD_TICKERS.map(async (ticker) => {
+        await Promise.all(uniqueTickers.map(async (ticker) => {
           try {
-            const data = await gammaFlowApi.getCurrentGamma(ticker);
+            const [currentData, netFlowHist, gammaHist] = await Promise.all([
+              gammaFlowApi.getCurrentGamma(ticker),
+              gammaFlowApi.getHistoricalNetFlow(ticker),
+              gammaFlowApi.getHistoricalGamma(ticker),
+            ]);
+
             results[ticker] = {
-              spot: data.price,
-              strikes: data.strikes,
-              netFlow: data.net_flow,
+              spot: currentData.price,
+              strikes: currentData.strikes,
+              netFlow: currentData.net_flow,
+              netFlowHistory: netFlowHist.history,
+              gammaHistory: gammaHist.history,
             };
-            if (data.isMock) mockActive = true;
+            if (currentData.isMock) mockActive = true;
           } catch (err) {
             console.error(`Failed to fetch dashboard data for ${ticker}:`, err);
           }
@@ -156,17 +184,40 @@ export function GammaFlow() {
       active = false;
       clearInterval(timerId);
     };
-  }, [viewMode]);
+  }, [viewMode, widgets]);
 
   const handleTickerChange = (ticker: string) => {
     setCurrentTicker(ticker);
     setTicker(ticker);
   };
 
-  const handleCardClick = (ticker: string) => {
-    setCurrentTicker(ticker);
-    setTicker(ticker);
-    setViewMode('focus');
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = Number(e.dataTransfer.getData('text/plain'));
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
+
+    const updated = [...widgets];
+    const [draggedWidget] = updated.splice(sourceIndex, 1);
+    updated.splice(targetIndex, 0, draggedWidget);
+    setWidgets(updated);
+  };
+
+  const handleWidgetTickerChange = (id: string, nextTicker: string) => {
+    setWidgets((current) =>
+      current.map((w) => (w.id === id ? { ...w, ticker: nextTicker } : w))
+    );
+  };
+
+  const handleWidgetTypeChange = (id: string, nextType: ChartType) => {
+    setWidgets((current) =>
+      current.map((w) => (w.id === id ? { ...w, type: nextType } : w))
+    );
   };
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
@@ -264,7 +315,7 @@ export function GammaFlow() {
             <div className={styles.controlSection}>
               <h3 className={styles.sectionTitle}>Tickers Tracked</h3>
               <p className={styles.sidebarHint}>
-                Displaying real-time feed updates for index ETFs and major tech equities. Click any card in the grid to drill down.
+                Drag and drop widget cards to rearrange. Customize ticker or chart type directly using the dropdown selectors on each card header.
               </p>
             </div>
           )}
@@ -284,7 +335,7 @@ export function GammaFlow() {
           ) : viewMode === 'focus' ? (
             /* Focus View Content */
             <div className={styles.chartsGrid}>
-              {/* Top: Dealer GEX Bar Chart */}
+              {/* Top: Dealer GEX Heatmap Chart */}
               <section className={styles.chartWrapper}>
                 <div className={styles.chartHeader}>
                   <h2 className={styles.chartTitle}>Dealer Gamma Exposure Profile (Intraday Heatmap) — {currentTicker}</h2>
@@ -312,25 +363,61 @@ export function GammaFlow() {
           ) : (
             /* Grid Dashboard View Content */
             <div className={styles.dashboardGrid}>
-              {DASHBOARD_TICKERS.map((ticker) => {
-                const data = dashboardData[ticker];
+              {widgets.map((widget, index) => {
+                const data = dashboardData[widget.ticker];
                 if (!data) return null;
                 const netPrem = data.netFlow?.net_premium ?? 0;
                 const isPositive = netPrem >= 0;
 
                 return (
                   <div
-                    key={ticker}
+                    key={widget.id}
                     className={styles.dashboardCard}
-                    onClick={() => handleCardClick(ticker)}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleDrop(e, index)}
                   >
+                    {/* Card Header with Interactive Dropdown Controls */}
                     <div className={styles.cardHeader}>
-                      <span className={styles.cardTicker}>{ticker}</span>
+                      <div className={styles.cardLeftControls}>
+                        <span className={styles.cardGrip}>☰</span>
+                        
+                        {/* Ticker Dropdown Selector */}
+                        <select
+                          className={styles.cardSelector}
+                          value={widget.ticker}
+                          onChange={(e) => handleWidgetTickerChange(widget.id, e.target.value)}
+                        >
+                          {AVAILABLE_TICKERS.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+
+                        {/* Chart Type Dropdown Selector */}
+                        <select
+                          className={styles.cardSelector}
+                          value={widget.type}
+                          onChange={(e) => handleWidgetTypeChange(widget.id, e.target.value as ChartType)}
+                        >
+                          <option value="heatmap">Heatmap</option>
+                          <option value="net_flow">Net Flow</option>
+                          <option value="bar_chart">Bar Chart</option>
+                        </select>
+                      </div>
+
                       <span className={styles.cardSpot}>${data.spot.toFixed(2)}</span>
                     </div>
                     
+                    {/* Conditional Chart Rendering based on Widget Type */}
                     <div className={styles.cardChartBody}>
-                      <GammaBarChart strikes={data.strikes} spot={data.spot} />
+                      {widget.type === 'heatmap' ? (
+                        <GammaHeatmap history={data.gammaHistory} />
+                      ) : widget.type === 'net_flow' ? (
+                        <NetFlowChart history={data.netFlowHistory} />
+                      ) : (
+                        <GammaBarChart strikes={data.strikes} spot={data.spot} />
+                      )}
                     </div>
 
                     <div className={styles.cardFooter}>
