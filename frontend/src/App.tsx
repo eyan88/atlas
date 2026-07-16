@@ -146,7 +146,7 @@ export function App() {
               <EvolutionControls />
             </div>
           </div>
-          <div className={styles.paneStrip}>
+          <div className={`${styles.paneStrip} ${activeTab === 'compass' ? styles.compassStrip : ''}`}>
             {activeTab === 'heatmap' ? (
               openTickers.map((ticker) => (
                 <div

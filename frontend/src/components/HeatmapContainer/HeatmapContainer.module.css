@@ -13,6 +13,12 @@
 
 .compassContainer {
   min-width: max-content;
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid var(--border);
+}
+.compassContainer:last-child {
+  border-right: none;
 }
 
 .titleBar {

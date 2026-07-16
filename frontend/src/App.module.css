@@ -129,6 +129,11 @@
   background: var(--bg-base);
 }
 
+.compassStrip {
+  gap: 0;
+  padding: 0;
+}
+
 .loadingOverlay {
   position: absolute;
   top: var(--header-h);
