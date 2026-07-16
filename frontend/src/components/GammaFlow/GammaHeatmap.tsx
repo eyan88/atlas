@@ -184,11 +184,11 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
       });
 
       if (hasLine) {
-        // High visibility outer glow
-        ctx.shadowColor = 'rgba(245, 158, 11, 0.75)';
-        ctx.shadowBlur = 10;
+        // High visibility outer glow (thin, clean profile)
+        ctx.shadowColor = 'rgba(245, 158, 11, 0.65)';
+        ctx.shadowBlur = 5;
         ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 1.8;
         ctx.stroke();
         ctx.shadowBlur = 0; // reset
       }

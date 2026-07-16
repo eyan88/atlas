@@ -166,11 +166,11 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       for (let i = 1; i < sorted.length; i++) {
         ctx.lineTo(getX(sorted[i].timestamp), getSpotY(sorted[i].price));
       }
-      // Glowing highlight
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.65)';
-      ctx.shadowBlur = 8;
+      // Glowing highlight (thin, clean profile)
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.5)';
+      ctx.shadowBlur = 5;
       ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 3.0;
+      ctx.lineWidth = 1.8;
       ctx.setLineDash([3, 3]); // dotted line to differentiate from flows
       ctx.stroke();
       ctx.setLineDash([]); // reset
