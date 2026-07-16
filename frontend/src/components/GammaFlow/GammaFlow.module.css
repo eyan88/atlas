@@ -435,3 +435,23 @@
   box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
   transform: translateY(-4px) scale(1.01);
 }
+
+.cardLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.cardSpinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.1);
+  border-top-color: #38bdf8;
+  animation: spin 1s linear infinite;
+}

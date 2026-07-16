@@ -439,18 +439,17 @@ export function GammaFlow() {
             <div className={styles.dashboardGrid}>
               {widgets.map((widget, index) => {
                 const data = dashboardData[widget.ticker];
-                if (!data) return null;
-                const netPrem = data.netFlow?.net_premium ?? 0;
+                const netPrem = data?.netFlow?.net_premium ?? 0;
                 const isPositive = netPrem >= 0;
 
-                // Scrub historical grid data
-                const widgetGammaHistory = currentTimestamp
+                // Scrub historical grid data if loaded
+                const widgetGammaHistory = data && currentTimestamp
                   ? data.gammaHistory.filter((h) => h.timestamp <= currentTimestamp)
-                  : data.gammaHistory;
+                  : data?.gammaHistory ?? [];
 
-                const widgetNetFlowHistory = currentTimestamp
+                const widgetNetFlowHistory = data && currentTimestamp
                   ? data.netFlowHistory.filter((h) => h.timestamp <= currentTimestamp)
-                  : data.netFlowHistory;
+                  : data?.netFlowHistory ?? [];
 
                 return (
                   <div
@@ -462,7 +461,7 @@ export function GammaFlow() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, index)}
-                    onClick={() => handleCardClick(widget.ticker)}
+                    onClick={() => data && handleCardClick(widget.ticker)}
                   >
                     {/* Card Header with Interactive Dropdown Controls */}
                     <div className={styles.cardHeader}>
@@ -507,7 +506,9 @@ export function GammaFlow() {
                       </div>
 
                       <div className={styles.cardRightControls}>
-                        <span className={styles.cardSpot}>${data.spot.toFixed(2)}</span>
+                        <span className={styles.cardSpot}>
+                          {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
+                        </span>
                         
                         {/* Close/Delete Card Button */}
                         <button
@@ -525,7 +526,12 @@ export function GammaFlow() {
                     
                     {/* Conditional Chart Rendering based on Widget Type */}
                     <div className={styles.cardChartBody}>
-                      {widget.type === 'heatmap' ? (
+                      {!data ? (
+                        <div className={styles.cardLoading}>
+                          <div className={styles.cardSpinner} />
+                          <span>Fetching {widget.ticker} data...</span>
+                        </div>
+                      ) : widget.type === 'heatmap' ? (
                         <GammaHeatmap history={widgetGammaHistory} />
                       ) : widget.type === 'net_flow' ? (
                         <NetFlowChart history={widgetNetFlowHistory} />
@@ -536,8 +542,8 @@ export function GammaFlow() {
 
                     <div className={styles.cardFooter}>
                       <div className={styles.footerLabel}>Net Premium</div>
-                      <div className={`${styles.footerVal} ${isPositive ? styles.positive : styles.negative}`}>
-                        {isPositive ? '▲ +' : '▼ '}{formatUSD(netPrem)}
+                      <div className={`${styles.footerVal} ${!data ? '' : isPositive ? styles.positive : styles.negative}`}>
+                        {data ? `${isPositive ? '▲ +' : '▼ '}${formatUSD(netPrem)}` : '--'}
                       </div>
                     </div>
                   </div>
