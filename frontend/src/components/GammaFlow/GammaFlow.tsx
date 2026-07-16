@@ -58,6 +58,7 @@ export function GammaFlow() {
   const [isMockDataActive, setIsMockDataActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
   // States for Grid Dashboard view data cache
   const [dashboardData, setDashboardData] = useState<Record<string, {
@@ -205,11 +206,17 @@ export function GammaFlow() {
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
+    setDraggedIdx(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIdx(null);
   };
 
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     const sourceIndex = Number(e.dataTransfer.getData('text/plain'));
+    setDraggedIdx(null);
     if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
 
     const updated = [...widgets];
@@ -424,7 +431,12 @@ export function GammaFlow() {
                 return (
                   <div
                     key={widget.id}
-                    className={styles.dashboardCard}
+                    className={`${styles.dashboardCard} ${draggedIdx === index ? styles.draggedCard : ''}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleDrop(e, index)}
                     onClick={() => handleCardClick(widget.ticker)}
                   >
                     {/* Card Header with Interactive Dropdown Controls */}
@@ -433,10 +445,6 @@ export function GammaFlow() {
                         {/* Drag Handle */}
                         <span
                           className={styles.cardGrip}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, index)}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => handleDrop(e, index)}
                           onClick={(e) => e.stopPropagation()}
                         >
                           ☰

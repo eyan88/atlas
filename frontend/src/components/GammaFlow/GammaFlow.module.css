@@ -422,3 +422,10 @@
   min-height: 0;
   width: 100%;
 }
+
+.draggedCard {
+  opacity: 0.35;
+  border: 1px dashed #38bdf8 !important;
+  box-shadow: none !important;
+  transform: scale(0.98);
+}
