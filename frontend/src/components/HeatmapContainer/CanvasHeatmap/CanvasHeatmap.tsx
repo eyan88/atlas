@@ -487,12 +487,13 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         }
         ctx.font = FONT;
         ctx.textBaseline = 'middle';
+        const strikeLabel = Number.isInteger(strike) ? strike.toFixed(0) : strike.toFixed(2).replace(/\.?0+$/, '');
         if (isCompassMode) {
           ctx.textAlign = 'left';
-          ctx.fillText(strike.toFixed(0), axisLeft + 4, y + CELL_H / 2);
+          ctx.fillText(strikeLabel, axisLeft + 4, y + CELL_H / 2);
         } else {
           ctx.textAlign = 'right';
-          ctx.fillText(strike.toFixed(0), axisLeft - 6, y + CELL_H / 2);
+          ctx.fillText(strikeLabel, axisLeft - 6, y + CELL_H / 2);
         }
       }
     },
