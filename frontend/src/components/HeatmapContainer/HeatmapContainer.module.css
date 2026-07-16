@@ -12,6 +12,7 @@
 }
 
 .compassContainer {
+  flex: 0 0 auto;
   min-width: max-content;
   border: none;
   border-radius: 0;
@@ -23,17 +24,31 @@
 
 .titleBar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 6px 10px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
 }
 
+.titleContent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.titleContentCompass {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 .levelBar {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .levelBadge {

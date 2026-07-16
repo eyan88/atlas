@@ -35,7 +35,7 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
   return (
     <section className={`${styles.container} ${isCompassMode ? styles.compassContainer : ''}`}>
       <div className={styles.titleBar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className={isCompassMode ? styles.titleContentCompass : styles.titleContent}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span className={styles.title}>{ticker}</span>
             {snapshot?.timestamp && (
