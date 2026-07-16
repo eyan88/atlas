@@ -60,6 +60,9 @@ export interface CellDetail {
   colIdx: number;
   /** Row index in the matrix */
   rowIdx: number;
+  /** Page coordinates for tooltip positioning */
+  mouseX: number;
+  mouseY: number;
 }
 
 // ─── WebSocket Messages ───────────────────────────────────────────────────────

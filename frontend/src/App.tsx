@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import type { HeatmapSnapshot } from './types';
 import { Header } from './components/Header/Header';
-import { Sidebar } from './components/Sidebar/Sidebar';
 import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer';
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
+import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
 import { useAppStore } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
@@ -29,7 +29,7 @@ export function App() {
   const setTimestamp   = useAppStore((s) => s.setTimestamp);
   const isLoadingHistory = useAppStore((s) => s.isLoadingHistory);
   const setIsLoadingHistory = useAppStore((s) => s.setIsLoadingHistory);
-  const isSidebarOpen  = useAppStore((s) => s.isSidebarOpen);
+
 
   // 1. Preload the complete date timeline and history snapshots on mount / ticker change / date change
   useEffect(() => {
@@ -170,7 +170,7 @@ export function App() {
             )}
           </div>
         </div>
-        {isSidebarOpen && <Sidebar />}
+        <HoverTooltip />
       </div>
       <TimelineControls />
     </div>

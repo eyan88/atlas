@@ -543,7 +543,9 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           value,
           pctChange,
           rowIdx: rIdx,
-          colIdx: cIdx
+          colIdx: cIdx,
+          mouseX: e.pageX,
+          mouseY: e.pageY,
         });
       } else {
         setHovered(null);
