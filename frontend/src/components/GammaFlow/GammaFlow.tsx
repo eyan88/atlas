@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { gammaFlowApi, type GammaStrike, type NetFlowData } from '../../api/gammaFlowClient';
 import { GammaBarChart } from './GammaBarChart';
 import { NetFlowChart } from './NetFlowChart';
+import { GammaHeatmap } from './GammaHeatmap';
 import styles from './GammaFlow.module.css';
 
 const REFRESH_INTERVAL_MS = 5000;
@@ -37,9 +38,9 @@ export function GammaFlow() {
 
   // States for Focus view
   const [spot, setSpot] = useState<number>(0);
-  const [strikes, setStrikes] = useState<GammaStrike[]>([]);
   const [netFlow, setNetFlow] = useState<NetFlowData | null>(null);
   const [netFlowHistory, setNetFlowHistory] = useState<NetFlowData[]>([]);
+  const [gammaHistory, setGammaHistory] = useState<GammaStrike[]>([]);
   const [isMockDataActive, setIsMockDataActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +71,6 @@ export function GammaFlow() {
         const data = await gammaFlowApi.getCurrentGamma(currentTicker);
         if (!active) return;
         setSpot(data.price);
-        setStrikes(data.strikes);
         setNetFlow(data.net_flow);
         setIsMockDataActive(!!data.isMock);
         setError(null);
@@ -84,11 +84,15 @@ export function GammaFlow() {
 
     const fetchHistory = async () => {
       try {
-        const historyData = await gammaFlowApi.getHistoricalNetFlow(currentTicker);
+        const [netFlowData, gammaData] = await Promise.all([
+          gammaFlowApi.getHistoricalNetFlow(currentTicker),
+          gammaFlowApi.getHistoricalGamma(currentTicker),
+        ]);
         if (!active) return;
-        setNetFlowHistory(historyData.history);
+        setNetFlowHistory(netFlowData.history);
+        setGammaHistory(gammaData.history);
       } catch (err) {
-        console.error('Failed to load net flow history:', err);
+        console.error('Failed to load history:', err);
       }
     };
 
@@ -283,11 +287,11 @@ export function GammaFlow() {
               {/* Top: Dealer GEX Bar Chart */}
               <section className={styles.chartWrapper}>
                 <div className={styles.chartHeader}>
-                  <h2 className={styles.chartTitle}>Dealer Gamma Exposure — {currentTicker}</h2>
+                  <h2 className={styles.chartTitle}>Dealer Gamma Exposure Profile (Intraday Heatmap) — {currentTicker}</h2>
                   <span className={styles.spotBadge}>Spot price: ${spot.toFixed(2)}</span>
                 </div>
                 <div className={styles.chartBody}>
-                  <GammaBarChart strikes={strikes} spot={spot} />
+                  <GammaHeatmap history={gammaHistory} />
                 </div>
               </section>
 

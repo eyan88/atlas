@@ -163,6 +163,52 @@ export function generateMockNetFlowHistory(ticker: string): HistoricalNetFlowRes
   };
 }
 
+export function generateMockGammaHistory(ticker: string): HistoricalGammaResponse {
+  const spot = TICKER_SPOTS[ticker.toUpperCase()] || 100.0;
+  const history: GammaStrike[] = [];
+  const now = Math.floor(Date.now() / 1000);
+
+  const strikeInterval = spot > 500 ? 5 : spot > 200 ? 2.5 : 1;
+  const baseStrike = Math.round(spot / strikeInterval) * strikeInterval;
+
+  // Let the spot price drift dynamically over 20 timestamps
+  let currentSpot = spot;
+
+  for (let tIdx = 0; tIdx < 20; tIdx++) {
+    const timestamp = now - (20 - tIdx) * 600; // 10 min intervals
+    // Random walk drift for price line
+    currentSpot += (Math.random() - 0.5) * 1.5;
+
+    for (let i = -7; i <= 7; i++) {
+      const strike = baseStrike + i * strikeInterval;
+      const isAboveSpot = strike > currentSpot;
+      const factor = Math.exp(-Math.abs(strike - currentSpot) / (strikeInterval * 4));
+      
+      const multiplier = ['SPY', 'QQQ'].includes(ticker) ? 1.5e9 : 3.5e7;
+      const dealerGamma = (isAboveSpot ? 1.2 : -1.0) * factor * multiplier * (0.8 + Math.random() * 0.4);
+      const callGamma = Math.max(0, dealerGamma) + Math.random() * 0.2 * multiplier;
+      const putGamma = Math.min(0, dealerGamma) - Math.random() * 0.2 * multiplier;
+
+      history.push({
+        timestamp,
+        ticker,
+        strike,
+        price: currentSpot,
+        dealer_gamma_vol: dealerGamma,
+        call_gamma_vol: callGamma,
+        put_gamma_vol: putGamma,
+      });
+    }
+  }
+
+  return {
+    ticker,
+    date: new Date().toISOString().split('T')[0],
+    history,
+  };
+}
+
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -183,15 +229,19 @@ export const gammaFlowApi = {
     }
   },
 
-  getHistoricalGamma: (
+  getHistoricalGamma: async (
     ticker: string,
     opts: { date?: string; limit?: number } = {}
   ): Promise<HistoricalGammaResponse> => {
-    const params = new URLSearchParams();
-    if (opts.date) params.set('date', opts.date);
-    if (opts.limit !== undefined) params.set('limit', String(opts.limit));
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    return get<HistoricalGammaResponse>(`/historical/${ticker}${qs}`);
+    try {
+      const params = new URLSearchParams();
+      if (opts.date) params.set('date', opts.date);
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      return await get<HistoricalGammaResponse>(`/historical/${ticker}${qs}`);
+    } catch (e) {
+      return generateMockGammaHistory(ticker);
+    }
   },
 
   getCurrentNetFlow: async (ticker: string): Promise<NetFlowData> => {
