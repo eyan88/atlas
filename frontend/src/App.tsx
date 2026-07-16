@@ -19,6 +19,8 @@ export function App() {
   const activeTab      = useAppStore((s) => s.activeTab);
   const activeTicker   = useAppStore((s) => s.activeTicker);
   const openTickers    = useAppStore((s) => s.openTickers);
+  const setTicker      = useAppStore((s) => s.setTicker);
+  const closeTickerPane = useAppStore((s) => s.closeTickerPane);
   const selectedMetric = useAppStore((s) => s.selectedMetric);
   const strikeCount    = useAppStore((s) => s.strikeCount);
   const selectedDate   = useAppStore((s) => s.selectedDate);
@@ -109,28 +111,53 @@ export function App() {
             <p>Loading market data...</p>
           </div>
         )}
-        <div className={styles.paneStrip}>
-          {activeTab === 'heatmap' ? (
-            openTickers.map((ticker) => (
-              <div
-                key={ticker}
-                style={{
-                  display: ticker === activeTicker ? 'flex' : 'none',
-                  flex: 1,
-                  minWidth: 0,
-                  minHeight: 0
-                }}
-              >
-                <HeatmapContainer ticker={ticker} />
-              </div>
-            ))
-          ) : (
-            <>
-              <HeatmapContainer key="SPY-compass" ticker="SPY" isCompassMode />
-              <HeatmapContainer key="QQQ-compass" ticker="QQQ" isCompassMode />
-              <HeatmapContainer key="IWM-compass" ticker="IWM" isCompassMode />
-            </>
+        <div className={styles.mainArea}>
+          {activeTab === 'heatmap' && openTickers.length > 0 && (
+            <div className={styles.browserTabs}>
+              {openTickers.map((t) => (
+                <div
+                  key={t}
+                  className={`${styles.browserTab} ${t === activeTicker ? styles.browserTabActive : ''}`}
+                  onClick={() => setTicker(t)}
+                >
+                  <span className={styles.browserTabTitle}>{t}</span>
+                  <button
+                    type="button"
+                    className={styles.browserTabClose}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTickerPane(t);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
+          <div className={styles.paneStrip}>
+            {activeTab === 'heatmap' ? (
+              openTickers.map((ticker) => (
+                <div
+                  key={ticker}
+                  style={{
+                    display: ticker === activeTicker ? 'flex' : 'none',
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 0
+                  }}
+                >
+                  <HeatmapContainer ticker={ticker} />
+                </div>
+              ))
+            ) : (
+              <>
+                <HeatmapContainer key="SPY-compass" ticker="SPY" isCompassMode />
+                <HeatmapContainer key="QQQ-compass" ticker="QQQ" isCompassMode />
+                <HeatmapContainer key="IWM-compass" ticker="IWM" isCompassMode />
+              </>
+            )}
+          </div>
         </div>
         <Sidebar />
       </div>

@@ -24,37 +24,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.tabBar {
-  display: flex;
-  align-items: stretch;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-}
-
-.tickerTab {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 12px;
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-  background: var(--bg-base);
-  color: var(--text-secondary);
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.tickerTab:hover {
-  background: var(--bg-hover);
-}
-
-.tickerTabActive {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--accent);
-}
-
 .levelBar {
   display: flex;
   align-items: center;
