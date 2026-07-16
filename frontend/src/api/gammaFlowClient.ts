@@ -41,6 +41,7 @@ export interface HistoricalGammaResponse {
   ticker: string;
   date: string;
   history: GammaStrike[];
+  isMock?: boolean;
 }
 
 export interface HistoricalNetFlowResponse {
@@ -67,22 +68,25 @@ const TICKER_SPOTS: Record<string, number> = {
   MSFT: 398.80,
 };
 
+function getBaseTimestampForDate(dateStr: string): number {
+  // Parse YYYY-MM-DD to a local 9:30 AM timestamp
+  const d = new Date(`${dateStr}T09:30:00`);
+  return isNaN(d.getTime()) ? Math.floor(Date.now() / 1000) - 23400 : Math.floor(d.getTime() / 1000);
+}
+
 export function generateMockGammaFlow(ticker: string): GammaFlowResponse {
   const spot = TICKER_SPOTS[ticker.toUpperCase()] || 100.0;
   const timestamp = Math.floor(Date.now() / 1000);
   const strikes: GammaStrike[] = [];
 
-  // Generate 15 strikes around spot price
   const strikeInterval = spot > 500 ? 5 : spot > 200 ? 2.5 : 1;
   const baseStrike = Math.round(spot / strikeInterval) * strikeInterval;
 
   for (let i = -7; i <= 7; i++) {
     const strike = baseStrike + i * strikeInterval;
-    // Positive gamma above spot (calls dominant), negative below spot (puts dominant)
     const isAboveSpot = strike > spot;
     const factor = Math.exp(-Math.abs(strike - spot) / (strikeInterval * 4));
     
-    // Scale values to realistic sizes (billions for index ETFs, millions for stock options)
     const multiplier = ['SPY', 'QQQ'].includes(ticker) ? 1.5e9 : 3.5e7;
     const dealerGamma = (isAboveSpot ? 1.2 : -1.0) * factor * multiplier * (0.8 + Math.random() * 0.4);
     const callGamma = Math.max(0, dealerGamma) + Math.random() * 0.2 * multiplier;
@@ -99,7 +103,6 @@ export function generateMockGammaFlow(ticker: string): GammaFlowResponse {
     });
   }
 
-  // Generate net flow metrics
   const multiplier = ['SPY', 'QQQ'].includes(ticker) ? 1.0e9 : 1.0e7;
   const netCallPrem = (1.5 + Math.random() * 1.0) * multiplier;
   const netPutPrem = (1.0 + Math.random() * 1.0) * multiplier;
@@ -126,25 +129,24 @@ export function generateMockGammaFlow(ticker: string): GammaFlowResponse {
   };
 }
 
-export function generateMockNetFlowHistory(ticker: string): HistoricalNetFlowResponse {
+export function generateMockNetFlowHistory(ticker: string, dateStr: string): HistoricalNetFlowResponse {
   const spot = TICKER_SPOTS[ticker.toUpperCase()] || 100.0;
   const history: NetFlowData[] = [];
-  const now = Math.floor(Date.now() / 1000);
-  
-  // Generate 20 data points spanning a trading day
+  const startTs = getBaseTimestampForDate(dateStr);
+
   const multiplier = ['SPY', 'QQQ'].includes(ticker) ? 1.0e9 : 1.0e7;
   let callPrem = 0.2 * multiplier;
   let putPrem = 0.1 * multiplier;
 
-  for (let i = 0; i < 20; i++) {
-    const timestamp = now - (20 - i) * 600; // 10 minutes interval
-    // Simulating random walk upwards
-    callPrem += (Math.random() - 0.35) * 0.25 * multiplier;
-    putPrem += (Math.random() - 0.4) * 0.2 * multiplier;
+  // Generate 78 ticks (every 5 minutes from 9:30 AM to 4:00 PM)
+  for (let i = 0; i < 78; i++) {
+    const timestamp = startTs + i * 300;
+    callPrem += (Math.random() - 0.35) * 0.15 * multiplier;
+    putPrem += (Math.random() - 0.4) * 0.12 * multiplier;
 
     history.push({
       ticker,
-      price: spot + (Math.random() - 0.5) * 2,
+      price: spot + (Math.random() - 0.5) * 3,
       timestamp,
       net_call_prem: Math.max(0, callPrem),
       net_put_prem: Math.max(0, putPrem),
@@ -157,27 +159,26 @@ export function generateMockNetFlowHistory(ticker: string): HistoricalNetFlowRes
 
   return {
     ticker,
-    date: new Date().toISOString().split('T')[0],
+    date: dateStr,
     history,
     isMock: true,
   };
 }
 
-export function generateMockGammaHistory(ticker: string): HistoricalGammaResponse {
+export function generateMockGammaHistory(ticker: string, dateStr: string): HistoricalGammaResponse {
   const spot = TICKER_SPOTS[ticker.toUpperCase()] || 100.0;
   const history: GammaStrike[] = [];
-  const now = Math.floor(Date.now() / 1000);
+  const startTs = getBaseTimestampForDate(dateStr);
 
   const strikeInterval = spot > 500 ? 5 : spot > 200 ? 2.5 : 1;
   const baseStrike = Math.round(spot / strikeInterval) * strikeInterval;
 
-  // Let the spot price drift dynamically over 20 timestamps
   let currentSpot = spot;
 
-  for (let tIdx = 0; tIdx < 20; tIdx++) {
-    const timestamp = now - (20 - tIdx) * 600; // 10 min intervals
-    // Random walk drift for price line
-    currentSpot += (Math.random() - 0.5) * 1.5;
+  // Generate 78 ticks (every 5 minutes from 9:30 AM to 4:00 PM)
+  for (let tIdx = 0; tIdx < 78; tIdx++) {
+    const timestamp = startTs + tIdx * 300;
+    currentSpot += (Math.random() - 0.5) * 0.8;
 
     for (let i = -7; i <= 7; i++) {
       const strike = baseStrike + i * strikeInterval;
@@ -203,11 +204,11 @@ export function generateMockGammaHistory(ticker: string): HistoricalGammaRespons
 
   return {
     ticker,
-    date: new Date().toISOString().split('T')[0],
+    date: dateStr,
     history,
+    isMock: true,
   };
 }
-
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -240,7 +241,7 @@ export const gammaFlowApi = {
       const qs = params.toString() ? `?${params.toString()}` : '';
       return await get<HistoricalGammaResponse>(`/historical/${ticker}${qs}`);
     } catch (e) {
-      return generateMockGammaHistory(ticker);
+      return generateMockGammaHistory(ticker, opts.date || new Date().toISOString().split('T')[0]);
     }
   },
 
@@ -263,7 +264,7 @@ export const gammaFlowApi = {
       const qs = params.toString() ? `?${params.toString()}` : '';
       return await get<HistoricalNetFlowResponse>(`/net-flow/historical/${ticker}${qs}`);
     } catch (e) {
-      return generateMockNetFlowHistory(ticker);
+      return generateMockNetFlowHistory(ticker, opts.date || new Date().toISOString().split('T')[0]);
     }
   },
 
