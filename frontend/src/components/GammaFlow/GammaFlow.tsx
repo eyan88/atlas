@@ -8,7 +8,7 @@ import styles from './GammaFlow.module.css';
 
 const REFRESH_INTERVAL_MS = 5000;
 const AVAILABLE_TICKERS = ["SPY", "QQQ", "IWM", "NVDA", "AAPL", "TSLA", "MSFT"];
-const MAX_WIDGETS = 4;
+const MAX_WIDGETS = 8;
 
 type ViewMode = 'dashboard' | 'focus';
 type ChartType = 'heatmap' | 'net_flow' | 'bar_chart';
