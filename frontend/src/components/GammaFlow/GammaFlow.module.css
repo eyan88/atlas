@@ -429,3 +429,9 @@
   box-shadow: none !important;
   transform: scale(0.98);
 }
+
+.dragOverCard {
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
+  transform: translateY(-4px) scale(1.01);
+}

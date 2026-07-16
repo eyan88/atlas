@@ -35,7 +35,6 @@ function formatUSD(value: number): string {
   return `${sign}$${abs.toFixed(2)}`;
 }
 
-
 export function GammaFlow() {
   const activeTicker = useAppStore((s) => s.activeTicker);
   const openTickers = useAppStore((s) => s.openTickers);
@@ -47,7 +46,7 @@ export function GammaFlow() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(activeTicker);
 
-  // Widget state for Dashboard Grid (Defaults to 4 widgets)
+  // Widget state for Dashboard Grid
   const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
 
   // States for Focus view
@@ -58,7 +57,10 @@ export function GammaFlow() {
   const [isMockDataActive, setIsMockDataActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Drag and Drop States
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   // States for Grid Dashboard view data cache
   const [dashboardData, setDashboardData] = useState<Record<string, {
@@ -129,6 +131,9 @@ export function GammaFlow() {
     };
   }, [currentTicker, viewMode, selectedDate, setTimelineData]);
 
+  // Extract unique sorted list of tickers to cache requests
+  const uniqueTickersKey = Array.from(new Set(widgets.map((w) => w.ticker))).sort().join(',');
+
   // Fetch Dashboard Grid Data (Batch requests for active tickers)
   useEffect(() => {
     if (viewMode !== 'dashboard') return;
@@ -139,7 +144,7 @@ export function GammaFlow() {
     const fetchAllDashboardData = async () => {
       try {
         const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
-        const results: typeof dashboardData = {};
+        const results: typeof dashboardData = { ...dashboardData };
         let mockActive = false;
         let mainTimestamps: number[] = [];
 
@@ -186,7 +191,11 @@ export function GammaFlow() {
       }
     };
 
-    setLoading(true);
+    // Only trigger full-screen loading spinner if we don't have any cached data yet
+    if (Object.keys(dashboardData).length === 0) {
+      setLoading(true);
+    }
+    
     fetchAllDashboardData();
 
     timerId = setInterval(fetchAllDashboardData, REFRESH_INTERVAL_MS);
@@ -195,7 +204,8 @@ export function GammaFlow() {
       active = false;
       clearInterval(timerId);
     };
-  }, [viewMode, widgets, selectedDate, setTimelineData]);
+    // Depend on uniqueTickersKey instead of raw widgets so re-ordering doesn't trigger refetches!
+  }, [viewMode, uniqueTickersKey, selectedDate, setTimelineData]);
 
   const handleTickerChange = (ticker: string) => {
     setCurrentTicker(ticker);
@@ -211,12 +221,26 @@ export function GammaFlow() {
 
   const handleDragEnd = () => {
     setDraggedIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIdx !== index) {
+      setDragOverIdx(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIdx(null);
   };
 
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     const sourceIndex = Number(e.dataTransfer.getData('text/plain'));
     setDraggedIdx(null);
+    setDragOverIdx(null);
+    
     if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
 
     const updated = [...widgets];
@@ -237,7 +261,7 @@ export function GammaFlow() {
     );
   };
 
-  // Add Widget Selector Change (max 4 widgets total)
+  // Add Widget Selector Change (max 8 widgets total)
   const handleAddWidgetSelect = (ticker: string) => {
     if (widgets.length >= MAX_WIDGETS || !ticker) return;
     const newId = `w_${Date.now()}`;
@@ -431,11 +455,12 @@ export function GammaFlow() {
                 return (
                   <div
                     key={widget.id}
-                    className={`${styles.dashboardCard} ${draggedIdx === index ? styles.draggedCard : ''}`}
+                    className={`${styles.dashboardCard} ${draggedIdx === index ? styles.draggedCard : ''} ${dragOverIdx === index ? styles.dragOverCard : ''}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragEnd={handleDragEnd}
-                    onDragOver={(e) => e.preventDefault()}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, index)}
                     onClick={() => handleCardClick(widget.ticker)}
                   >
@@ -525,4 +550,7 @@ export function GammaFlow() {
     </div>
   );
 }
+
+
+
 export default GammaFlow;
