@@ -12,8 +12,10 @@
 }
 
 .compassContainer {
-  flex: 0 0 auto;
-  min-width: max-content;
+  flex: 0 0 164px;
+  width: 164px;
+  min-width: 164px;
+  max-width: 164px;
   border: none;
   border-radius: 0;
   border-right: 1px solid var(--border);
