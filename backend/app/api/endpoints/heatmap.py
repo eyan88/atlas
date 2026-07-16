@@ -30,9 +30,9 @@ def get_heatmap(
     ticker = ticker.upper()
     metric = metric.lower()
     
-    # Cache key format: atlas:heatmap:{ticker}:{metric}:{timestamp_str or 'latest'}:{strikeCount}
+    # Cache key format: atlas:heatmap:v2:{ticker}:{metric}:{timestamp_str or 'latest'}:{strikeCount}
     timestamp_key_part = timestamp if timestamp else "latest"
-    cache_key = f"atlas:heatmap:{ticker}:{metric}:{timestamp_key_part}:{strikeCount}"
+    cache_key = f"atlas:heatmap:v2:{ticker}:{metric}:{timestamp_key_part}:{strikeCount}"
     
     # Check if redis_conn is an active Redis client (avoiding Depends wrapper during direct function calls)
     is_redis_active = redis_conn is not None and type(redis_conn).__name__ != "Depends"
@@ -180,10 +180,10 @@ def get_heatmap(
         try:
             redis_conn.set(cache_key, json.dumps(result), ex=86400)
             if not timestamp:
-                latest_cache_key = f"atlas:heatmap:{ticker}:{metric}:latest:{strikeCount}"
+                latest_cache_key = f"atlas:heatmap:v2:{ticker}:{metric}:latest:{strikeCount}"
                 redis_conn.set(latest_cache_key, json.dumps(result), ex=86400)
                 # Base key from architecture doc
-                redis_conn.set(f"atlas:heatmap:{ticker}:latest", json.dumps(result), ex=86400)
+                redis_conn.set(f"atlas:heatmap:v2:{ticker}:latest", json.dumps(result), ex=86400)
         except Exception as e:
             print(f"Redis cache write error: {e}")
 
@@ -260,8 +260,8 @@ def get_heatmap_history(
     ticker = ticker.upper()
     metric = metric.lower()
     
-    # Cache key format: atlas:heatmap:history:{ticker}:{date}:{metric}:{strikeCount}
-    cache_key = f"atlas:heatmap:history:{ticker}:{date}:{metric}:{strikeCount}"
+    # Cache key format: atlas:heatmap:history:v2:{ticker}:{date}:{metric}:{strikeCount}
+    cache_key = f"atlas:heatmap:history:v2:{ticker}:{date}:{metric}:{strikeCount}"
     
     is_redis_active = redis_conn is not None and type(redis_conn).__name__ != "Depends"
     
