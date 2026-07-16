@@ -9,6 +9,8 @@ import { api } from './api/client';
 import styles from './App.module.css';
 
 import { useWebSocket } from './hooks/useWebSocket';
+import { MetricControls } from './components/HeatmapContainer/MetricControls/MetricControls';
+import { EvolutionControls } from './components/HeatmapContainer/EvolutionControls/EvolutionControls';
 
 export function App() {
   useWebSocket();
@@ -112,29 +114,37 @@ export function App() {
           </div>
         )}
         <div className={styles.mainArea}>
-          {activeTab === 'heatmap' && openTickers.length > 0 && (
-            <div className={styles.browserTabs}>
-              {openTickers.map((t) => (
-                <div
-                  key={t}
-                  className={`${styles.browserTab} ${t === activeTicker ? styles.browserTabActive : ''}`}
-                  onClick={() => setTicker(t)}
-                >
-                  <span className={styles.browserTabTitle}>{t}</span>
-                  <button
-                    type="button"
-                    className={styles.browserTabClose}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeTickerPane(t);
-                    }}
+          <div className={styles.globalControlsBar}>
+            {activeTab === 'heatmap' && openTickers.length > 0 ? (
+              <div className={styles.browserTabs}>
+                {openTickers.map((t) => (
+                  <div
+                    key={t}
+                    className={`${styles.browserTab} ${t === activeTicker ? styles.browserTabActive : ''}`}
+                    onClick={() => setTicker(t)}
                   >
-                    ×
-                  </button>
-                </div>
-              ))}
+                    <span className={styles.browserTabTitle}>{t}</span>
+                    <button
+                      type="button"
+                      className={styles.browserTabClose}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTickerPane(t);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ flex: 1 }} />
+            )}
+            <div className={styles.controlsGroup}>
+              <MetricControls />
+              <EvolutionControls />
             </div>
-          )}
+          </div>
           <div className={styles.paneStrip}>
             {activeTab === 'heatmap' ? (
               openTickers.map((ticker) => (

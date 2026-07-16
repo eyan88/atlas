@@ -22,15 +22,29 @@
   min-height: 0;
 }
 
-.browserTabs {
+.globalControlsBar {
   display: flex;
-  flex: 0 0 auto;
   align-items: flex-end;
+  justify-content: space-between;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
+}
+
+.browserTabs {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
   padding: 12px 12px 0 12px;
   gap: 4px;
   overflow-x: auto;
+}
+
+.controlsGroup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  flex: 0 0 auto;
 }
 
 .browserTab {
