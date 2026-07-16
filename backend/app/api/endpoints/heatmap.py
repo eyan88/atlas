@@ -112,6 +112,7 @@ def get_heatmap(
     
     call_wall, put_wall = engine.find_walls(grouped_full)
     gamma_flip = engine.find_gamma_flip_strike(grouped_full, spot=spot_price)
+    net_gamma = float(df["net_gex"].sum()) if not df.empty else 0.0
 
     # 5. Filter strikes based on strikeCount (closest strikes to spot)
     unique_strikes = df["strike"].unique()
@@ -167,6 +168,7 @@ def get_heatmap(
         "timestamp": target_ts.isoformat(),
         "spot_price": float(spot_price) if spot_price is not None else None,
         "gamma_flip": float(gamma_flip) if (gamma_flip is not None and not np.isnan(gamma_flip)) else None,
+        "net_gamma": net_gamma,
         "call_wall": float(call_wall) if (call_wall is not None and not np.isnan(call_wall)) else None,
         "put_wall": float(put_wall) if (put_wall is not None and not np.isnan(put_wall)) else None,
         "columns": columns,
@@ -344,6 +346,7 @@ def get_heatmap_history(
         
         call_wall, put_wall = engine.find_walls(grouped_full)
         gamma_flip = engine.find_gamma_flip_strike(grouped_full, spot=spot_price)
+        net_gamma = float(ts_df["net_gex"].sum()) if not ts_df.empty else 0.0
 
         # Filter strikes based on strikeCount
         ts_df_filtered = ts_df
@@ -394,6 +397,7 @@ def get_heatmap_history(
             "timestamp": dt.isoformat(),
             "spot_price": float(spot_price) if spot_price is not None else None,
             "gamma_flip": float(gamma_flip) if (gamma_flip is not None and not np.isnan(gamma_flip)) else None,
+            "net_gamma": net_gamma,
             "call_wall": float(call_wall) if (call_wall is not None and not np.isnan(call_wall)) else None,
             "put_wall": float(put_wall) if (put_wall is not None and not np.isnan(put_wall)) else None,
             "columns": columns,

@@ -127,12 +127,14 @@ async def realtime_live_publisher():
                     
                     call_wall, put_wall = engine.find_walls(df_grouped)
                     gamma_flip = engine.find_gamma_flip_strike(df_grouped, spot=spot_price)
+                    net_gamma = float(df_grouped["net_gex"].sum()) if not df_grouped.empty else 0.0
                     
                     payload = {
                         "ticker": ticker,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "spot_price": spot_price,
                         "gamma_flip": gamma_flip,
+                        "net_gamma": net_gamma,
                         "call_wall": call_wall,
                         "put_wall": put_wall,
                         "diffs": diffs

@@ -141,3 +141,7 @@
 .badgePut {
   border-left: 3px solid #f87171 !important;
 }
+
+.badgeNet {
+  border-left: 3px solid #8b5cf6 !important;
+}

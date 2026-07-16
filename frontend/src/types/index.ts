@@ -36,6 +36,7 @@ export interface HeatmapSnapshot {
   timestamp: string;         // ISO 8601
   spot_price: number | null;
   gamma_flip: number | null;
+  net_gamma: number | null;
   call_wall: number | null;
   put_wall: number | null;
   /** Expiration dates, ISO strings, one per column */
@@ -86,6 +87,7 @@ export interface WsPatchPayload {
   timestamp: string;
   spot_price: number;
   gamma_flip: number | null;
+  net_gamma: number | null;
   call_wall: number | null;
   put_wall: number | null;
   diffs: CellDiff[];

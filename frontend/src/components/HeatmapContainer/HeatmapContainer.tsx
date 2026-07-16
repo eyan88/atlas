@@ -32,6 +32,15 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
     return () => vp.removeEventListener('scroll', handleScroll);
   }, [isCompassMode]);
 
+  const formatGamma = (val: number | null | undefined) => {
+    if (val == null) return '—';
+    const abs = Math.abs(val);
+    if (abs >= 1e9) return `${val >= 0 ? '+' : '-'}${(abs / 1e9).toFixed(1)}B`;
+    if (abs >= 1e6) return `${val >= 0 ? '+' : '-'}${(abs / 1e6).toFixed(1)}M`;
+    if (abs >= 1e3) return `${val >= 0 ? '+' : '-'}${(abs / 1e3).toFixed(0)}K`;
+    return `${val >= 0 ? '+' : '-'}${abs.toFixed(0)}`;
+  };
+
   return (
     <section className={`${styles.container} ${isCompassMode ? styles.compassContainer : ''}`}>
       <div className={styles.titleBar}>
@@ -53,6 +62,12 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
             <div className={`${styles.levelBadge} ${styles.badgeSpot}`} title="Current spot price (White row outline)">
               <span className={styles.levelLabel}>SPOT</span>
               <span className={styles.levelValue}>{snapshot?.spot_price?.toFixed(2) ?? '—'}</span>
+            </div>
+            <div className={`${styles.levelBadge} ${styles.badgeNet}`} title="Total Net Gamma">
+              <span className={styles.levelLabel}>NET Γ</span>
+              <span className={styles.levelValue} style={{ color: snapshot?.net_gamma && snapshot.net_gamma >= 0 ? '#34d399' : '#f87171' }}>
+                {formatGamma(snapshot?.net_gamma)}
+              </span>
             </div>
             <div className={`${styles.levelBadge} ${styles.badgeFlip}`} title="Gamma flip level (Amber/Gold row outline)">
               <span className={styles.levelLabel}>FLIP</span>

@@ -318,6 +318,7 @@ export const useAppStore = create<AppState>((set) => ({
         timestamp: payload.timestamp,
         spot_price: payload.spot_price ?? (current ? current.spot_price : null),
         gamma_flip: payload.gamma_flip ?? (current ? current.gamma_flip : null),
+        net_gamma: payload.net_gamma ?? (current ? current.net_gamma : null),
         call_wall: payload.call_wall ?? (current ? current.call_wall : null),
         put_wall: payload.put_wall ?? (current ? current.put_wall : null),
         rows,
