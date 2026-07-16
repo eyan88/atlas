@@ -566,7 +566,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
     <div className={styles.wrapper}>
       <canvas
         ref={canvasRef}
-        id="heatmap-canvas"
+        id={`heatmap-canvas-${ticker}`}
         className={styles.canvas}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}

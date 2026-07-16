@@ -96,7 +96,7 @@
   padding-left: 8px;
 }
 
-.closeBtn {
+.closeBtn, .actionBtn {
   display: grid;
   place-items: center;
   width: 24px;
@@ -105,11 +105,12 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-secondary);
+  cursor: pointer;
 }
 
-.closeBtn:hover {
-  color: var(--text-primary);
+.closeBtn:hover, .actionBtn:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
   border-color: var(--border);
 }
 

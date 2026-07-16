@@ -41,6 +41,17 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
     return `${val >= 0 ? '+' : '-'}${abs.toFixed(0)}`;
   };
 
+  const exportToPng = () => {
+    const canvas = document.getElementById(`heatmap-canvas-${ticker}`) as HTMLCanvasElement;
+    if (canvas) {
+      const link = document.createElement('a');
+      const tsStr = snapshot?.timestamp ? new Date(snapshot.timestamp).toISOString().split('T')[0] : 'live';
+      link.download = `atlas-${ticker}-${tsStr}-heatmap.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  };
+
   return (
     <section className={`${styles.container} ${isCompassMode ? styles.compassContainer : ''}`}>
       <div className={styles.titleBar}>
@@ -83,17 +94,30 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
             </div>
           </div>
         </div>
-        {!isCompassMode && (
+        <div style={{ display: 'flex', gap: '4px' }}>
           <button
             type="button"
-            className={styles.closeBtn}
-            onClick={() => closeTickerPane(ticker)}
-            aria-label={`Close ${ticker} heatmap`}
-            title={`Close ${ticker}`}
+            className={styles.actionBtn}
+            onClick={exportToPng}
+            aria-label={`Export ${ticker} heatmap to PNG`}
+            title="Export PNG"
           >
-            ×
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
-        )}
+          {!isCompassMode && (
+            <button
+              type="button"
+              className={styles.closeBtn}
+              onClick={() => closeTickerPane(ticker)}
+              aria-label={`Close ${ticker} heatmap`}
+              title={`Close ${ticker}`}
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
       <div 
         ref={viewportRef}
