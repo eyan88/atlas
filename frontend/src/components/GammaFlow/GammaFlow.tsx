@@ -395,6 +395,7 @@ export function GammaFlow() {
                   <div className={styles.legend}>
                     <span className={styles.legendItem}><span className={`${styles.dot} ${styles.bgPositive}`} /> Call Premium</span>
                     <span className={styles.legendItem}><span className={`${styles.dot} ${styles.bgNegative}`} /> Put Premium</span>
+                    <span className={styles.legendItem}><span className={`${styles.dot}`} style={{ background: '#f59e0b', borderRadius: '0', width: '8px', height: '2px' }} /> Spot Price</span>
                   </div>
                 </div>
                 <div className={styles.chartBody}>

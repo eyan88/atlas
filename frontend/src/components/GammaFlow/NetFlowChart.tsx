@@ -36,7 +36,7 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
 
-    // Find min and max values across both lines
+    // Find min and max values across both premium lines
     const timestamps = sorted.map((h) => h.timestamp);
     const minTime = Math.min(...timestamps);
     const maxTime = Math.max(...timestamps);
@@ -45,8 +45,18 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     const puts = sorted.map((h) => h.net_put_prem);
     const maxVal = Math.max(...calls, ...puts, 1e6);
     const minVal = Math.min(...calls, ...puts, 0);
-
     const valRange = maxVal - minVal;
+
+    // Find min and max for spot prices (for secondary axis)
+    const spots = sorted.map((h) => h.price);
+    const maxSpot = Math.max(...spots);
+    const minSpot = Math.min(...spots);
+    const spotRange = maxSpot - minSpot;
+    // Add small padding (10%) to spot price axis
+    const spotPad = spotRange > 0 ? spotRange * 0.1 : 1.0;
+    const spotMin = minSpot - spotPad;
+    const spotMax = maxSpot + spotPad;
+    const spotScaleRange = spotMax - spotMin;
 
     // Get screen coordinates helper
     const getX = (ts: number) => {
@@ -54,12 +64,19 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
     };
 
-    const getY = (val: number) => {
+    // Primary Y-Axis coordinate (Premium Flow - Left axis)
+    const getPremY = (val: number) => {
       if (valRange === 0) return margin.top + chartHeight / 2;
       return margin.top + chartHeight - ((val - minVal) / valRange) * chartHeight;
     };
 
-    // Draw grid lines
+    // Secondary Y-Axis coordinate (Spot Price - Right axis)
+    const getSpotY = (val: number) => {
+      if (spotScaleRange === 0) return margin.top + chartHeight / 2;
+      return margin.top + chartHeight - ((val - spotMin) / spotScaleRange) * chartHeight;
+    };
+
+    // 1. Draw horizontal grid lines and Left/Right axis labels
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -69,23 +86,29 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       ctx.lineTo(margin.left + chartWidth, y);
       ctx.stroke();
 
-      // Y-axis label
+      // Left axis label (Premium flow in M/B)
       const val = maxVal - (i / 4) * valRange;
       ctx.fillStyle = '#94a3b8';
       ctx.font = '10px Inter';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      const formatted = (v: number) => {
+      const formattedPrem = (v: number) => {
         const abs = Math.abs(v);
         if (abs >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
         if (abs >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
         if (abs >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
         return `$${v.toFixed(0)}`;
       };
-      ctx.fillText(formatted(val), margin.left - 8, y);
+      ctx.fillText(formattedPrem(val), margin.left - 8, y);
+
+      // Right axis label (Spot price)
+      const spotVal = spotMax - (i / 4) * spotScaleRange;
+      ctx.fillStyle = '#f59e0b'; // Amber color for spot
+      ctx.textAlign = 'left';
+      ctx.fillText(`$${spotVal.toFixed(2)}`, margin.left + chartWidth + 8, y);
     }
 
-    // Draw line charts
+    // 2. Draw Call & Put Premium Lines
     const drawLine = (
       points: number[],
       strokeColor: string,
@@ -94,10 +117,10 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       if (points.length === 0) return;
 
       ctx.beginPath();
-      ctx.moveTo(getX(sorted[0].timestamp), getY(points[0]));
+      ctx.moveTo(getX(sorted[0].timestamp), getPremY(points[0]));
 
       for (let i = 1; i < sorted.length; i++) {
-        ctx.lineTo(getX(sorted[i].timestamp), getY(points[i]));
+        ctx.lineTo(getX(sorted[i].timestamp), getPremY(points[i]));
       }
 
       ctx.strokeStyle = strokeColor;
@@ -118,12 +141,24 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     };
 
     // Draw Call premium line (green)
-    drawLine(calls, '#4ade80', 'rgba(74, 222, 128, 0.15)');
+    drawLine(calls, '#00e676', 'rgba(0, 230, 118, 0.12)');
 
     // Draw Put premium line (red)
-    drawLine(puts, '#f87171', 'rgba(248, 113, 113, 0.15)');
+    drawLine(puts, '#ff3d00', 'rgba(255, 61, 0, 0.12)');
 
-    // Draw X-axis timestamps
+    // 3. Draw Spot Price Line Overlay (amber secondary axis path)
+    ctx.beginPath();
+    ctx.moveTo(getX(sorted[0].timestamp), getSpotY(sorted[0].price));
+    for (let i = 1; i < sorted.length; i++) {
+      ctx.lineTo(getX(sorted[i].timestamp), getSpotY(sorted[i].price));
+    }
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]); // dotted line to differentiate from flows
+    ctx.stroke();
+    ctx.setLineDash([]); // reset
+
+    // 4. Draw X-axis Time stamps
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px Inter';
     ctx.textAlign = 'center';
@@ -137,7 +172,6 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       ctx.fillText(timeStr, getX(h.timestamp), margin.top + chartHeight + 8);
     }
 
-    // Also draw the last timestamp label if it was skipped
     if ((sorted.length - 1) % tickInterval !== 0) {
       const h = sorted[sorted.length - 1];
       const date = new Date(h.timestamp * 1000);
@@ -161,3 +195,4 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     </div>
   );
 }
+export default NetFlowChart;
