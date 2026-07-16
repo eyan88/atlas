@@ -8,6 +8,7 @@ import styles from './GammaFlow.module.css';
 
 const REFRESH_INTERVAL_MS = 5000;
 const AVAILABLE_TICKERS = ["SPY", "QQQ", "IWM", "NVDA", "AAPL", "TSLA", "MSFT"];
+const MAX_WIDGETS = 4;
 
 type ViewMode = 'dashboard' | 'focus';
 type ChartType = 'heatmap' | 'net_flow' | 'bar_chart';
@@ -23,8 +24,6 @@ const DEFAULT_WIDGETS: Widget[] = [
   { id: 'w2', ticker: 'QQQ', type: 'net_flow' },
   { id: 'w3', ticker: 'SPY', type: 'heatmap' },
   { id: 'w4', ticker: 'SPY', type: 'net_flow' },
-  { id: 'w5', ticker: 'NVDA', type: 'heatmap' },
-  { id: 'w6', ticker: 'TSLA', type: 'bar_chart' },
 ];
 
 function formatUSD(value: number): string {
@@ -55,7 +54,7 @@ export function GammaFlow() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(activeTicker);
 
-  // Widget state for Dashboard Grid
+  // Widget state for Dashboard Grid (Defaults to 4 widgets)
   const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
 
   // States for Focus view
@@ -210,12 +209,12 @@ export function GammaFlow() {
   };
 
   // Drag and Drop handlers
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+  const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => {
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     const sourceIndex = Number(e.dataTransfer.getData('text/plain'));
     if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
@@ -236,6 +235,29 @@ export function GammaFlow() {
     setWidgets((current) =>
       current.map((w) => (w.id === id ? { ...w, type: nextType } : w))
     );
+  };
+
+  // Add Widget (up to 4 widgets total)
+  const handleAddWidget = () => {
+    if (widgets.length >= MAX_WIDGETS) return;
+    const newId = `w_${Date.now()}`;
+    const nextWidget: Widget = {
+      id: newId,
+      ticker: AVAILABLE_TICKERS[widgets.length % AVAILABLE_TICKERS.length],
+      type: 'heatmap',
+    };
+    setWidgets((current) => [...current, nextWidget]);
+  };
+
+  // Delete Widget
+  const handleDeleteWidget = (id: string) => {
+    setWidgets((current) => current.filter((w) => w.id !== id));
+  };
+
+  const handleCardClick = (ticker: string) => {
+    setCurrentTicker(ticker);
+    setTicker(ticker);
+    setViewMode('focus');
   };
 
   // Apply timeline playback scrubbing filter to datasets
@@ -339,12 +361,27 @@ export function GammaFlow() {
           )}
 
           {viewMode === 'dashboard' && (
-            <div className={styles.controlSection}>
-              <h3 className={styles.sectionTitle}>Tickers Tracked</h3>
-              <p className={styles.sidebarHint}>
-                Drag and drop widget cards to rearrange. Customize ticker or chart type directly using the dropdown selectors on each card header.
-              </p>
-            </div>
+            <>
+              <div className={styles.controlSection}>
+                <h3 className={styles.sectionTitle}>Dashboard Actions</h3>
+                <button
+                  className={styles.addWidgetBtn}
+                  onClick={handleAddWidget}
+                  disabled={widgets.length >= MAX_WIDGETS}
+                >
+                  + Add Grid Item ({widgets.length}/{MAX_WIDGETS})
+                </button>
+              </div>
+
+              <div className={styles.controlSection}>
+                <h3 className={styles.sectionTitle}>Dashboard Instructions</h3>
+                <p className={styles.sidebarHint}>
+                  • Drag widget cards by the ☰ handle to rearrange them.<br />
+                  • Change tickers or chart types using card dropdowns.<br />
+                  • Click anywhere on a card's body to open detailed Focus View.
+                </p>
+              </div>
+            </>
           )}
         </aside>
 
@@ -409,21 +446,32 @@ export function GammaFlow() {
                   <div
                     key={widget.id}
                     className={styles.dashboardCard}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleDrop(e, index)}
+                    onClick={() => handleCardClick(widget.ticker)}
                   >
                     {/* Card Header with Interactive Dropdown Controls */}
                     <div className={styles.cardHeader}>
                       <div className={styles.cardLeftControls}>
-                        <span className={styles.cardGrip}>☰</span>
+                        {/* Drag Handle */}
+                        <span
+                          className={styles.cardGrip}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          ☰
+                        </span>
                         
                         {/* Ticker Dropdown Selector */}
                         <select
                           className={styles.cardSelector}
                           value={widget.ticker}
-                          onChange={(e) => handleWidgetTickerChange(widget.id, e.target.value)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleWidgetTickerChange(widget.id, e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {AVAILABLE_TICKERS.map((t) => (
                             <option key={t} value={t}>{t}</option>
@@ -434,7 +482,11 @@ export function GammaFlow() {
                         <select
                           className={styles.cardSelector}
                           value={widget.type}
-                          onChange={(e) => handleWidgetTypeChange(widget.id, e.target.value as ChartType)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleWidgetTypeChange(widget.id, e.target.value as ChartType);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <option value="heatmap">Heatmap</option>
                           <option value="net_flow">Net Flow</option>
@@ -442,7 +494,21 @@ export function GammaFlow() {
                         </select>
                       </div>
 
-                      <span className={styles.cardSpot}>${data.spot.toFixed(2)}</span>
+                      <div className={styles.cardRightControls}>
+                        <span className={styles.cardSpot}>${data.spot.toFixed(2)}</span>
+                        
+                        {/* Close/Delete Card Button */}
+                        <button
+                          type="button"
+                          className={styles.cardDeleteBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteWidget(widget.id);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                     
                     {/* Conditional Chart Rendering based on Widget Type */}
