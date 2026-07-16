@@ -1,11 +1,31 @@
 .container {
   display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
   background: #0d0f14;
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
+}
+
+/* Simulated Data Warning Banner */
+.mockBanner {
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 6px 12px;
+  letter-spacing: 0.02em;
+}
+
+.tabContentWrapper {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Sidebar Styles */
@@ -34,6 +54,38 @@
   letter-spacing: 0.1em;
   color: var(--text-secondary);
   margin-bottom: 4px;
+}
+
+/* View toggle group button */
+.viewToggleGroup {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.viewToggleBtn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.viewToggleBtn:hover {
+  color: var(--text-primary);
+}
+
+.viewToggleBtnActive {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .tickerList {
@@ -94,18 +146,19 @@
   letter-spacing: -0.01em;
 }
 
-.positive {
-  color: #4ade80;
-}
-
-.negative {
-  color: #f87171;
-}
+.positive { color: #4ade80; }
+.negative { color: #f87171; }
 
 .placeholderText {
   font-size: 11px;
   color: var(--text-secondary);
   font-style: italic;
+}
+
+.sidebarHint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 /* Workspace Styles */
@@ -144,17 +197,87 @@
 }
 
 .errorMsg {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #f87171;
 }
 
-.errorHint {
-  font-size: 12px;
-  line-height: 1.6;
-  max-width: 480px;
+/* Grid Dashboard View */
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  padding-bottom: 40px;
 }
 
+.dashboardCard {
+  background: #0f111a;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 280px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboardCard:hover {
+  transform: translateY(-4px);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+}
+
+.cardTicker {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.cardSpot {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.cardChartBody {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+}
+
+.footerLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.footerVal {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Focus View Styles */
 .chartsGrid {
   display: flex;
   flex-direction: column;
@@ -172,15 +295,15 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
-/* Top chart takes slightly more space */
+/* Focus View Chart scaling */
 .chartsGrid > .chartWrapper:first-child {
-  flex: 1.3;
-  min-height: 340px;
+  flex: 1.4;
+  min-height: 380px;
 }
 
 .chartsGrid > .chartWrapper:last-child {
   flex: 1;
-  min-height: 220px;
+  min-height: 240px;
 }
 
 .chartHeader {
@@ -191,7 +314,7 @@
 }
 
 .chartTitle {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
