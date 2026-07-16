@@ -44,7 +44,7 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
       spotPrices[h.timestamp] = h.price;
     });
 
-    const margin = { top: 20, right: 60, bottom: 30, left: 60 };
+    const margin = { top: 20, right: 55, bottom: 30, left: 20 };
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
 
@@ -95,11 +95,11 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
 
-    // Y-Axis Strike Labels (Draw 6-8 evenly spaced strikes)
+    // Y-Axis Strike Labels (Draw on the RIGHT side instead of left)
     const yTickInterval = Math.max(1, Math.floor(strikes.length / 6));
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px Inter';
-    ctx.textAlign = 'right';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
     for (let i = 0; i < strikes.length; i += yTickInterval) {
@@ -110,7 +110,7 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
       ctx.lineTo(margin.left + chartWidth, y);
       ctx.stroke();
 
-      ctx.fillText(strike.toFixed(1), margin.left - 8, y);
+      ctx.fillText(strike.toFixed(1), margin.left + chartWidth + 8, y);
     }
 
     // X-Axis Time Labels (Draw 4-5 ticks)
