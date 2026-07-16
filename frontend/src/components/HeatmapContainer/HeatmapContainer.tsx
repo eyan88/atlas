@@ -12,6 +12,9 @@ interface HeatmapContainerProps {
 
 export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapContainerProps) {
   const closeTickerPane = useAppStore((s) => s.closeTickerPane);
+  const setTicker = useAppStore((s) => s.setTicker);
+  const openTickers = useAppStore((s) => s.openTickers);
+  const activeTicker = useAppStore((s) => s.activeTicker);
   const snapshot = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -36,30 +39,68 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
 
   return (
     <section className={`${styles.container} ${isCompassMode ? styles.compassContainer : ''}`}>
-      <div className={styles.titleBar}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span className={styles.title}>{ticker}</span>
-          {snapshot?.timestamp && (
-            <span className={styles.timestamp}>
-              {new Date(snapshot.timestamp).toLocaleString(undefined, { 
-                month: 'short', 
-                day: 'numeric', 
-                hour: 'numeric', 
-                minute: '2-digit' 
-              })}
-            </span>
-          )}
+      {!isCompassMode ? (
+        <div className={styles.tabBar}>
+          {openTickers.map((t) => (
+            <div 
+              key={t}
+              className={`${styles.tickerTab} ${t === activeTicker ? styles.tickerTabActive : ''}`}
+              onClick={() => setTicker(t)}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <span className={styles.title}>{t}</span>
+                {t === activeTicker && snapshot?.timestamp && (
+                  <span className={styles.timestamp}>
+                    {new Date(snapshot.timestamp).toLocaleString(undefined, { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      hour: 'numeric', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className={styles.closeBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTickerPane(t);
+                }}
+                aria-label={`Close ${t} heatmap`}
+                title={`Close ${t}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
-        <button
-          type="button"
-          className={styles.closeBtn}
-          onClick={() => closeTickerPane(ticker)}
-          aria-label={`Close ${ticker} heatmap`}
-          title={`Close ${ticker}`}
-        >
-          ×
-        </button>
-      </div>
+      ) : (
+        <div className={styles.titleBar}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span className={styles.title}>{ticker}</span>
+            {snapshot?.timestamp && (
+              <span className={styles.timestamp}>
+                {new Date(snapshot.timestamp).toLocaleString(undefined, { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  hour: 'numeric', 
+                  minute: '2-digit' 
+                })}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={() => closeTickerPane(ticker)}
+            aria-label={`Close ${ticker} heatmap`}
+            title={`Close ${ticker}`}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className={styles.levelBar}>
         <div className={`${styles.levelBadge} ${styles.badgeSpot}`} title="Current spot price (White row outline)">
           <span className={styles.levelLabel}>SPOT</span>

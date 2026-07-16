@@ -112,7 +112,17 @@ export function App() {
         <div className={styles.paneStrip}>
           {activeTab === 'heatmap' ? (
             openTickers.map((ticker) => (
-              <HeatmapContainer key={ticker} ticker={ticker} />
+              <div
+                key={ticker}
+                style={{
+                  display: ticker === activeTicker ? 'flex' : 'none',
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: 0
+                }}
+              >
+                <HeatmapContainer ticker={ticker} />
+              </div>
             ))
           ) : (
             <>
