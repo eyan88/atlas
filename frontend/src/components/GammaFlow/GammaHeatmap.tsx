@@ -3,6 +3,7 @@ import type { GammaStrike } from '../../api/gammaFlowClient';
 
 interface GammaHeatmapProps {
   history: GammaStrike[];
+  strikeCount?: number;
 }
 
 function formatUSD(value: number): string {
@@ -14,7 +15,7 @@ function formatUSD(value: number): string {
   return `${sign}$${abs.toFixed(2)}`;
 }
 
-export function GammaHeatmap({ history }: GammaHeatmapProps) {
+export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
 
     // 1. Process and sort data
     const timestamps = Array.from(new Set(history.map((h) => h.timestamp))).sort((a, b) => a - b);
-    const rawStrikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order (lowest at bottom)
+    const rawStrikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order
 
     if (timestamps.length < 2 || rawStrikes.length < 2) return;
 
@@ -44,20 +45,13 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
     const lastHistoryItem = history[history.length - 1];
     const currentSpot = lastHistoryItem ? lastHistoryItem.price : rawStrikes[Math.floor(rawStrikes.length / 2)];
 
-    // Zoom the Y-axis strike range to be +/- 1.5% around the spot price so vertical movements are clearly visible.
+    // Filter strikes to the closest N strikes around the spot price
     let strikes = rawStrikes;
-    if (currentSpot > 0) {
-      const minBound = currentSpot * 0.985; // -1.5%
-      const maxBound = currentSpot * 1.015; // +1.5%
-      strikes = rawStrikes.filter((s) => s >= minBound && s <= maxBound);
-
-      // Fallback if the range is too tight and leaves too few strikes
-      if (strikes.length < 6) {
-        strikes = [...rawStrikes]
-          .sort((a, b) => Math.abs(a - currentSpot) - Math.abs(b - currentSpot))
-          .slice(0, 10)
-          .sort((a, b) => a - b);
-      }
+    if (currentSpot > 0 && strikeCount !== undefined && strikeCount > 0) {
+      strikes = [...rawStrikes]
+        .sort((a, b) => Math.abs(a - currentSpot) - Math.abs(b - currentSpot))
+        .slice(0, strikeCount)
+        .sort((a, b) => a - b);
     }
 
     // Build lookup map and gather spot prices per timestamp
@@ -215,7 +209,6 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
 
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
-        // Find closest timestamp
         const xRatio = (mouseX - margin.left) / chartWidth;
         const targetTsIdx = Math.round(xRatio * (timestamps.length - 1));
         const activeTs = timestamps[Math.max(0, Math.min(timestamps.length - 1, targetTsIdx))];
@@ -253,7 +246,7 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
         const date = new Date(activeTs * 1000);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-        // Tooltip box metrics
+        // Tooltip box dimensions
         const tooltipW = 140;
         const tooltipH = 80;
         let tooltipX = xPos + 15;
@@ -263,7 +256,7 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
         let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
         tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
 
-        // Draw box container
+        // Draw container box
         ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
         ctx.lineWidth = 1;
@@ -315,7 +308,7 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [history]);
+  }, [history, strikeCount]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

@@ -19,12 +19,13 @@ interface Widget {
   ticker: string;
   type: ChartType;
   group: LinkGroup;
+  strikeCount?: number;
 }
 
 const DEFAULT_WIDGETS: Widget[] = [
-  { id: 'w1', ticker: 'QQQ', type: 'heatmap', group: 'A' },
+  { id: 'w1', ticker: 'QQQ', type: 'heatmap', group: 'A', strikeCount: 12 },
   { id: 'w2', ticker: 'QQQ', type: 'net_flow', group: 'A' },
-  { id: 'w3', ticker: 'SPY', type: 'heatmap', group: 'B' },
+  { id: 'w3', ticker: 'SPY', type: 'heatmap', group: 'B', strikeCount: 12 },
   { id: 'w4', ticker: 'SPY', type: 'net_flow', group: 'B' },
 ];
 
@@ -48,7 +49,10 @@ export function GammaFlow() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(activeTicker);
 
-  // Widget state for Dashboard Grid (defaults to 2 pairs of linked widgets)
+  // Focus View specific GEX heatmap strike count setting
+  const [focusStrikeCount, setFocusStrikeCount] = useState<number>(12);
+
+  // Widget state for Dashboard Grid
   const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
 
   // States for Focus view
@@ -275,7 +279,14 @@ export function GammaFlow() {
     );
   };
 
-  // Update Link Group for a specific widget
+  // Update Strike Count for a specific widget card
+  const handleWidgetStrikeCountChange = (id: string, count: number) => {
+    setWidgets((current) =>
+      current.map((w) => (w.id === id ? { ...w, strikeCount: count === 0 ? undefined : count } : w))
+    );
+  };
+
+  // Update Link Group Color channel for a specific widget
   const handleWidgetGroupChange = (id: string, nextGroup: LinkGroup) => {
     setWidgets((current) =>
       current.map((w) => (w.id === id ? { ...w, group: nextGroup } : w))
@@ -291,6 +302,7 @@ export function GammaFlow() {
       ticker: ticker,
       type: 'heatmap',
       group: 'none', // Default new widgets to independent (No Group Link)
+      strikeCount: 12, // Default to 12 strikes for medium zoom
     };
     setWidgets((current) => [...current, nextWidget]);
   };
@@ -388,20 +400,37 @@ export function GammaFlow() {
 
             {/* Focus View Ticker Pill Group */}
             {viewMode === 'focus' && (
-              <div className={styles.topControlGroup}>
-                <span className={styles.topControlLabel}>Focus Ticker:</span>
-                <div className={styles.tickerList}>
-                  {openTickers.map((t) => (
-                    <button
-                      key={t}
-                      className={`${styles.tickerBtn} ${t === currentTicker ? styles.tickerBtnActive : ''}`}
-                      onClick={() => handleTickerChange(t)}
-                    >
-                      {t}
-                    </button>
-                  ))}
+              <>
+                <div className={styles.topControlGroup}>
+                  <span className={styles.topControlLabel}>Focus Ticker:</span>
+                  <div className={styles.tickerList}>
+                    {openTickers.map((t) => (
+                      <button
+                        key={t}
+                        className={`${styles.tickerBtn} ${t === currentTicker ? styles.tickerBtnActive : ''}`}
+                        onClick={() => handleTickerChange(t)}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                {/* Focus View strikes range control */}
+                <div className={styles.topControlGroup}>
+                  <span className={styles.topControlLabel}>Strikes:</span>
+                  <select
+                    className={styles.cardSelector}
+                    value={focusStrikeCount ?? 0}
+                    onChange={(e) => setFocusStrikeCount(Number(e.target.value) === 0 ? 0 : Number(e.target.value))}
+                  >
+                    <option value={6}>6 strikes</option>
+                    <option value={12}>12 strikes</option>
+                    <option value={20}>20 strikes</option>
+                    <option value={0}>All strikes</option>
+                  </select>
+                </div>
+              </>
             )}
 
             {/* Focus View Compact Live Stats Panel */}
@@ -445,7 +474,7 @@ export function GammaFlow() {
                   <span className={styles.spotBadge}>Spot price: ${spot.toFixed(2)}</span>
                 </div>
                 <div className={styles.chartBody}>
-                  <GammaHeatmap history={filteredGammaHistory} />
+                  <GammaHeatmap history={filteredGammaHistory} strikeCount={focusStrikeCount === 0 ? undefined : focusStrikeCount} />
                 </div>
               </section>
 
@@ -533,6 +562,25 @@ export function GammaFlow() {
                           <option value="net_flow">Net Flow</option>
                           <option value="bar_chart">Bar Chart</option>
                         </select>
+
+                        {/* strikes setting dropdown (only visible on heatmap types) */}
+                        {widget.type === 'heatmap' && (
+                          <select
+                            className={styles.cardSelector}
+                            value={widget.strikeCount ?? 12}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleWidgetStrikeCountChange(widget.id, Number(e.target.value));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Adjust visible strike counts on the GEX Heatmap"
+                          >
+                            <option value={6}>6 Strk</option>
+                            <option value={12}>12 Strk</option>
+                            <option value={20}>20 Strk</option>
+                            <option value={0}>All Strk</option>
+                          </select>
+                        )}
                       </div>
 
                       <div className={styles.cardRightControls}>
@@ -540,7 +588,7 @@ export function GammaFlow() {
                           {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
                         </span>
                         
-                        {/* Link Group Channel Selector (A, B, C or None) */}
+                        {/* Link Group Channel Color Selector (🔵, 🟣, 🟢 or ⚪) */}
                         <select
                           className={getGroupSelectClass(widget.group)}
                           value={widget.group}
@@ -549,12 +597,12 @@ export function GammaFlow() {
                             handleWidgetGroupChange(widget.id, e.target.value as LinkGroup);
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          title="Assign Link Group Channel to sync tickers"
+                          title="Assign Link Channel Color to sync tickers"
                         >
-                          <option value="none">— (No Link)</option>
-                          <option value="A">Group A</option>
-                          <option value="B">Group B</option>
-                          <option value="C">Group C</option>
+                          <option value="none">⚪ Unlinked</option>
+                          <option value="A">🔵 Blue Link</option>
+                          <option value="B">🟣 Purple Link</option>
+                          <option value="C">🟢 Green Link</option>
                         </select>
 
                         {/* Close/Delete Card Button */}
@@ -579,7 +627,7 @@ export function GammaFlow() {
                           <span>Fetching {widget.ticker} data...</span>
                         </div>
                       ) : widget.type === 'heatmap' ? (
-                        <GammaHeatmap history={widgetGammaHistory} />
+                        <GammaHeatmap history={widgetGammaHistory} strikeCount={widget.strikeCount} />
                       ) : widget.type === 'net_flow' ? (
                         <NetFlowChart history={widgetNetFlowHistory} />
                       ) : (
