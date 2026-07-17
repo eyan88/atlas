@@ -21,25 +21,17 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     const canvas = canvasRef.current;
     if (!canvas || history.length === 0) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
 
-    // Set dimensions based on client bounding rect
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const width = rect.width;
-    const height = rect.height;
+    // Track mouse coordinates & observed dimensions for robust rendering
+    let mouseX: number | null = null;
+    let mouseY: number | null = null;
+    let observedWidth = 0;
+    let observedHeight = 0;
 
     // Sort history by timestamp ascending
     const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
-
-    const margin = { top: 20, right: 60, bottom: 30, left: 60 };
-    const chartWidth = width - margin.left - margin.right;
-    const chartHeight = height - margin.top - margin.bottom;
 
     // Find min and max values across both premium lines
     const timestamps = sorted.map((h) => h.timestamp);
@@ -63,32 +55,43 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     const spotMax = maxSpot + spotPad;
     const spotScaleRange = spotMax - spotMin;
 
-    // Get screen coordinates helper
-    const getX = (ts: number) => {
-      if (maxTime === minTime) return margin.left;
-      return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
-    };
-
-    // Primary Y-Axis coordinate (Premium Flow - Left axis)
-    const getPremY = (val: number) => {
-      if (valRange === 0) return margin.top + chartHeight / 2;
-      return margin.top + chartHeight - ((val - minVal) / valRange) * chartHeight;
-    };
-
-    // Secondary Y-Axis coordinate (Spot Price - Right axis)
-    const getSpotY = (val: number) => {
-      if (spotScaleRange === 0) return margin.top + chartHeight / 2;
-      return margin.top + chartHeight - ((val - spotMin) / spotScaleRange) * chartHeight;
-    };
-
-    // Track mouse coordinates for interactive tooltips
-    let mouseX: number | null = null;
-    let mouseY: number | null = null;
-
     const draw = () => {
+      if (observedWidth === 0 || observedHeight === 0) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Handle high DPI displays
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = observedWidth * dpr;
+      canvas.height = observedHeight * dpr;
+      ctx.scale(dpr, dpr);
+
       // Clear canvas
       ctx.fillStyle = '#0d0f14';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(0, 0, observedWidth, observedHeight);
+
+      const margin = { top: 20, right: 60, bottom: 30, left: 60 };
+      const chartWidth = observedWidth - margin.left - margin.right;
+      const chartHeight = observedHeight - margin.top - margin.bottom;
+
+      // Get screen coordinates helper
+      const getX = (ts: number) => {
+        if (maxTime === minTime) return margin.left;
+        return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
+      };
+
+      // Primary Y-Axis coordinate (Premium Flow - Left axis)
+      const getPremY = (val: number) => {
+        if (valRange === 0) return margin.top + chartHeight / 2;
+        return margin.top + chartHeight - ((val - minVal) / valRange) * chartHeight;
+      };
+
+      // Secondary Y-Axis coordinate (Spot Price - Right axis)
+      const getSpotY = (val: number) => {
+        if (spotScaleRange === 0) return margin.top + chartHeight / 2;
+        return margin.top + chartHeight - ((val - spotMin) / spotScaleRange) * chartHeight;
+      };
 
       // 1. Draw horizontal grid lines and Left/Right axis labels
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
@@ -199,7 +202,6 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
 
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
-        // Find closest timestamp
         const xRatio = (mouseX - margin.left) / chartWidth;
         const targetTsIdx = Math.round(xRatio * (sorted.length - 1));
         const activeItem = sorted[Math.max(0, Math.min(sorted.length - 1, targetTsIdx))];
@@ -227,7 +229,7 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
         const tooltipW = 150;
         const tooltipH = 92;
         let tooltipX = xPos + 15;
-        if (tooltipX + tooltipW > width) {
+        if (tooltipX + tooltipW > observedWidth) {
           tooltipX = xPos - tooltipW - 15;
         }
         let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
@@ -263,8 +265,17 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       }
     };
 
-    // Initial draw
-    draw();
+    // Resize observer to dynamically capture container size changes
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width === 0 || height === 0) continue;
+        observedWidth = width;
+        observedHeight = height;
+        draw();
+      }
+    });
+    resizeObserver.observe(parent);
 
     // Mouse Move Listeners
     const handleMouseMove = (e: MouseEvent) => {
@@ -284,6 +295,7 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     canvas.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
+      resizeObserver.disconnect();
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };

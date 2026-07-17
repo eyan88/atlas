@@ -22,18 +22,14 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
     const canvas = canvasRef.current;
     if (!canvas || history.length === 0) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
 
-    // Set dimensions based on client bounding rect
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const width = rect.width;
-    const height = rect.height;
+    // Track mouse coordinates & observed dimensions for layout robustness
+    let mouseX: number | null = null;
+    let mouseY: number | null = null;
+    let observedWidth = 0;
+    let observedHeight = 0;
 
     // 1. Process and sort data
     const timestamps = Array.from(new Set(history.map((h) => h.timestamp))).sort((a, b) => a - b);
@@ -63,41 +59,47 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
       spotPrices[h.timestamp] = h.price;
     });
 
-    const margin = { top: 20, right: 55, bottom: 30, left: 20 };
-    const chartWidth = width - margin.left - margin.right;
-    const chartHeight = height - margin.top - margin.bottom;
-
-    // Helper coordinates
-    const getX = (ts: number) => {
-      const minTime = timestamps[0];
-      const maxTime = timestamps[timestamps.length - 1];
-      if (maxTime === minTime) return margin.left;
-      return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
-    };
-
-    const getRowY = (strikeIdx: number) => {
-      // Index 0 (lowest strike) is drawn at the bottom
-      return margin.top + chartHeight - (strikeIdx / (strikes.length - 1)) * chartHeight;
-    };
-
     // Find global max absolute GEX for color scaling
     const maxGexAbs = Math.max(
       ...history.map((h) => Math.abs(h.dealer_gamma_vol)),
       1e6
     );
 
-    // Calculate dimensions of a single heatmap cell
-    const cellWidth = chartWidth / (timestamps.length - 1);
-    const cellHeight = chartHeight / (strikes.length - 1);
-
-    // Track mouse coordinates for interactive tooltips
-    let mouseX: number | null = null;
-    let mouseY: number | null = null;
-
     const draw = () => {
+      if (observedWidth === 0 || observedHeight === 0) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Handle high DPI displays
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = observedWidth * dpr;
+      canvas.height = observedHeight * dpr;
+      ctx.scale(dpr, dpr);
+
       // Clear canvas
       ctx.fillStyle = '#0d0f14';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(0, 0, observedWidth, observedHeight);
+
+      const margin = { top: 20, right: 55, bottom: 30, left: 20 };
+      const chartWidth = observedWidth - margin.left - margin.right;
+      const chartHeight = observedHeight - margin.top - margin.bottom;
+
+      // Helper coordinates
+      const getX = (ts: number) => {
+        const minTime = timestamps[0];
+        const maxTime = timestamps[timestamps.length - 1];
+        if (maxTime === minTime) return margin.left;
+        return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
+      };
+
+      const getRowY = (strikeIdx: number) => {
+        return margin.top + chartHeight - (strikeIdx / (strikes.length - 1)) * chartHeight;
+      };
+
+      // Calculate dimensions of a single heatmap cell
+      const cellWidth = chartWidth / (timestamps.length - 1);
+      const cellHeight = chartHeight / (strikes.length - 1);
 
       // 2. Draw Heatmap Cells
       for (let xIdx = 0; xIdx < timestamps.length - 1; xIdx++) {
@@ -250,7 +252,7 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
         const tooltipW = 140;
         const tooltipH = 80;
         let tooltipX = xPos + 15;
-        if (tooltipX + tooltipW > width) {
+        if (tooltipX + tooltipW > observedWidth) {
           tooltipX = xPos - tooltipW - 15;
         }
         let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
@@ -284,8 +286,17 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
       }
     };
 
-    // Initial draw
-    draw();
+    // Resize observer to dynamically capture container size changes
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width === 0 || height === 0) continue;
+        observedWidth = width;
+        observedHeight = height;
+        draw();
+      }
+    });
+    resizeObserver.observe(parent);
 
     // Mouse Move Listeners
     const handleMouseMove = (e: MouseEvent) => {
@@ -305,6 +316,7 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
     canvas.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
+      resizeObserver.disconnect();
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
