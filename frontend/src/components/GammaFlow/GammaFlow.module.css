@@ -203,6 +203,8 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .dashboardCard:hover {
@@ -217,21 +219,24 @@
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding-bottom: 8px;
-  gap: 8px;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cardLeftControls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .cardGrip {
   cursor: grab;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   user-select: none;
-  padding: 2px 4px;
+  padding: 2px;
 }
 
 .cardGrip:active {
@@ -241,16 +246,17 @@
 .cardRightControls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .cardSelector {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 3px 6px;
+  padding: 2px 4px;
   border-radius: 4px;
   cursor: pointer;
   outline: none;
@@ -262,13 +268,13 @@
 }
 
 .cardSpot {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
   color: #f59e0b;
   background: rgba(245, 158, 11, 0.09);
   border: 1px solid rgba(245, 158, 11, 0.22);
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
@@ -279,7 +285,7 @@
   color: var(--text-primary);
   font-size: 10px;
   font-weight: 800;
-  padding: 3px 5px;
+  padding: 2px 4px;
   border-radius: 4px;
   cursor: pointer;
   outline: none;
