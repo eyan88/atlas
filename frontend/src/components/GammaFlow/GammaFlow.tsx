@@ -318,14 +318,18 @@ export function GammaFlow() {
     setViewMode('focus');
   };
 
-  // Apply timeline playback scrubbing filter to datasets
-  const filteredGammaHistory = currentTimestamp
-    ? gammaHistory.filter((h) => h.timestamp <= currentTimestamp)
-    : gammaHistory;
+  // Apply timeline playback scrubbing filter to datasets with fallback to prevent blank loads
+  let filteredGammaHistory = gammaHistory;
+  if (currentTimestamp && gammaHistory.length > 0) {
+    const filtered = gammaHistory.filter((h) => h.timestamp <= currentTimestamp);
+    filteredGammaHistory = filtered.length > 0 ? filtered : gammaHistory.slice(0, 1);
+  }
 
-  const filteredNetFlowHistory = currentTimestamp
-    ? netFlowHistory.filter((h) => h.timestamp <= currentTimestamp)
-    : netFlowHistory;
+  let filteredNetFlowHistory = netFlowHistory;
+  if (currentTimestamp && netFlowHistory.length > 0) {
+    const filtered = netFlowHistory.filter((h) => h.timestamp <= currentTimestamp);
+    filteredNetFlowHistory = filtered.length > 0 ? filtered : netFlowHistory.slice(0, Math.min(2, netFlowHistory.length));
+  }
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
 
@@ -501,14 +505,18 @@ export function GammaFlow() {
                 const netPrem = data?.netFlow?.net_premium ?? 0;
                 const isPositive = netPrem >= 0;
 
-                // Scrub historical grid data if loaded
-                const widgetGammaHistory = data && currentTimestamp
-                  ? data.gammaHistory.filter((h) => h.timestamp <= currentTimestamp)
-                  : data?.gammaHistory ?? [];
+                 // Scrub historical grid data if loaded with dynamic fallback bounds
+                 let widgetGammaHistory = data ? data.gammaHistory : [];
+                 if (data && currentTimestamp) {
+                   const filtered = data.gammaHistory.filter((h) => h.timestamp <= currentTimestamp);
+                   widgetGammaHistory = filtered.length > 0 ? filtered : data.gammaHistory.slice(0, 1);
+                 }
 
-                const widgetNetFlowHistory = data && currentTimestamp
-                  ? data.netFlowHistory.filter((h) => h.timestamp <= currentTimestamp)
-                  : data?.netFlowHistory ?? [];
+                 let widgetNetFlowHistory = data ? data.netFlowHistory : [];
+                 if (data && currentTimestamp) {
+                   const filtered = data.netFlowHistory.filter((h) => h.timestamp <= currentTimestamp);
+                   widgetNetFlowHistory = filtered.length > 0 ? filtered : data.netFlowHistory.slice(0, Math.min(2, data.netFlowHistory.length));
+                 }
 
                 return (
                   <div
