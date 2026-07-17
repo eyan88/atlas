@@ -12,19 +12,20 @@ const MAX_WIDGETS = 8;
 
 type ViewMode = 'dashboard' | 'focus';
 type ChartType = 'heatmap' | 'net_flow' | 'bar_chart';
+type LinkGroup = 'A' | 'B' | 'C' | 'none';
 
 interface Widget {
   id: string;
   ticker: string;
   type: ChartType;
-  isLinked?: boolean;
+  group: LinkGroup;
 }
 
 const DEFAULT_WIDGETS: Widget[] = [
-  { id: 'w1', ticker: 'QQQ', type: 'heatmap', isLinked: true },
-  { id: 'w2', ticker: 'QQQ', type: 'net_flow', isLinked: true },
-  { id: 'w3', ticker: 'SPY', type: 'heatmap', isLinked: true },
-  { id: 'w4', ticker: 'SPY', type: 'net_flow', isLinked: true },
+  { id: 'w1', ticker: 'QQQ', type: 'heatmap', group: 'A' },
+  { id: 'w2', ticker: 'QQQ', type: 'net_flow', group: 'A' },
+  { id: 'w3', ticker: 'SPY', type: 'heatmap', group: 'B' },
+  { id: 'w4', ticker: 'SPY', type: 'net_flow', group: 'B' },
 ];
 
 function formatUSD(value: number): string {
@@ -47,7 +48,7 @@ export function GammaFlow() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(activeTicker);
 
-  // Widget state for Dashboard Grid (defaults to 4 linked widgets)
+  // Widget state for Dashboard Grid (defaults to 2 pairs of linked widgets)
   const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
 
   // States for Focus view
@@ -249,17 +250,17 @@ export function GammaFlow() {
     setWidgets(updated);
   };
 
-  // Update Widget Ticker (with synchronized linking propagation support)
+  // Update Widget Ticker (with Link Group propagation support)
   const handleWidgetTickerChange = (id: string, nextTicker: string) => {
     setWidgets((current) => {
       const target = current.find((w) => w.id === id);
-      const isTargetLinked = target?.isLinked ?? false;
+      const targetGroup = target?.group ?? 'none';
 
       return current.map((w) => {
         if (w.id === id) {
           return { ...w, ticker: nextTicker };
         }
-        if (isTargetLinked && w.isLinked) {
+        if (targetGroup !== 'none' && w.group === targetGroup) {
           return { ...w, ticker: nextTicker };
         }
         return w;
@@ -274,10 +275,10 @@ export function GammaFlow() {
     );
   };
 
-  // Toggle Widget linkage
-  const toggleWidgetLink = (id: string) => {
+  // Update Link Group for a specific widget
+  const handleWidgetGroupChange = (id: string, nextGroup: LinkGroup) => {
     setWidgets((current) =>
-      current.map((w) => (w.id === id ? { ...w, isLinked: !w.isLinked } : w))
+      current.map((w) => (w.id === id ? { ...w, group: nextGroup } : w))
     );
   };
 
@@ -289,7 +290,7 @@ export function GammaFlow() {
       id: newId,
       ticker: ticker,
       type: 'heatmap',
-      isLinked: true, // Default new widgets to linked for intuitive syncing
+      group: 'none', // Default new widgets to independent (No Group Link)
     };
     setWidgets((current) => [...current, nextWidget]);
   };
@@ -315,6 +316,14 @@ export function GammaFlow() {
     : netFlowHistory;
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
+
+  // Helper to resolve CSS classes for group select color badges
+  const getGroupSelectClass = (group: LinkGroup) => {
+    if (group === 'A') return `${styles.cardGroupSelector} ${styles.groupA}`;
+    if (group === 'B') return `${styles.cardGroupSelector} ${styles.groupB}`;
+    if (group === 'C') return `${styles.cardGroupSelector} ${styles.groupC}`;
+    return `${styles.cardGroupSelector} ${styles.groupNone}`;
+  };
 
   return (
     <div className={styles.container}>
@@ -531,18 +540,22 @@ export function GammaFlow() {
                           {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
                         </span>
                         
-                        {/* Link/Sync Card Ticker Button */}
-                        <button
-                          type="button"
-                          className={`${styles.cardLinkBtn} ${widget.isLinked ? styles.cardLinkActive : styles.cardLinkInactive}`}
-                          onClick={(e) => {
+                        {/* Link Group Channel Selector (A, B, C or None) */}
+                        <select
+                          className={getGroupSelectClass(widget.group)}
+                          value={widget.group}
+                          onChange={(e) => {
                             e.stopPropagation();
-                            toggleWidgetLink(widget.id);
+                            handleWidgetGroupChange(widget.id, e.target.value as LinkGroup);
                           }}
-                          title={widget.isLinked ? "Unlink ticker from other cards" : "Link ticker to sync with other cards"}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Assign Link Group Channel to sync tickers"
                         >
-                          🔗
-                        </button>
+                          <option value="none">— (No Link)</option>
+                          <option value="A">Group A</option>
+                          <option value="B">Group B</option>
+                          <option value="C">Group C</option>
+                        </select>
 
                         {/* Close/Delete Card Button */}
                         <button
