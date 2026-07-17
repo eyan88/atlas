@@ -600,9 +600,9 @@ export function GammaFlow() {
                           title="Assign Link Channel Color to sync tickers"
                         >
                           <option value="none">⚪ Unlinked</option>
-                          <option value="A">🔵 Blue Link</option>
-                          <option value="B">🟣 Purple Link</option>
-                          <option value="C">🟢 Green Link</option>
+                          <option value="A">🔵 Blue</option>
+                          <option value="B">🟣 Purple</option>
+                          <option value="C">🟢 Green</option>
                         </select>
 
                         {/* Close/Delete Card Button */}
