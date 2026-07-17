@@ -17,13 +17,14 @@ interface Widget {
   id: string;
   ticker: string;
   type: ChartType;
+  isLinked?: boolean;
 }
 
 const DEFAULT_WIDGETS: Widget[] = [
-  { id: 'w1', ticker: 'QQQ', type: 'heatmap' },
-  { id: 'w2', ticker: 'QQQ', type: 'net_flow' },
-  { id: 'w3', ticker: 'SPY', type: 'heatmap' },
-  { id: 'w4', ticker: 'SPY', type: 'net_flow' },
+  { id: 'w1', ticker: 'QQQ', type: 'heatmap', isLinked: true },
+  { id: 'w2', ticker: 'QQQ', type: 'net_flow', isLinked: true },
+  { id: 'w3', ticker: 'SPY', type: 'heatmap', isLinked: true },
+  { id: 'w4', ticker: 'SPY', type: 'net_flow', isLinked: true },
 ];
 
 function formatUSD(value: number): string {
@@ -46,7 +47,7 @@ export function GammaFlow() {
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(activeTicker);
 
-  // Widget state for Dashboard Grid
+  // Widget state for Dashboard Grid (defaults to 4 linked widgets)
   const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
 
   // States for Focus view
@@ -204,7 +205,6 @@ export function GammaFlow() {
       active = false;
       clearInterval(timerId);
     };
-    // Depend on uniqueTickersKey instead of raw widgets so re-ordering doesn't trigger refetches!
   }, [viewMode, uniqueTickersKey, selectedDate, setTimelineData]);
 
   const handleTickerChange = (ticker: string) => {
@@ -249,15 +249,35 @@ export function GammaFlow() {
     setWidgets(updated);
   };
 
+  // Update Widget Ticker (with synchronized linking propagation support)
   const handleWidgetTickerChange = (id: string, nextTicker: string) => {
-    setWidgets((current) =>
-      current.map((w) => (w.id === id ? { ...w, ticker: nextTicker } : w))
-    );
+    setWidgets((current) => {
+      const target = current.find((w) => w.id === id);
+      const isTargetLinked = target?.isLinked ?? false;
+
+      return current.map((w) => {
+        if (w.id === id) {
+          return { ...w, ticker: nextTicker };
+        }
+        if (isTargetLinked && w.isLinked) {
+          return { ...w, ticker: nextTicker };
+        }
+        return w;
+      });
+    });
   };
 
+  // Update Chart Type
   const handleWidgetTypeChange = (id: string, nextType: ChartType) => {
     setWidgets((current) =>
       current.map((w) => (w.id === id ? { ...w, type: nextType } : w))
+    );
+  };
+
+  // Toggle Widget linkage
+  const toggleWidgetLink = (id: string) => {
+    setWidgets((current) =>
+      current.map((w) => (w.id === id ? { ...w, isLinked: !w.isLinked } : w))
     );
   };
 
@@ -269,6 +289,7 @@ export function GammaFlow() {
       id: newId,
       ticker: ticker,
       type: 'heatmap',
+      isLinked: true, // Default new widgets to linked for intuitive syncing
     };
     setWidgets((current) => [...current, nextWidget]);
   };
@@ -510,6 +531,19 @@ export function GammaFlow() {
                           {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
                         </span>
                         
+                        {/* Link/Sync Card Ticker Button */}
+                        <button
+                          type="button"
+                          className={`${styles.cardLinkBtn} ${widget.isLinked ? styles.cardLinkActive : styles.cardLinkInactive}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWidgetLink(widget.id);
+                          }}
+                          title={widget.isLinked ? "Unlink ticker from other cards" : "Link ticker to sync with other cards"}
+                        >
+                          🔗
+                        </button>
+
                         {/* Close/Delete Card Button */}
                         <button
                           type="button"
@@ -556,7 +590,5 @@ export function GammaFlow() {
     </div>
   );
 }
-
-
 
 export default GammaFlow;

@@ -36,9 +36,29 @@ export function GammaHeatmap({ history }: GammaHeatmapProps) {
 
     // 1. Process and sort data
     const timestamps = Array.from(new Set(history.map((h) => h.timestamp))).sort((a, b) => a - b);
-    const strikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order (lowest at bottom)
+    const rawStrikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order (lowest at bottom)
 
-    if (timestamps.length < 2 || strikes.length < 2) return;
+    if (timestamps.length < 2 || rawStrikes.length < 2) return;
+
+    // Find the latest spot price to orient our zoom window
+    const lastHistoryItem = history[history.length - 1];
+    const currentSpot = lastHistoryItem ? lastHistoryItem.price : rawStrikes[Math.floor(rawStrikes.length / 2)];
+
+    // Zoom the Y-axis strike range to be +/- 1.5% around the spot price so vertical movements are clearly visible.
+    let strikes = rawStrikes;
+    if (currentSpot > 0) {
+      const minBound = currentSpot * 0.985; // -1.5%
+      const maxBound = currentSpot * 1.015; // +1.5%
+      strikes = rawStrikes.filter((s) => s >= minBound && s <= maxBound);
+
+      // Fallback if the range is too tight and leaves too few strikes
+      if (strikes.length < 6) {
+        strikes = [...rawStrikes]
+          .sort((a, b) => Math.abs(a - currentSpot) - Math.abs(b - currentSpot))
+          .slice(0, 10)
+          .sort((a, b) => a - b);
+      }
+    }
 
     // Build lookup map and gather spot prices per timestamp
     const matrix: Record<string, number> = {};
