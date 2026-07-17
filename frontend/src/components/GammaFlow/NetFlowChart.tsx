@@ -24,11 +24,11 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    // Track mouse coordinates & observed dimensions for robust rendering
+    // Track mouse coordinates & observed dimensions (initialized with parent size to avoid rendering delay)
     let mouseX: number | null = null;
     let mouseY: number | null = null;
-    let observedWidth = 0;
-    let observedHeight = 0;
+    let observedWidth = parent.clientWidth || canvas.getBoundingClientRect().width || 400;
+    let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
     // Sort history by timestamp ascending
     const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
@@ -265,14 +265,19 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       }
     };
 
+    // Draw immediately on mount to solve load races
+    draw();
+
     // Resize observer to dynamically capture container size changes
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
         if (width === 0 || height === 0) continue;
-        observedWidth = width;
-        observedHeight = height;
-        draw();
+        if (width !== observedWidth || height !== observedHeight) {
+          observedWidth = width;
+          observedHeight = height;
+          draw();
+        }
       }
     });
     resizeObserver.observe(parent);
