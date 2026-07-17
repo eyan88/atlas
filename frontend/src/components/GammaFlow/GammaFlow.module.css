@@ -334,6 +334,29 @@
   color: #f87171;
 }
 
+.cardFocusBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  transition: color 0.15s ease, transform 0.15s ease;
+  user-select: none;
+}
+
+.cardFocusBtn:hover {
+  color: #38bdf8;
+  transform: scale(1.15);
+}
+
+.cardFocusBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .cardChartBody {
   flex: 1;
   min-height: 0;

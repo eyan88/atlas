@@ -3,6 +3,7 @@ import type { NetFlowData } from '../../api/gammaFlowClient';
 
 interface NetFlowChartProps {
   history: NetFlowData[];
+  currentTimestamp?: number | null;
 }
 
 function formatUSD(value: number): string {
@@ -14,7 +15,7 @@ function formatUSD(value: number): string {
   return `${sign}$${abs.toFixed(2)}`;
 }
 
-export function NetFlowChart({ history }: NetFlowChartProps) {
+export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -24,20 +25,21 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    // Track mouse coordinates & observed dimensions (initialized with parent size to avoid rendering delay)
+    // Track mouse coordinates & observed dimensions
     let mouseX: number | null = null;
     let mouseY: number | null = null;
     let observedWidth = parent.clientWidth || canvas.getBoundingClientRect().width || 400;
     let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
-    // Sort history by timestamp ascending
+    // Sort full history by timestamp ascending to construct a stable X axis range
     const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
 
-    // Find min and max values across both premium lines
+    // Full daily bounds for X scale stability
     const timestamps = sorted.map((h) => h.timestamp);
     const minTime = Math.min(...timestamps);
     const maxTime = Math.max(...timestamps);
 
+    // Find min and max values across both premium lines for primary Y-axis
     const calls = sorted.map((h) => h.net_call_prem);
     const puts = sorted.map((h) => h.net_put_prem);
     const maxVal = Math.max(...calls, ...puts, 1e6);
@@ -75,7 +77,7 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
-      // Get screen coordinates helper
+      // Get screen coordinates helper (stabilized using full session ranges)
       const getX = (ts: number) => {
         if (maxTime === minTime) return margin.left;
         return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
@@ -125,6 +127,10 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
         ctx.fillText(`$${spotVal.toFixed(2)}`, margin.left + chartWidth + 8, y);
       }
 
+      // Filter history down to the currently visible segments
+      const latestAllowedTs = currentTimestamp ?? maxTime;
+      const visibleHistory = sorted.filter((h) => h.timestamp <= latestAllowedTs);
+
       // 2. Draw Call & Put Premium Lines
       const drawLine = (
         points: number[],
@@ -134,10 +140,10 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
         if (points.length === 0) return;
 
         ctx.beginPath();
-        ctx.moveTo(getX(sorted[0].timestamp), getPremY(points[0]));
+        ctx.moveTo(getX(visibleHistory[0].timestamp), getPremY(points[0]));
 
-        for (let i = 1; i < sorted.length; i++) {
-          ctx.lineTo(getX(sorted[i].timestamp), getPremY(points[i]));
+        for (let i = 1; i < visibleHistory.length; i++) {
+          ctx.lineTo(getX(visibleHistory[i].timestamp), getPremY(points[i]));
         }
 
         ctx.strokeStyle = strokeColor;
@@ -149,35 +155,40 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
         grad.addColorStop(0, fillGradientStart);
         grad.addColorStop(1, 'rgba(13, 15, 20, 0.0)');
 
-        ctx.lineTo(getX(sorted[sorted.length - 1].timestamp), margin.top + chartHeight);
-        ctx.lineTo(getX(sorted[0].timestamp), margin.top + chartHeight);
+        ctx.lineTo(getX(visibleHistory[visibleHistory.length - 1].timestamp), margin.top + chartHeight);
+        ctx.lineTo(getX(visibleHistory[0].timestamp), margin.top + chartHeight);
         ctx.closePath();
 
         ctx.fillStyle = grad;
         ctx.fill();
       };
 
-      // Draw Call premium line (green)
-      drawLine(calls, '#00e676', 'rgba(0, 230, 118, 0.12)');
+      if (visibleHistory.length > 0) {
+        const visibleCalls = visibleHistory.map((h) => h.net_call_prem);
+        const visiblePuts = visibleHistory.map((h) => h.net_put_prem);
 
-      // Draw Put premium line (red)
-      drawLine(puts, '#ff3d00', 'rgba(255, 61, 0, 0.12)');
+        // Draw Call premium line (green)
+        drawLine(visibleCalls, '#00e676', 'rgba(0, 230, 118, 0.12)');
 
-      // 3. Draw Spot Price Line Overlay (Glowing Dotted Path)
-      ctx.beginPath();
-      ctx.moveTo(getX(sorted[0].timestamp), getSpotY(sorted[0].price));
-      for (let i = 1; i < sorted.length; i++) {
-        ctx.lineTo(getX(sorted[i].timestamp), getSpotY(sorted[i].price));
+        // Draw Put premium line (red)
+        drawLine(visiblePuts, '#ff3d00', 'rgba(255, 61, 0, 0.12)');
+
+        // 3. Draw Spot Price Line Overlay (Glowing Dotted Path)
+        ctx.beginPath();
+        ctx.moveTo(getX(visibleHistory[0].timestamp), getSpotY(visibleHistory[0].price));
+        for (let i = 1; i < visibleHistory.length; i++) {
+          ctx.lineTo(getX(visibleHistory[i].timestamp), getSpotY(visibleHistory[i].price));
+        }
+        // Glowing highlight (thin, clean profile)
+        ctx.shadowColor = 'rgba(245, 158, 11, 0.5)';
+        ctx.shadowBlur = 5;
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([3, 3]); // dotted line to differentiate from flows
+        ctx.stroke();
+        ctx.setLineDash([]); // reset
+        ctx.shadowBlur = 0; // reset shadow
       }
-      // Glowing highlight (thin, clean profile)
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.5)';
-      ctx.shadowBlur = 5;
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.8;
-      ctx.setLineDash([3, 3]); // dotted line to differentiate from flows
-      ctx.stroke();
-      ctx.setLineDash([]); // reset
-      ctx.shadowBlur = 0; // reset shadow
 
       // 4. Draw X-axis Time stamps
       ctx.fillStyle = '#94a3b8';
@@ -205,67 +216,71 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
         const xRatio = (mouseX - margin.left) / chartWidth;
         const targetTsIdx = Math.round(xRatio * (sorted.length - 1));
         const activeItem = sorted[Math.max(0, Math.min(sorted.length - 1, targetTsIdx))];
-        const xPos = getX(activeItem.timestamp);
 
-        // Draw vertical crosshair line
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(xPos, margin.top);
-        ctx.lineTo(xPos, margin.top + chartHeight);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Only show tooltip for sections containing active drawn data
+        if (activeItem.timestamp <= latestAllowedTs) {
+          const xPos = getX(activeItem.timestamp);
 
-        // Gather metrics
-        const callVal = activeItem.net_call_prem;
-        const putVal = activeItem.net_put_prem;
-        const netVal = activeItem.net_premium;
-        const spotPrice = activeItem.price;
-        const date = new Date(activeItem.timestamp * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          // Draw vertical crosshair line
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(xPos, margin.top);
+          ctx.lineTo(xPos, margin.top + chartHeight);
+          ctx.stroke();
+          ctx.setLineDash([]);
 
-        // Tooltip box dimensions
-        const tooltipW = 150;
-        const tooltipH = 92;
-        let tooltipX = xPos + 15;
-        if (tooltipX + tooltipW > observedWidth) {
-          tooltipX = xPos - tooltipW - 15;
+          // Gather metrics
+          const callVal = activeItem.net_call_prem;
+          const putVal = activeItem.net_put_prem;
+          const netVal = activeItem.net_premium;
+          const spotPrice = activeItem.price;
+          const date = new Date(activeItem.timestamp * 1000);
+          const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+          // Tooltip box dimensions
+          const tooltipW = 150;
+          const tooltipH = 92;
+          let tooltipX = xPos + 15;
+          if (tooltipX + tooltipW > observedWidth) {
+            tooltipX = xPos - tooltipW - 15;
+          }
+          let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
+          tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
+
+          // Draw container box
+          ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.roundRect(tooltipX, tooltipY, tooltipW, tooltipH, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          // Write Tooltip text
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px Inter';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(`Time: ${timeStr}`, tooltipX + 10, tooltipY + 10);
+          
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillText(`Spot: $${spotPrice.toFixed(2)}`, tooltipX + 10, tooltipY + 25);
+
+          ctx.fillStyle = '#00e676';
+          ctx.fillText(`Calls: ${formatUSD(callVal)}`, tooltipX + 10, tooltipY + 40);
+
+          ctx.fillStyle = '#ff3d00';
+          ctx.fillText(`Puts: ${formatUSD(putVal)}`, tooltipX + 10, tooltipY + 55);
+
+          ctx.fillStyle = netVal >= 0 ? '#00e676' : '#ff3d00';
+          ctx.fillText(`Net Prem: ${formatUSD(netVal)}`, tooltipX + 10, tooltipY + 70);
         }
-        let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
-        tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
-
-        // Draw container box
-        ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(tooltipX, tooltipY, tooltipW, tooltipH, 6);
-        ctx.fill();
-        ctx.stroke();
-
-        // Write Tooltip text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px Inter';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(`Time: ${timeStr}`, tooltipX + 10, tooltipY + 10);
-        
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillText(`Spot: $${spotPrice.toFixed(2)}`, tooltipX + 10, tooltipY + 25);
-
-        ctx.fillStyle = '#00e676';
-        ctx.fillText(`Calls: ${formatUSD(callVal)}`, tooltipX + 10, tooltipY + 40);
-
-        ctx.fillStyle = '#ff3d00';
-        ctx.fillText(`Puts: ${formatUSD(putVal)}`, tooltipX + 10, tooltipY + 55);
-
-        ctx.fillStyle = netVal >= 0 ? '#00e676' : '#ff3d00';
-        ctx.fillText(`Net Prem: ${formatUSD(netVal)}`, tooltipX + 10, tooltipY + 70);
       }
     };
 
-    // Draw immediately on mount to solve load races
+    // Draw immediately on mount
     draw();
 
     // Resize observer to dynamically capture container size changes
@@ -304,7 +319,7 @@ export function NetFlowChart({ history }: NetFlowChartProps) {
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [history]);
+  }, [history, currentTimestamp]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

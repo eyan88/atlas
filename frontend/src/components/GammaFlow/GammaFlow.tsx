@@ -342,18 +342,7 @@ export function GammaFlow() {
     setViewMode('focus');
   };
 
-  // Apply timeline playback scrubbing filter to datasets with fallback to prevent blank loads
-  let filteredGammaHistory = gammaHistory;
-  if (currentTimestamp && gammaHistory.length > 0) {
-    const filtered = gammaHistory.filter((h) => h.timestamp <= currentTimestamp);
-    filteredGammaHistory = filtered.length > 0 ? filtered : gammaHistory.slice(0, 1);
-  }
-
-  let filteredNetFlowHistory = netFlowHistory;
-  if (currentTimestamp && netFlowHistory.length > 0) {
-    const filtered = netFlowHistory.filter((h) => h.timestamp <= currentTimestamp);
-    filteredNetFlowHistory = filtered.length > 0 ? filtered : netFlowHistory.slice(0, Math.min(2, netFlowHistory.length));
-  }
+  // No local filtering needed anymore since canvas graphs render up to currentTimestamp natively
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
 
@@ -502,7 +491,7 @@ export function GammaFlow() {
                   <span className={styles.spotBadge}>Spot price: ${spot.toFixed(2)}</span>
                 </div>
                 <div className={styles.chartBody}>
-                  <GammaHeatmap history={filteredGammaHistory} strikeCount={focusStrikeCount === 0 ? undefined : focusStrikeCount} />
+                  <GammaHeatmap history={gammaHistory} currentTimestamp={currentTimestamp} strikeCount={focusStrikeCount === 0 ? undefined : focusStrikeCount} />
                 </div>
               </section>
 
@@ -517,7 +506,7 @@ export function GammaFlow() {
                   </div>
                 </div>
                 <div className={styles.chartBody}>
-                  <NetFlowChart history={filteredNetFlowHistory} />
+                  <NetFlowChart history={netFlowHistory} currentTimestamp={currentTimestamp} />
                 </div>
               </section>
             </div>
@@ -529,18 +518,7 @@ export function GammaFlow() {
                 const netPrem = data?.netFlow?.net_premium ?? 0;
                 const isPositive = netPrem >= 0;
 
-                 // Scrub historical grid data if loaded with dynamic fallback bounds
-                 let widgetGammaHistory = data ? data.gammaHistory : [];
-                 if (data && currentTimestamp) {
-                   const filtered = data.gammaHistory.filter((h) => h.timestamp <= currentTimestamp);
-                   widgetGammaHistory = filtered.length > 0 ? filtered : data.gammaHistory.slice(0, 1);
-                 }
-
-                 let widgetNetFlowHistory = data ? data.netFlowHistory : [];
-                 if (data && currentTimestamp) {
-                   const filtered = data.netFlowHistory.filter((h) => h.timestamp <= currentTimestamp);
-                   widgetNetFlowHistory = filtered.length > 0 ? filtered : data.netFlowHistory.slice(0, Math.min(2, data.netFlowHistory.length));
-                 }
+                 // No local grid filtering needed since canvas components handle currentTimestamp directly
 
                 return (
                   <div
@@ -552,7 +530,6 @@ export function GammaFlow() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, index)}
-                    onClick={() => data && handleCardClick(widget.ticker)}
                   >
                     {/* Card Header with Interactive Dropdown Controls */}
                     <div className={styles.cardHeader}>
@@ -637,6 +614,20 @@ export function GammaFlow() {
                           <option value="C">🟢 Green</option>
                         </select>
 
+                        {/* Open Focus View Button */}
+                        <button
+                          type="button"
+                          className={styles.cardFocusBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCardClick(widget.ticker);
+                          }}
+                          title="Open detailed focus view for this ticker"
+                          disabled={!data}
+                        >
+                          ⤢
+                        </button>
+
                         {/* Close/Delete Card Button */}
                         <button
                           type="button"
@@ -659,9 +650,9 @@ export function GammaFlow() {
                           <span>Fetching {widget.ticker} data...</span>
                         </div>
                       ) : widget.type === 'heatmap' ? (
-                        <GammaHeatmap history={widgetGammaHistory} strikeCount={widget.strikeCount} />
+                        <GammaHeatmap history={data.gammaHistory} currentTimestamp={currentTimestamp} strikeCount={widget.strikeCount} />
                       ) : widget.type === 'net_flow' ? (
-                        <NetFlowChart history={widgetNetFlowHistory} />
+                        <NetFlowChart history={data.netFlowHistory} currentTimestamp={currentTimestamp} />
                       ) : (
                         <GammaBarChart strikes={data.strikes} spot={data.spot} />
                       )}

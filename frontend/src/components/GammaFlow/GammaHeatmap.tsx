@@ -3,6 +3,7 @@ import type { GammaStrike } from '../../api/gammaFlowClient';
 
 interface GammaHeatmapProps {
   history: GammaStrike[];
+  currentTimestamp?: number | null;
   strikeCount?: number;
 }
 
@@ -15,7 +16,7 @@ function formatUSD(value: number): string {
   return `${sign}$${abs.toFixed(2)}`;
 }
 
-export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
+export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -25,20 +26,23 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    // Track mouse coordinates & observed dimensions (initialized with current parent size to guarantee instant load)
+    // Track mouse coordinates & observed dimensions
     let mouseX: number | null = null;
     let mouseY: number | null = null;
     let observedWidth = parent.clientWidth || canvas.getBoundingClientRect().width || 400;
     let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
-    // 1. Process and sort data
+    // 1. Process and sort full timestamps to compute a stable static timeline width
     const timestamps = Array.from(new Set(history.map((h) => h.timestamp))).sort((a, b) => a - b);
     const rawStrikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order
 
     if (timestamps.length < 2 || rawStrikes.length < 2) return;
 
-    // Find the latest spot price to orient our zoom window
-    const lastHistoryItem = history[history.length - 1];
+    // Find the latest spot price from the visible segment to orient our zoom window
+    const visibleSegment = currentTimestamp
+      ? history.filter((h) => h.timestamp <= currentTimestamp)
+      : history;
+    const lastHistoryItem = visibleSegment[visibleSegment.length - 1] || history[history.length - 1];
     const currentSpot = lastHistoryItem ? lastHistoryItem.price : rawStrikes[Math.floor(rawStrikes.length / 2)];
 
     // Filter strikes to the closest N strikes around the spot price
@@ -85,7 +89,7 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
-      // Helper coordinates
+      // Helper coordinates (stabilized against full daily range)
       const getX = (ts: number) => {
         const minTime = timestamps[0];
         const maxTime = timestamps[timestamps.length - 1];
@@ -101,9 +105,14 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
       const cellWidth = chartWidth / (timestamps.length - 1);
       const cellHeight = chartHeight / (strikes.length - 1);
 
+      // Resolve maximum timestamp currently allowed to display
+      const latestAllowedTs = currentTimestamp ?? timestamps[timestamps.length - 1];
+
       // 2. Draw Heatmap Cells
       for (let xIdx = 0; xIdx < timestamps.length - 1; xIdx++) {
         const ts = timestamps[xIdx];
+        if (ts > latestAllowedTs) continue; // Skip future cells
+
         const x = getX(ts);
 
         strikes.forEach((strike, yIdx) => {
@@ -143,7 +152,7 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
         ctx.fillText(strike.toFixed(1), margin.left + chartWidth + 8, y);
       }
 
-      // X-Axis Time Labels (Draw 4-5 ticks)
+      // X-Axis Time Labels (Draw 4-5 ticks at stable intervals)
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       const xTickInterval = Math.max(1, Math.floor(timestamps.length / 5));
@@ -161,11 +170,13 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
         ctx.fillText(timeStr, x, margin.top + chartHeight + 8);
       }
 
-      // 4. Draw Price Line Overlay (Glowing Spot Path)
+      // 4. Draw Price Line Overlay (Glowing Spot Path - Plotted up to latest allowed timestamp)
       ctx.beginPath();
       let hasLine = false;
 
       timestamps.forEach((ts) => {
+        if (ts > latestAllowedTs) return; // Skip future price paths
+
         const price = spotPrices[ts];
         if (price === undefined) return;
 
@@ -214,75 +225,79 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
         const xRatio = (mouseX - margin.left) / chartWidth;
         const targetTsIdx = Math.round(xRatio * (timestamps.length - 1));
         const activeTs = timestamps[Math.max(0, Math.min(timestamps.length - 1, targetTsIdx))];
-        const xPos = getX(activeTs);
 
-        // Draw vertical crosshair line
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(xPos, margin.top);
-        ctx.lineTo(xPos, margin.top + chartHeight);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Only show tooltip/cursor details for regions containing active drawn data
+        if (activeTs <= latestAllowedTs) {
+          const xPos = getX(activeTs);
 
-        // Find closest strike corresponding to mouseY
-        let hoveredStrike = strikes[0];
-        if (mouseY !== null && mouseY >= margin.top && mouseY <= margin.top + chartHeight) {
-          const yRatio = 1 - (mouseY - margin.top) / chartHeight;
-          const targetStrikeIdx = Math.round(yRatio * (strikes.length - 1));
-          hoveredStrike = strikes[Math.max(0, Math.min(strikes.length - 1, targetStrikeIdx))];
-          const yPos = getRowY(targetStrikeIdx);
-
-          // Draw horizontal crosshair line
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          // Draw vertical crosshair line
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
           ctx.beginPath();
-          ctx.moveTo(margin.left, yPos);
-          ctx.lineTo(margin.left + chartWidth, yPos);
+          ctx.moveTo(xPos, margin.top);
+          ctx.lineTo(xPos, margin.top + chartHeight);
           ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Find closest strike corresponding to mouseY
+          let hoveredStrike = strikes[0];
+          if (mouseY !== null && mouseY >= margin.top && mouseY <= margin.top + chartHeight) {
+            const yRatio = 1 - (mouseY - margin.top) / chartHeight;
+            const targetStrikeIdx = Math.round(yRatio * (strikes.length - 1));
+            hoveredStrike = strikes[Math.max(0, Math.min(strikes.length - 1, targetStrikeIdx))];
+            const yPos = getRowY(targetStrikeIdx);
+
+            // Draw horizontal crosshair line
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(margin.left, yPos);
+            ctx.lineTo(margin.left + chartWidth, yPos);
+            ctx.stroke();
+          }
+
+          // Gather metrics
+          const gexValue = matrix[`${activeTs}:${hoveredStrike}`] || 0;
+          const spotPrice = spotPrices[activeTs] || 0;
+          const date = new Date(activeTs * 1000);
+          const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+          // Tooltip box dimensions
+          const tooltipW = 140;
+          const tooltipH = 80;
+          let tooltipX = xPos + 15;
+          if (tooltipX + tooltipW > observedWidth) {
+            tooltipX = xPos - tooltipW - 15;
+          }
+          let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
+          tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
+
+          // Draw container box
+          ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.roundRect(tooltipX, tooltipY, tooltipW, tooltipH, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          // Write Tooltip text
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px Inter';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(`Time: ${timeStr}`, tooltipX + 10, tooltipY + 10);
+          
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillText(`Spot: $${spotPrice.toFixed(2)}`, tooltipX + 10, tooltipY + 26);
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillText(`Strike: ${hoveredStrike.toFixed(1)}`, tooltipX + 10, tooltipY + 42);
+
+          const gexStr = formatUSD(gexValue);
+          ctx.fillStyle = gexValue >= 0 ? '#00e676' : '#ff3d00';
+          ctx.fillText(`GEX: ${gexStr}`, tooltipX + 10, tooltipY + 58);
         }
-
-        // Gather metrics
-        const gexValue = matrix[`${activeTs}:${hoveredStrike}`] || 0;
-        const spotPrice = spotPrices[activeTs] || 0;
-        const date = new Date(activeTs * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-        // Tooltip box dimensions
-        const tooltipW = 140;
-        const tooltipH = 80;
-        let tooltipX = xPos + 15;
-        if (tooltipX + tooltipW > observedWidth) {
-          tooltipX = xPos - tooltipW - 15;
-        }
-        let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
-        tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
-
-        // Draw container box
-        ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(tooltipX, tooltipY, tooltipW, tooltipH, 6);
-        ctx.fill();
-        ctx.stroke();
-
-        // Write Tooltip text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px Inter';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(`Time: ${timeStr}`, tooltipX + 10, tooltipY + 10);
-        
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillText(`Spot: $${spotPrice.toFixed(2)}`, tooltipX + 10, tooltipY + 26);
-
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(`Strike: ${hoveredStrike.toFixed(1)}`, tooltipX + 10, tooltipY + 42);
-
-        const gexStr = formatUSD(gexValue);
-        ctx.fillStyle = gexValue >= 0 ? '#00e676' : '#ff3d00';
-        ctx.fillText(`GEX: ${gexStr}`, tooltipX + 10, tooltipY + 58);
       }
     };
 
@@ -325,7 +340,7 @@ export function GammaHeatmap({ history, strikeCount }: GammaHeatmapProps) {
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [history, strikeCount]);
+  }, [history, currentTimestamp, strikeCount]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
