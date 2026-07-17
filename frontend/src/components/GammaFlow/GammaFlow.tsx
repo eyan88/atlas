@@ -120,6 +120,19 @@ export function GammaFlow() {
         // Feed timestamps into global playback controls
         const timestamps = Array.from(new Set(gammaData.history.map((h) => h.timestamp))).sort((a, b) => a - b);
         setTimelineData(currentTicker, timestamps, {});
+
+        if (timestamps.length > 0) {
+          const latestTs = timestamps[timestamps.length - 1];
+          const todayStr = new Date().toISOString().split('T')[0];
+          const isTodaySelected = selectedDate === todayStr;
+          const storeState = useAppStore.getState();
+
+          if (storeState.currentTimestamp === null && !isTodaySelected) {
+            storeState.setTimestamp(latestTs);
+          } else if (storeState.currentTimestamp !== null && !timestamps.includes(storeState.currentTimestamp)) {
+            storeState.setTimestamp(latestTs);
+          }
+        }
       } catch (err) {
         console.error('Failed to load history:', err);
       }
@@ -188,6 +201,17 @@ export function GammaFlow() {
         // Align global playback slider with widgets timeline
         if (mainTimestamps.length > 0) {
           setTimelineData(uniqueTickers[0], mainTimestamps, {});
+
+          const latestTs = mainTimestamps[mainTimestamps.length - 1];
+          const todayStr = new Date().toISOString().split('T')[0];
+          const isTodaySelected = selectedDate === todayStr;
+          const storeState = useAppStore.getState();
+
+          if (storeState.currentTimestamp === null && !isTodaySelected) {
+            storeState.setTimestamp(latestTs);
+          } else if (storeState.currentTimestamp !== null && !mainTimestamps.includes(storeState.currentTimestamp)) {
+            storeState.setTimestamp(latestTs);
+          }
         }
       } catch (err: any) {
         if (!active) return;
