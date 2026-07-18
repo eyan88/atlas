@@ -218,11 +218,6 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
 
       tickTimes.forEach((ts) => {
         const x = getX(ts);
-        ctx.beginPath();
-        ctx.moveTo(x, margin.top);
-        ctx.lineTo(x, margin.top + chartHeight);
-        ctx.stroke();
-
         const date = new Date(ts * 1000);
         const timeStr = date.toLocaleTimeString('en-US', {
           hour: '2-digit',
