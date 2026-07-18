@@ -46,14 +46,31 @@ export function GammaFlow() {
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
   const setTimelineData = useAppStore((s) => s.setTimelineData);
 
-  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
-  const [currentTicker, setCurrentTicker] = useState(activeTicker);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('atlas_gamma_flow_view_mode') as ViewMode) || 'dashboard';
+  });
+  const [currentTicker, setCurrentTicker] = useState(() => {
+    return localStorage.getItem('atlas_gamma_flow_current_ticker') || activeTicker || 'SPY';
+  });
 
   // Focus View specific GEX heatmap strike count setting
-  const [focusStrikeCount, setFocusStrikeCount] = useState<number>(12);
+  const [focusStrikeCount, setFocusStrikeCount] = useState<number>(() => {
+    const saved = localStorage.getItem('atlas_gamma_flow_focus_strike_count');
+    return saved ? Number(saved) : 12;
+  });
 
   // Widget state for Dashboard Grid
-  const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
+  const [widgets, setWidgets] = useState<Widget[]>(() => {
+    const saved = localStorage.getItem('atlas_gamma_flow_widgets');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Failed to parse saved widgets, using defaults:', e);
+      }
+    }
+    return DEFAULT_WIDGETS;
+  });
 
   // States for Focus view
   const [spot, setSpot] = useState<number>(0);
@@ -76,6 +93,23 @@ export function GammaFlow() {
     netFlowHistory: NetFlowData[];
     gammaHistory: GammaStrike[];
   }>>({});
+
+  // Sync state values to localStorage for persistence
+  useEffect(() => {
+    localStorage.setItem('atlas_gamma_flow_view_mode', viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    localStorage.setItem('atlas_gamma_flow_current_ticker', currentTicker);
+  }, [currentTicker]);
+
+  useEffect(() => {
+    localStorage.setItem('atlas_gamma_flow_focus_strike_count', String(focusStrikeCount));
+  }, [focusStrikeCount]);
+
+  useEffect(() => {
+    localStorage.setItem('atlas_gamma_flow_widgets', JSON.stringify(widgets));
+  }, [widgets]);
 
   // Sync with main app store active ticker if it changes
   useEffect(() => {
