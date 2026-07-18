@@ -5,7 +5,7 @@ import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
 import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
 import { GammaFlow } from './components/GammaFlow/GammaFlow';
-import { useAppStore } from './store/useAppStore';
+import { useAppStore, toSeconds } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
 
@@ -43,7 +43,7 @@ export function App() {
         try {
           // Query timeline for the target date
           const timeline = await api.getTimeline(ticker, selectedDate);
-          const timestamps = timeline.timestamps;
+          const timestamps = timeline.timestamps.map(toSeconds);
           
           if (timestamps.length === 0) {
             // If no history on this date, clear timeline but don't crash
@@ -77,7 +77,11 @@ export function App() {
           // Re-key the history dict with numbers so lookups match.
           const normalizedHistory: Record<number, HeatmapSnapshot> = {};
           for (const [key, value] of Object.entries(historyData.history)) {
-            normalizedHistory[Number(key)] = value;
+            const secKey = toSeconds(Number(key));
+            normalizedHistory[secKey] = {
+              ...value,
+              timestamp: new Date(secKey * 1000).toISOString(),
+            };
           }
 
           // Store the preloaded snapshots in local history cache

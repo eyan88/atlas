@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore, toSeconds } from '../../store/useAppStore';
 import { gammaFlowApi, type GammaStrike, type NetFlowData } from '../../api/gammaFlowClient';
 import { GammaBarChart } from './GammaBarChart';
 import { NetFlowChart } from './NetFlowChart';
@@ -114,11 +114,13 @@ export function GammaFlow() {
           gammaFlowApi.getHistoricalGamma(currentTicker, { date: selectedDate }),
         ]);
         if (!active) return;
-        setNetFlowHistory(netFlowData.history);
-        setGammaHistory(gammaData.history);
+        const normalizedNetFlow = netFlowData.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+        const normalizedGamma = gammaData.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+        setNetFlowHistory(normalizedNetFlow);
+        setGammaHistory(normalizedGamma);
 
         // Feed timestamps into global playback controls
-        const timestamps = Array.from(new Set(gammaData.history.map((h) => h.timestamp))).sort((a, b) => a - b);
+        const timestamps = Array.from(new Set(normalizedGamma.map((h) => h.timestamp))).sort((a, b) => a - b);
         setTimelineData(currentTicker, timestamps, {});
 
         if (timestamps.length > 0) {
@@ -175,18 +177,20 @@ export function GammaFlow() {
               gammaFlowApi.getHistoricalGamma(ticker, { date: selectedDate }),
             ]);
 
+            const normalizedNetFlow = netFlowHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+            const normalizedGamma = gammaHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
             results[ticker] = {
               spot: currentData.price,
               strikes: currentData.strikes,
               netFlow: currentData.net_flow,
-              netFlowHistory: netFlowHist.history,
-              gammaHistory: gammaHist.history,
+              netFlowHistory: normalizedNetFlow,
+              gammaHistory: normalizedGamma,
             };
             if (currentData.isMock) mockActive = true;
 
             // Pick one ticker timestamps to drive timeline controls
             if (ticker === uniqueTickers[0]) {
-              mainTimestamps = Array.from(new Set(gammaHist.history.map((h) => h.timestamp))).sort((a, b) => a - b);
+              mainTimestamps = Array.from(new Set(normalizedGamma.map((h) => h.timestamp))).sort((a, b) => a - b);
             }
           } catch (err) {
             console.error(`Failed to fetch dashboard data for ${ticker}:`, err);

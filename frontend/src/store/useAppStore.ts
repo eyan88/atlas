@@ -3,6 +3,11 @@ import type { CellDetail, HeatmapSnapshot, Metric, EvolutionWindow, WsPatchPaylo
 
 const MAX_OPEN_TICKERS = 5;
 
+export function toSeconds(ts: number): number {
+  if (!ts) return 0;
+  return ts > 1e11 ? Math.floor(ts / 1000) : ts;
+}
+
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
 export type AppTab = 'heatmap' | 'compass' | 'gamma-flow';

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, toSeconds } from '../store/useAppStore';
 import type { WsMessage } from '../types';
 import { api } from '../api/client';
 
@@ -66,6 +66,13 @@ export function useWebSocket() {
         ws.onmessage = (event: MessageEvent<string>) => {
           try {
             const msg = JSON.parse(event.data) as WsMessage;
+            if (msg.payload && msg.payload.timestamp) {
+              const ms = new Date(msg.payload.timestamp).getTime();
+              if (!isNaN(ms)) {
+                const sec = toSeconds(ms);
+                msg.payload.timestamp = new Date(sec * 1000).toISOString();
+              }
+            }
             if (msg.type === 'INIT') {
               setHeatmapForTicker(activeTicker, msg.payload);
               setHeatmap(msg.payload);
