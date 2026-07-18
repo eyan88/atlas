@@ -247,28 +247,41 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
           if (activeItem.timestamp <= latestAllowedTs) {
             const xPos = getX(activeItem.timestamp);
 
-            // Draw vertical crosshair line
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(xPos, margin.top);
-            ctx.lineTo(xPos, margin.top + chartHeight);
-            ctx.stroke();
-            ctx.setLineDash([]);
+             // Format time string for the highlight badge
+             const date = new Date(activeItem.timestamp * 1000);
+             const timeStr = date.toLocaleTimeString('en-US', {
+               hour: '2-digit',
+               minute: '2-digit',
+               timeZone: 'America/New_York',
+               hour12: false
+             });
+
+             // Draw highlighted time badge at the bottom axis (instead of vertical crosshair line)
+             const badgeW = 44;
+             const badgeH = 16;
+             const badgeX = xPos - badgeW / 2;
+             const badgeY = margin.top + chartHeight + 4;
+
+             ctx.fillStyle = '#0f172a';
+             ctx.strokeStyle = '#38bdf8';
+             ctx.lineWidth = 1;
+             ctx.beginPath();
+             ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+             ctx.fill();
+             ctx.stroke();
+
+             ctx.fillStyle = '#38bdf8';
+             ctx.font = 'bold 9px Inter';
+             ctx.textAlign = 'center';
+             ctx.textBaseline = 'middle';
+             ctx.fillText(timeStr, xPos, badgeY + badgeH / 2);
 
             // Gather metrics
             const callVal = activeItem.net_call_prem;
             const putVal = activeItem.net_put_prem;
             const netVal = activeItem.net_premium;
             const spotPrice = activeItem.price;
-            const date = new Date(activeItem.timestamp * 1000);
-            const timeStr = date.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: 'America/New_York',
-              hour12: false
-            });
+            // Use already declared timeStr and date variables for tooltip
 
             // Tooltip box dimensions
             const tooltipW = 150;
