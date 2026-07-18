@@ -64,7 +64,7 @@ export function TimelineControls() {
     ? new Date(timestamp * 1000).toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'America/Chicago',
+        timeZone: 'America/New_York',
       })
     : 'LIVE';
 

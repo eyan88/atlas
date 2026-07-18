@@ -38,24 +38,29 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
 
     if (timestamps.length < 2 || rawStrikes.length < 2) return;
 
-    // Fix the X-axis to represent exactly the standard trading session: 9:30 AM to 4:00 PM Eastern (local day)
+    // Fix the X-axis to represent exactly the standard trading session: 9:30 AM to 4:00 PM Eastern (America/New_York)
     const firstTs = timestamps[0];
     const dateRef = new Date(firstTs * 1000);
-    const year = dateRef.getFullYear();
-    const month = dateRef.getMonth();
-    const day = dateRef.getDate();
+    const year = dateRef.getUTCFullYear();
+    const month = dateRef.getUTCMonth();
+    const day = dateRef.getUTCDate();
 
-    const minTime = Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000);
-    const maxTime = Math.floor(new Date(year, month, day, 16, 0, 0).getTime() / 1000);
+    // Determine if the session started at 13:30 UTC (Daylight Saving Time) or 14:30 UTC (Standard Time)
+    const startHour = dateRef.getUTCHours() < 14 ? 13 : 14;
+    const startMin = 30;
 
-    // Static clean 1.5-hour interval tick times: 9:30, 11:00, 12:30, 14:00, 15:30, 16:00
+    const minTimeDate = new Date(Date.UTC(year, month, day, startHour, startMin, 0));
+    const minTime = Math.floor(minTimeDate.getTime() / 1000);
+    const maxTime = minTime + 23400; // Exactly 6.5 hours later (23,400 seconds)
+
+    // Static clean 1.5-hour interval tick times: 9:30, 11:00, 12:30, 14:00, 15:30, 16:00 Eastern
     const tickTimes = [
-      Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000),
-      Math.floor(new Date(year, month, day, 11, 0, 0).getTime() / 1000),
-      Math.floor(new Date(year, month, day, 12, 30, 0).getTime() / 1000),
-      Math.floor(new Date(year, month, day, 14, 0, 0).getTime() / 1000),
-      Math.floor(new Date(year, month, day, 15, 30, 0).getTime() / 1000),
-      Math.floor(new Date(year, month, day, 16, 0, 0).getTime() / 1000),
+      minTime,
+      minTime + 5400,   // 11:00 AM
+      minTime + 10800,  // 12:30 PM
+      minTime + 16200,  // 02:00 PM
+      minTime + 21600,  // 03:30 PM
+      maxTime,          // 04:00 PM
     ];
 
     // Find the latest spot price from the visible segment to orient our zoom window
@@ -185,7 +190,12 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         ctx.stroke();
 
         const date = new Date(ts * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        const timeStr = date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'America/New_York',
+          hour12: false
+        });
         ctx.fillText(timeStr, x, margin.top + chartHeight + 8);
       });
 
@@ -287,7 +297,12 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
           const gexValue = matrix[`${activeTs}:${hoveredStrike}`] || 0;
           const spotPrice = spotPrices[activeTs] || 0;
           const date = new Date(activeTs * 1000);
-          const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          const timeStr = date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/New_York',
+            hour12: false
+          });
 
           // Tooltip box dimensions
           const tooltipW = 140;
