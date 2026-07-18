@@ -126,7 +126,11 @@ export function TimelineControls() {
       <button
         id="toggle-live-btn"
         className={`${styles.liveBtn} ${timestamp === null ? styles.liveActive : ''}`}
-        onClick={() => setTimestamp(null)}
+        onClick={() => {
+          const todayStr = new Date().toISOString().split('T')[0];
+          useAppStore.setState({ selectedDate: todayStr });
+          setTimestamp(null);
+        }}
         title={timestamp === null ? 'Active WebSocket streaming live feed' : 'Switch to real-time live trading session'}
       >
         <span className={`${styles.timeDot} ${timestamp === null ? styles.liveDot : ''}`} />

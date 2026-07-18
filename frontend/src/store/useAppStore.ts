@@ -224,8 +224,6 @@ export const useAppStore = create<AppState>((set) => ({
       const activeHist = state.snapshotsHistory[state.activeTicker];
       const nextHeatmap = ts && activeHist && activeHist[ts] ? activeHist[ts] : state.heatmap;
 
-       const todayStr = new Date().toISOString().split('T')[0];
-
        return {
          currentTimestamp: ts,
          heatmap: nextHeatmap,
@@ -235,7 +233,6 @@ export const useAppStore = create<AppState>((set) => ({
          callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
          putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
          isPlaying: ts === null ? false : state.isPlaying,
-         selectedDate: ts === null ? todayStr : state.selectedDate,
        };
      }),
 
