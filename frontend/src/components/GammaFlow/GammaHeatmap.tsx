@@ -32,11 +32,31 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
     let observedWidth = parent.clientWidth || canvas.getBoundingClientRect().width || 400;
     let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
-    // 1. Process and sort full timestamps to compute a stable static timeline width
+    // 1. Process and sort timestamps
     const timestamps = Array.from(new Set(history.map((h) => h.timestamp))).sort((a, b) => a - b);
     const rawStrikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order
 
     if (timestamps.length < 2 || rawStrikes.length < 2) return;
+
+    // Fix the X-axis to represent exactly the standard trading session: 9:30 AM to 4:00 PM Eastern (local day)
+    const firstTs = timestamps[0];
+    const dateRef = new Date(firstTs * 1000);
+    const year = dateRef.getFullYear();
+    const month = dateRef.getMonth();
+    const day = dateRef.getDate();
+
+    const minTime = Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000);
+    const maxTime = Math.floor(new Date(year, month, day, 16, 0, 0).getTime() / 1000);
+
+    // Static clean 1.5-hour interval tick times: 9:30, 11:00, 12:30, 14:00, 15:30, 16:00
+    const tickTimes = [
+      Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 11, 0, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 12, 30, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 14, 0, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 15, 30, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 16, 0, 0).getTime() / 1000),
+    ];
 
     // Find the latest spot price from the visible segment to orient our zoom window
     const visibleSegment = currentTimestamp
@@ -89,10 +109,8 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
-      // Helper coordinates (stabilized against full daily range)
+      // Helper coordinates (stabilized against fixed trading hours minTime/maxTime)
       const getX = (ts: number) => {
-        const minTime = timestamps[0];
-        const maxTime = timestamps[timestamps.length - 1];
         if (maxTime === minTime) return margin.left;
         return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
       };
@@ -101,32 +119,35 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         return margin.top + chartHeight - (strikeIdx / (strikes.length - 1)) * chartHeight;
       };
 
-      // Calculate dimensions of a single heatmap cell
-      const cellWidth = chartWidth / (timestamps.length - 1);
+      // Calculate vertical height of a single heatmap cell
       const cellHeight = chartHeight / (strikes.length - 1);
 
       // Resolve maximum timestamp currently allowed to display
-      const latestAllowedTs = currentTimestamp ?? timestamps[timestamps.length - 1];
+      const latestAllowedTs = currentTimestamp ?? maxTime;
 
       // 2. Draw Heatmap Cells
-      for (let xIdx = 0; xIdx < timestamps.length - 1; xIdx++) {
+      for (let xIdx = 0; xIdx < timestamps.length; xIdx++) {
         const ts = timestamps[xIdx];
         if (ts > latestAllowedTs) continue; // Skip future cells
 
         const x = getX(ts);
+        // Compute cell width dynamically based on distance to next timestamp
+        const nextTs = timestamps[xIdx + 1] || ts + 300;
+        const nextX = getX(nextTs);
+        const cellWidth = Math.max(1.5, nextX - x);
 
         strikes.forEach((strike, yIdx) => {
           const val = matrix[`${ts}:${strike}`] || 0;
           const pct = val / maxGexAbs; // ranges -1 to 1
 
           // Boosted non-linear scale to make low/mid-range exposure levels vivid and clear
-          const boostedOpacity = Math.pow(Math.abs(pct), 0.75);
+          const boostedOpacity = Math.pow(Math.abs(pct), 0.6); // lowered from 0.75 for much greater visibility
           ctx.fillStyle = pct >= 0
             ? `rgba(0, 230, 118, ${boostedOpacity * 0.95})` // Vivid Neon Emerald Green
             : `rgba(255, 61, 0, ${boostedOpacity * 0.95})`;  // Vivid Coral Crimson Red
 
           const y = getRowY(yIdx) - cellHeight / 2;
-          ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5); // Add 0.5px to prevent rendering seams
+          ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5); // Add 0.5px to prevent rendering gaps
         });
       }
 
@@ -152,13 +173,11 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         ctx.fillText(strike.toFixed(1), margin.left + chartWidth + 8, y);
       }
 
-      // X-Axis Time Labels (Draw 4-5 ticks at stable intervals)
+      // X-Axis Time Labels (Draw exactly at the fixed tickTimes trading hours)
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      const xTickInterval = Math.max(1, Math.floor(timestamps.length / 5));
 
-      for (let i = 0; i < timestamps.length; i += xTickInterval) {
-        const ts = timestamps[i];
+      tickTimes.forEach((ts) => {
         const x = getX(ts);
         ctx.beginPath();
         ctx.moveTo(x, margin.top);
@@ -168,13 +187,13 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         const date = new Date(ts * 1000);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
         ctx.fillText(timeStr, x, margin.top + chartHeight + 8);
-      }
+      });
 
       // 4. Draw Price Line Overlay (Glowing Spot Path - Plotted up to latest allowed timestamp)
       ctx.beginPath();
       let hasLine = false;
 
-      timestamps.forEach((ts) => {
+      timestamps.forEach((ts, xIdx) => {
         if (ts > latestAllowedTs) return; // Skip future price paths
 
         const price = spotPrices[ts];
@@ -200,7 +219,11 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         }
 
         if (yVal !== null) {
+          // Center the line inside the cell width
+          const nextTs = timestamps[xIdx + 1] || ts + 300;
+          const cellWidth = Math.max(1.5, getX(nextTs) - getX(ts));
           const x = getX(ts) + cellWidth / 2;
+
           if (!hasLine) {
             ctx.moveTo(x, yVal);
             hasLine = true;
@@ -223,8 +246,12 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
         const xRatio = (mouseX - margin.left) / chartWidth;
-        const targetTsIdx = Math.round(xRatio * (timestamps.length - 1));
-        const activeTs = timestamps[Math.max(0, Math.min(timestamps.length - 1, targetTsIdx))];
+        const targetTs = minTime + xRatio * (maxTime - minTime);
+
+        // Find closest timestamp present in history
+        const activeTs = timestamps.reduce((prev, curr) => {
+          return Math.abs(curr - targetTs) < Math.abs(prev - targetTs) ? curr : prev;
+        }, timestamps[0]);
 
         // Only show tooltip/cursor details for regions containing active drawn data
         if (activeTs <= latestAllowedTs) {

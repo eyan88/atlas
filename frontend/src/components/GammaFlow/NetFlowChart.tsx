@@ -31,13 +31,28 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     let observedWidth = parent.clientWidth || canvas.getBoundingClientRect().width || 400;
     let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
-    // Sort full history by timestamp ascending to construct a stable X axis range
+    // Sort full history by timestamp ascending
     const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
 
-    // Full daily bounds for X scale stability
-    const timestamps = sorted.map((h) => h.timestamp);
-    const minTime = Math.min(...timestamps);
-    const maxTime = Math.max(...timestamps);
+    // Fix the X-axis to represent exactly the standard trading session: 9:30 AM to 4:00 PM Eastern (local day)
+    const firstTs = sorted[0].timestamp;
+    const dateRef = new Date(firstTs * 1000);
+    const year = dateRef.getFullYear();
+    const month = dateRef.getMonth();
+    const day = dateRef.getDate();
+
+    const minTime = Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000);
+    const maxTime = Math.floor(new Date(year, month, day, 16, 0, 0).getTime() / 1000);
+
+    // Static clean 1.5-hour interval tick times: 9:30, 11:00, 12:30, 14:00, 15:30, 16:00
+    const tickTimes = [
+      Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 11, 0, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 12, 30, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 14, 0, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 15, 30, 0).getTime() / 1000),
+      Math.floor(new Date(year, month, day, 16, 0, 0).getTime() / 1000),
+    ];
 
     // Find min and max values across both premium lines for primary Y-axis
     const calls = sorted.map((h) => h.net_call_prem);
@@ -77,7 +92,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
-      // Get screen coordinates helper (stabilized using full session ranges)
+      // Get screen coordinates helper (stabilized using fixed trading hours minTime/maxTime)
       const getX = (ts: number) => {
         if (maxTime === minTime) return margin.left;
         return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
@@ -190,92 +205,94 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
         ctx.shadowBlur = 0; // reset shadow
       }
 
-      // 4. Draw X-axis Time stamps
+      // 4. Draw X-axis Time stamps exactly at standard session hours
       ctx.fillStyle = '#94a3b8';
       ctx.font = '10px Inter';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      const tickInterval = Math.max(1, Math.floor(sorted.length / 4));
-      for (let i = 0; i < sorted.length; i += tickInterval) {
-        const h = sorted[i];
-        const date = new Date(h.timestamp * 1000);
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        ctx.fillText(timeStr, getX(h.timestamp), margin.top + chartHeight + 8);
-      }
+      tickTimes.forEach((ts) => {
+        const x = getX(ts);
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, margin.top + chartHeight);
+        ctx.stroke();
 
-      if ((sorted.length - 1) % tickInterval !== 0) {
-        const h = sorted[sorted.length - 1];
-        const date = new Date(h.timestamp * 1000);
+        const date = new Date(ts * 1000);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        ctx.fillText(timeStr, getX(h.timestamp), margin.top + chartHeight + 8);
-      }
+        ctx.fillText(timeStr, x, margin.top + chartHeight + 8);
+      });
 
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
         const xRatio = (mouseX - margin.left) / chartWidth;
-        const targetTsIdx = Math.round(xRatio * (sorted.length - 1));
-        const activeItem = sorted[Math.max(0, Math.min(sorted.length - 1, targetTsIdx))];
+        const targetTs = minTime + xRatio * (maxTime - minTime);
 
-        // Only show tooltip for sections containing active drawn data
-        if (activeItem.timestamp <= latestAllowedTs) {
-          const xPos = getX(activeItem.timestamp);
+        // Find closest timestamp present in visibleHistory
+        if (visibleHistory.length > 0) {
+          const activeItem = visibleHistory.reduce((prev, curr) => {
+            return Math.abs(curr.timestamp - targetTs) < Math.abs(prev.timestamp - targetTs) ? curr : prev;
+          }, visibleHistory[0]);
 
-          // Draw vertical crosshair line
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.moveTo(xPos, margin.top);
-          ctx.lineTo(xPos, margin.top + chartHeight);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          if (activeItem.timestamp <= latestAllowedTs) {
+            const xPos = getX(activeItem.timestamp);
 
-          // Gather metrics
-          const callVal = activeItem.net_call_prem;
-          const putVal = activeItem.net_put_prem;
-          const netVal = activeItem.net_premium;
-          const spotPrice = activeItem.price;
-          const date = new Date(activeItem.timestamp * 1000);
-          const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            // Draw vertical crosshair line
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(xPos, margin.top);
+            ctx.lineTo(xPos, margin.top + chartHeight);
+            ctx.stroke();
+            ctx.setLineDash([]);
 
-          // Tooltip box dimensions
-          const tooltipW = 150;
-          const tooltipH = 92;
-          let tooltipX = xPos + 15;
-          if (tooltipX + tooltipW > observedWidth) {
-            tooltipX = xPos - tooltipW - 15;
+            // Gather metrics
+            const callVal = activeItem.net_call_prem;
+            const putVal = activeItem.net_put_prem;
+            const netVal = activeItem.net_premium;
+            const spotPrice = activeItem.price;
+            const date = new Date(activeItem.timestamp * 1000);
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            // Tooltip box dimensions
+            const tooltipW = 150;
+            const tooltipH = 92;
+            let tooltipX = xPos + 15;
+            if (tooltipX + tooltipW > observedWidth) {
+              tooltipX = xPos - tooltipW - 15;
+            }
+            let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
+            tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
+
+            // Draw container box
+            ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(tooltipX, tooltipY, tooltipW, tooltipH, 6);
+            ctx.fill();
+            ctx.stroke();
+
+            // Write Tooltip text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px Inter';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`Time: ${timeStr}`, tooltipX + 10, tooltipY + 10);
+            
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillText(`Spot: $${spotPrice.toFixed(2)}`, tooltipX + 10, tooltipY + 25);
+
+            ctx.fillStyle = '#00e676';
+            ctx.fillText(`Calls: ${formatUSD(callVal)}`, tooltipX + 10, tooltipY + 40);
+
+            ctx.fillStyle = '#ff3d00';
+            ctx.fillText(`Puts: ${formatUSD(putVal)}`, tooltipX + 10, tooltipY + 55);
+
+            ctx.fillStyle = netVal >= 0 ? '#00e676' : '#ff3d00';
+            ctx.fillText(`Net Prem: ${formatUSD(netVal)}`, tooltipX + 10, tooltipY + 70);
           }
-          let tooltipY = mouseY !== null ? mouseY - tooltipH / 2 : margin.top + 20;
-          tooltipY = Math.max(margin.top, Math.min(margin.top + chartHeight - tooltipH, tooltipY));
-
-          // Draw container box
-          ctx.fillStyle = 'rgba(15, 17, 26, 0.95)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.roundRect(tooltipX, tooltipY, tooltipW, tooltipH, 6);
-          ctx.fill();
-          ctx.stroke();
-
-          // Write Tooltip text
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 10px Inter';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'top';
-          ctx.fillText(`Time: ${timeStr}`, tooltipX + 10, tooltipY + 10);
-          
-          ctx.fillStyle = '#f59e0b';
-          ctx.fillText(`Spot: $${spotPrice.toFixed(2)}`, tooltipX + 10, tooltipY + 25);
-
-          ctx.fillStyle = '#00e676';
-          ctx.fillText(`Calls: ${formatUSD(callVal)}`, tooltipX + 10, tooltipY + 40);
-
-          ctx.fillStyle = '#ff3d00';
-          ctx.fillText(`Puts: ${formatUSD(putVal)}`, tooltipX + 10, tooltipY + 55);
-
-          ctx.fillStyle = netVal >= 0 ? '#00e676' : '#ff3d00';
-          ctx.fillText(`Net Prem: ${formatUSD(netVal)}`, tooltipX + 10, tooltipY + 70);
         }
       }
     };
