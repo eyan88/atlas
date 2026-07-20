@@ -126,7 +126,7 @@ export const useAppStore = create<AppState>((set) => ({
   // ─── Actions ────────────────────────────────────────────────────────────────
   
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-  setActiveTab: (tab) => set({ activeTab: tab }),
+  setActiveTab: (tab) => set({ activeTab: tab === 'gamma-flow' ? 'heatmap' : tab }),
 
   setTicker: (ticker) =>
     set((state) => {

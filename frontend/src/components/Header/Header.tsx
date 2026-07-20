@@ -93,12 +93,6 @@ export function Header() {
         >
           Compass
         </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'gamma-flow' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('gamma-flow')}
-        >
-          Gamma Flow
-        </button>
       </div>
 
       {/* Ticker Search */}
