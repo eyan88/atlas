@@ -106,12 +106,12 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       1e3
     );
 
-    // Exact color palette interpolation from gamma-exposure repository divColor()
-    const C_MID = [38, 38, 42];      // #26262a
-    const C_POS = [25, 158, 112];    // #199e70 (Emerald)
-    const C_POS2 = [165, 230, 200];  // #a5e6c8 (Mint)
-    const C_NEG = [230, 103, 103];   // #e66767 (Coral)
-    const C_NEG2 = [246, 193, 179];  // #f6c1b3 (Peach)
+    // Exact color palette interpolation from gamma-exposure repository divColor() with contrast curve p=1.5
+    const C_MID = [18, 20, 26];      // Deep dark charcoal background (#12141a)
+    const C_POS = [25, 158, 112];    // Vibrant Emerald Green (#199e70)
+    const C_POS2 = [140, 220, 185];  // Mint Green Highlight (#8cdcbb)
+    const C_NEG = [230, 103, 103];   // Vibrant Coral Red (#e66767)
+    const C_NEG2 = [235, 160, 150];  // Peach Red Highlight (#eba096)
 
     const mixColor = (c1: number[], c2: number[], f: number) => {
       const factor = Math.max(0, Math.min(1, f));
@@ -124,11 +124,13 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
     const getDivColor = (val: number) => {
       const clamped = Math.max(-1, Math.min(1, val));
-      const a = Math.abs(clamped);
-      if (a < 0.015) return '#141416'; // Dark subtle background for near-zero GEX
-      const pole = clamped >= 0 ? C_POS : C_NEG;
-      const pole2 = clamped >= 0 ? C_POS2 : C_NEG2;
-      const c = a <= 0.78 ? mixColor(C_MID, pole, a / 0.78) : mixColor(pole, pole2, (a - 0.78) / 0.22);
+      const sign = Math.sign(clamped);
+      // Apply contrast power curve p = 1.5 from gamma-exposure repo to prevent overly washed-out bright colors
+      const a = Math.pow(Math.abs(clamped), 1.5);
+      if (a < 0.02) return '#0d0d0d'; // Deep sleek dark base for low/zero GEX
+      const pole = sign >= 0 ? C_POS : C_NEG;
+      const pole2 = sign >= 0 ? C_POS2 : C_NEG2;
+      const c = a <= 0.80 ? mixColor(C_MID, pole, a / 0.80) : mixColor(pole, pole2, (a - 0.80) / 0.20);
       return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
     };
 
