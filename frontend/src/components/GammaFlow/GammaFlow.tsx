@@ -47,9 +47,7 @@ export function GammaFlow() {
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
   const setTimelineData = useAppStore((s) => s.setTimelineData);
 
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    return (localStorage.getItem('atlas_gamma_flow_view_mode') as ViewMode) || 'dashboard';
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(() => {
     return localStorage.getItem('atlas_gamma_flow_current_ticker') || activeTicker || 'SPY';
   });
@@ -702,10 +700,10 @@ export function GammaFlow() {
                           onClick={(e) => e.stopPropagation()}
                           title="Assign Link Channel Color to sync tickers"
                         >
-                          <option value="none">⚪ Unlinked</option>
-                          <option value="A">🔵 Blue</option>
-                          <option value="B">🟣 Purple</option>
-                          <option value="C">🟢 Green</option>
+                          <option value="none">⚪</option>
+                          <option value="A">🔵</option>
+                          <option value="B">🟣</option>
+                          <option value="C">🟢</option>
                         </select>
 
                         {/* Open Focus View Button */}

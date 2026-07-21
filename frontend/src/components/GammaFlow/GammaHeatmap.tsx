@@ -109,26 +109,26 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
     // Atlas Signature Color Palette
     type Rgb = [number, number, number];
 
-    // Positive ramp: Muted Teal -> Emerald -> Lime -> Neon Yellow (Dominant Positive Node)
+    // Positive ramp: Muted Teal -> Emerald -> Forest Green -> Soft Golden Lime (Soft, elegant contrast)
     const POS_RAMP: Array<[number, Rgb]> = [
-      [0.0,  [16, 26, 35]],       // Near-zero positive (blends smoothly into dark background)
-      [0.15, [20, 95, 85]],       // Muted teal-green
-      [0.35, [25, 150, 95]],      // Medium emerald
-      [0.55, [45, 185, 80]],      // Vivid green
-      [0.75, [130, 215, 35]],     // Lime green
-      [0.90, [210, 235, 30]],     // Yellow-lime highlight
-      [1.0,  [252, 246, 60]],     // Neon yellow (peak positive node)
+      [0.0,  [16, 24, 32]],       // Near-zero positive (blends smoothly into dark background)
+      [0.15, [18, 75, 70]],       // Deep teal-green
+      [0.35, [22, 125, 85]],      // Medium emerald
+      [0.55, [32, 160, 80]],      // Rich forest green
+      [0.75, [85, 180, 50]],      // Muted lime green
+      [0.90, [140, 195, 45]],     // Soft lime
+      [1.0,  [175, 210, 50]],     // Soft golden lime (non-blinding peak positive node)
     ];
 
-    // Negative ramp: Muted Dark Plum -> Violet -> Deep Purple (Dominant Negative Node)
+    // Negative ramp: Muted Dark Plum -> Violet -> Deep Purple (Soft, elegant contrast)
     const NEG_RAMP: Array<[number, Rgb]> = [
-      [0.0,  [22, 16, 32]],       // Near-zero negative (blends smoothly into dark background)
-      [0.15, [55, 30, 85]],       // Dark plum
-      [0.35, [80, 35, 125]],      // Medium purple
-      [0.55, [110, 40, 170]],     // Vivid violet
-      [0.75, [140, 45, 215]],     // Bright violet
-      [0.90, [115, 32, 195]],     // Deep vivid purple
-      [1.0,  [90, 25, 165]],      // Rich deep purple (peak negative node)
+      [0.0,  [20, 15, 28]],       // Near-zero negative (blends smoothly into dark background)
+      [0.15, [48, 25, 75]],       // Dark plum
+      [0.35, [72, 32, 110]],      // Medium purple
+      [0.55, [95, 38, 148]],      // Vivid violet
+      [0.75, [115, 40, 175]],     // Rich purple
+      [0.90, [130, 42, 185]],     // Deep vivid purple
+      [1.0,  [145, 45, 195]],     // Soft deep violet (non-blinding peak negative node)
     ];
 
     const mixColor = (c1: Rgb, c2: Rgb, f: number): Rgb => {
