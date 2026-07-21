@@ -310,16 +310,33 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(245, 158, 11, 0.15);
 }
 
+.cardGroupA {
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(56, 189, 248, 0.18) !important;
+}
+
+.cardGroupB {
+  border-color: rgba(192, 132, 252, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(192, 132, 252, 0.18) !important;
+}
+
+.cardGroupC {
+  border-color: rgba(74, 222, 128, 0.45) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(74, 222, 128, 0.18) !important;
+}
+
 .cardGroupSelector {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
   font-size: 11px;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 6px;
   cursor: pointer;
   outline: none;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -331,21 +348,21 @@
   background: rgba(56, 189, 248, 0.15) !important;
   border-color: rgba(56, 189, 248, 0.4) !important;
   color: #38bdf8 !important;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupB {
   background: rgba(192, 132, 252, 0.15) !important;
   border-color: rgba(192, 132, 252, 0.4) !important;
   color: #c084fc !important;
-  box-shadow: 0 0 12px rgba(192, 132, 252, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 8px rgba(192, 132, 252, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupC {
   background: rgba(74, 222, 128, 0.15) !important;
   border-color: rgba(74, 222, 128, 0.4) !important;
   color: #4ade80 !important;
-  box-shadow: 0 0 12px rgba(74, 222, 128, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupNone {

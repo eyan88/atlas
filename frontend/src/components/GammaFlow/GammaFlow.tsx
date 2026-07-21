@@ -410,6 +410,20 @@ export function GammaFlow() {
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
 
+  const cycleGroup = (current: LinkGroup): LinkGroup => {
+    if (current === 'none') return 'A';
+    if (current === 'A') return 'B';
+    if (current === 'B') return 'C';
+    return 'none';
+  };
+
+  const getCardGroupBorderClass = (group: LinkGroup) => {
+    if (group === 'A') return styles.cardGroupA;
+    if (group === 'B') return styles.cardGroupB;
+    if (group === 'C') return styles.cardGroupC;
+    return '';
+  };
+
   // Helper to resolve CSS classes for group select color badges
   const getGroupSelectClass = (group: LinkGroup) => {
     if (group === 'A') return `${styles.cardGroupSelector} ${styles.groupA}`;
@@ -600,7 +614,7 @@ export function GammaFlow() {
                 return (
                   <div
                     key={widget.id}
-                    className={`${styles.dashboardCard} ${draggedIdx === index ? styles.draggedCard : ''} ${dragOverIdx === index ? styles.dragOverCard : ''}`}
+                    className={`${styles.dashboardCard} ${getCardGroupBorderClass(widget.group)} ${draggedIdx === index ? styles.draggedCard : ''} ${dragOverIdx === index ? styles.dragOverCard : ''}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragEnd={handleDragEnd}
@@ -689,22 +703,18 @@ export function GammaFlow() {
                           {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
                         </span>
                         
-                        {/* Link Group Channel Color Selector (🔵, 🟣, 🟢 or ⚪) */}
-                        <select
+                        {/* Link Group Channel Color Cycle Toggle Button (🔵, 🟣, 🟢 or ⚪) */}
+                        <button
+                          type="button"
                           className={getGroupSelectClass(widget.group)}
-                          value={widget.group}
-                          onChange={(e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            handleWidgetGroupChange(widget.id, e.target.value as LinkGroup);
+                            handleWidgetGroupChange(widget.id, cycleGroup(widget.group));
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Assign Link Channel Color to sync tickers"
+                          title={`Link Channel: ${widget.group === 'none' ? 'Unlinked' : 'Group ' + widget.group} (Click to cycle)`}
                         >
-                          <option value="none">⚪</option>
-                          <option value="A">🔵</option>
-                          <option value="B">🟣</option>
-                          <option value="C">🟢</option>
-                        </select>
+                          {widget.group === 'A' ? '🔵' : widget.group === 'B' ? '🟣' : widget.group === 'C' ? '🟢' : '⚪'}
+                        </button>
 
                         {/* Open Focus View Button */}
                         <button
