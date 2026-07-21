@@ -146,6 +146,9 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
+      // Calculate vertical height of a single heatmap cell
+      const cellHeight = chartHeight / strikes.length;
+
       // Helper coordinates (stabilized against fixed trading hours minTime/maxTime)
       const getX = (ts: number) => {
         if (maxTime === minTime) return margin.left;
@@ -153,16 +156,18 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       };
 
       const getRowY = (strikeIdx: number) => {
-        return margin.top + chartHeight - (strikeIdx / (strikes.length - 1)) * chartHeight;
+        return margin.top + chartHeight - (strikeIdx + 0.5) * cellHeight;
       };
-
-      // Calculate vertical height of a single heatmap cell
-      const cellHeight = chartHeight / (strikes.length - 1);
 
       // Resolve maximum timestamp currently allowed to display
       const latestAllowedTs = currentTimestamp ?? maxTime;
 
-      // 2. Draw Heatmap Cells
+      // 2. Draw Heatmap Cells (Strictly clipped to Inner Plot Area)
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(margin.left, margin.top, chartWidth, chartHeight);
+      ctx.clip();
+
       for (let xIdx = 0; xIdx < timestamps.length; xIdx++) {
         const ts = timestamps[xIdx];
         if (ts > latestAllowedTs) continue; // Skip future cells
@@ -189,10 +194,64 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
             ? `rgba(25, 158, 112, ${opacity * 0.95})` // Vibrant Emerald Green (#199e70) from gamma-exposure
             : `rgba(230, 103, 103, ${opacity * 0.95})`; // Coral Red (#e66767) from gamma-exposure
 
-          const y = getRowY(yIdx) - cellHeight / 2;
-          ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5); // Add 0.5px to prevent rendering gaps
+          const y = margin.top + chartHeight - (yIdx + 1) * cellHeight;
+          ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5);
         });
       }
+
+      // Draw Price Line Overlay (Glowing Spot Path) within clipped plot area
+      ctx.beginPath();
+      let hasLine = false;
+
+      timestamps.forEach((ts, xIdx) => {
+        if (ts > latestAllowedTs) return; // Skip future price paths
+
+        const price = spotPrices[ts];
+        if (price === undefined) return;
+
+        // Interpolate Y coordinate based on surrounding strikes
+        let yVal: number | null = null;
+        if (strikes.length > 1) {
+          const minStrike = strikes[0];
+          const maxStrike = strikes[strikes.length - 1];
+
+          if (price >= minStrike && price <= maxStrike) {
+            for (let y = 0; y < strikes.length - 1; y++) {
+              const lower = strikes[y];
+              const upper = strikes[y + 1];
+              if (price >= lower && price <= upper) {
+                const idxPosition = y + (price - lower) / (upper - lower);
+                yVal = getRowY(idxPosition);
+                break;
+              }
+            }
+          }
+        }
+
+        if (yVal !== null) {
+          const nextTs = timestamps[xIdx + 1] || ts + 300;
+          const cellWidth = Math.max(1.5, getX(nextTs) - getX(ts));
+          const x = getX(ts) + cellWidth / 2;
+
+          if (!hasLine) {
+            ctx.moveTo(x, yVal);
+            hasLine = true;
+          } else {
+            ctx.lineTo(x, yVal);
+          }
+        }
+      });
+
+      if (hasLine) {
+        ctx.shadowColor = 'rgba(245, 158, 11, 0.7)';
+        ctx.shadowBlur = 4;
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.restore(); // End inner plot clip area
 
       // 3. Draw Grid Lines and Labels
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
@@ -237,60 +296,6 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
         }
         ctx.fillText(timeStr, x, margin.top + chartHeight + 6);
       });
-
-      // 4. Draw Price Line Overlay (Glowing Spot Path - Plotted up to latest allowed timestamp)
-      ctx.beginPath();
-      let hasLine = false;
-
-      timestamps.forEach((ts, xIdx) => {
-        if (ts > latestAllowedTs) return; // Skip future price paths
-
-        const price = spotPrices[ts];
-        if (price === undefined) return;
-
-        // Interpolate Y coordinate based on surrounding strikes
-        let yVal: number | null = null;
-        if (strikes.length > 1) {
-          const minStrike = strikes[0];
-          const maxStrike = strikes[strikes.length - 1];
-
-          if (price >= minStrike && price <= maxStrike) {
-            for (let y = 0; y < strikes.length - 1; y++) {
-              const lower = strikes[y];
-              const upper = strikes[y + 1];
-              if (price >= lower && price <= upper) {
-                const idxPosition = y + (price - lower) / (upper - lower);
-                yVal = getRowY(idxPosition);
-                break;
-              }
-            }
-          }
-        }
-
-        if (yVal !== null) {
-          // Center the line inside the cell width
-          const nextTs = timestamps[xIdx + 1] || ts + 300;
-          const cellWidth = Math.max(1.5, getX(nextTs) - getX(ts));
-          const x = getX(ts) + cellWidth / 2;
-
-          if (!hasLine) {
-            ctx.moveTo(x, yVal);
-            hasLine = true;
-          } else {
-            ctx.lineTo(x, yVal);
-          }
-        }
-      });
-
-      if (hasLine) {
-        // High visibility outer glow (thin, clean profile)
-        ctx.shadowColor = 'rgba(245, 158, 11, 0.65)';
-        ctx.shadowBlur = 5;
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
-        ctx.shadowBlur = 0; // reset
-      }
 
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {

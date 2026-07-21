@@ -62,8 +62,13 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     // Find min and max values across both premium lines for primary Y-axis
     const calls = sorted.map((h) => h.net_call_prem);
     const puts = sorted.map((h) => h.net_put_prem);
-    const maxVal = Math.max(...calls, ...puts, 1e6);
-    const minVal = Math.min(...calls, ...puts, 0);
+    const rawMaxVal = Math.max(...calls, ...puts, 1e6);
+    const rawMinVal = Math.min(...calls, ...puts, 0);
+    const rawValRange = (rawMaxVal - rawMinVal) || 1e6;
+    // Add 10% vertical padding buffer to flow premium axis so lines don't hit top/bottom axes
+    const valPad = rawValRange * 0.10;
+    const maxVal = rawMaxVal + valPad;
+    const minVal = rawMinVal - valPad;
     const valRange = maxVal - minVal;
 
     // Find min and max for spot prices (for secondary axis)
@@ -151,7 +156,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       const latestAllowedTs = currentTimestamp ?? maxTime;
       const visibleHistory = sorted.filter((h) => h.timestamp <= latestAllowedTs);
 
-      // 2. Draw Call & Put Premium Lines
+      // 2. Draw Call & Put Premium Lines (Strictly clipped to Inner Plot Area)
       const drawLine = (
         points: number[],
         strokeColor: string,
@@ -184,6 +189,11 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       };
 
       if (visibleHistory.length > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(margin.left, margin.top, chartWidth, chartHeight);
+        ctx.clip();
+
         const visibleCalls = visibleHistory.map((h) => h.net_call_prem);
         const visiblePuts = visibleHistory.map((h) => h.net_put_prem);
 
@@ -206,6 +216,8 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
         ctx.lineWidth = 1.8;
         ctx.stroke();
         ctx.shadowBlur = 0; // reset shadow
+
+        ctx.restore();
       }
 
       // 4. Draw X-axis Time stamps exactly at standard session hours
