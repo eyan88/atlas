@@ -267,7 +267,29 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
                hour12: false
              });
 
-             // Draw highlighted time badge at the bottom axis (instead of vertical crosshair line)
+             // Draw vertical dotted blue time tracking line
+             ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+             ctx.lineWidth = 1;
+             ctx.setLineDash([3, 3]);
+             ctx.beginPath();
+             ctx.moveTo(xPos, margin.top);
+             ctx.lineTo(xPos, margin.top + chartHeight);
+             ctx.stroke();
+             ctx.setLineDash([]); // Reset line dash
+
+             // Highlight Spot Price Marker Dot on spot curve at time xPos
+             const spotY = getSpotY(activeItem.price);
+             if (spotY >= margin.top && spotY <= margin.top + chartHeight) {
+               ctx.beginPath();
+               ctx.arc(xPos, spotY, 4.5, 0, Math.PI * 2);
+               ctx.fillStyle = '#f59e0b';
+               ctx.fill();
+               ctx.strokeStyle = '#ffffff';
+               ctx.lineWidth = 1.5;
+               ctx.stroke();
+             }
+
+             // Draw highlighted time badge at the bottom axis
              const badgeW = 44;
              const badgeH = 16;
              const badgeX = xPos - badgeW / 2;
