@@ -133,6 +133,18 @@ export function GammaFlow() {
     let active = true;
     let timerId: any = null;
 
+    // Instant pre-fill from cached dashboard data if available to avoid loading flicker
+    const cached = dashboardData[currentTicker];
+    if (cached && cached.gammaHistory && cached.gammaHistory.length > 0) {
+      setSpot(cached.spot);
+      setNetFlow(cached.netFlow);
+      setNetFlowHistory(cached.netFlowHistory);
+      setGammaHistory(cached.gammaHistory);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     const fetchData = async () => {
       try {
         const data = await gammaFlowApi.getCurrentGamma(currentTicker);
@@ -179,10 +191,11 @@ export function GammaFlow() {
         }
       } catch (err) {
         console.error('Failed to load history:', err);
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
-    setLoading(true);
     fetchData();
     fetchHistory();
 

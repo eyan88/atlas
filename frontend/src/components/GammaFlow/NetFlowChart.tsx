@@ -320,22 +320,41 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       }
     };
 
-    // Draw immediately on mount
+    // Initial draw immediately on mount to solve load races
     draw();
+
+    // Check dimensions helper
+    const checkAndDraw = () => {
+      const w = parent.clientWidth || parent.getBoundingClientRect().width;
+      const h = parent.clientHeight || parent.getBoundingClientRect().height;
+      if (w > 0 && h > 0 && (w !== observedWidth || h !== observedHeight)) {
+        observedWidth = w;
+        observedHeight = h;
+        draw();
+      }
+    };
 
     // Resize observer to dynamically capture container size changes
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
-        if (width === 0 || height === 0) continue;
-        if (width !== observedWidth || height !== observedHeight) {
-          observedWidth = width;
-          observedHeight = height;
-          draw();
+        const w = width || parent.clientWidth || parent.getBoundingClientRect().width;
+        const h = height || parent.clientHeight || parent.getBoundingClientRect().height;
+        if (w > 0 && h > 0) {
+          if (w !== observedWidth || h !== observedHeight) {
+            observedWidth = w;
+            observedHeight = h;
+            draw();
+          }
         }
       }
     });
     resizeObserver.observe(parent);
+
+    // Schedule post-mount draw checks for flex transitions
+    const rafId = requestAnimationFrame(checkAndDraw);
+    const timerId = setTimeout(checkAndDraw, 120);
+    window.addEventListener('resize', checkAndDraw);
 
     // Mouse Move Listeners
     const handleMouseMove = (e: MouseEvent) => {
@@ -355,6 +374,9 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     canvas.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+      window.removeEventListener('resize', checkAndDraw);
       resizeObserver.disconnect();
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
