@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { GammaStrike } from '../../api/gammaFlowClient';
+import { useAppStore } from '../../store/useAppStore';
 
 interface GammaHeatmapProps {
   history: GammaStrike[];
@@ -19,6 +20,7 @@ function formatUSD(value: number): string {
 
 export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 'gex' }: GammaHeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const colorTheme = useAppStore((s) => s.colorTheme);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -131,6 +133,28 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       [1.0,  [145, 45, 195]],     // Soft deep violet (non-blinding peak negative node)
     ];
 
+    // Classic Positive Green ramp: dark muted green -> vivid green -> soft golden green/lime
+    const CLASSIC_POS_RAMP: Array<[number, Rgb]> = [
+      [0.0,  [16, 24, 20]],
+      [0.15, [18, 75, 45]],
+      [0.35, [22, 125, 65]],
+      [0.55, [32, 160, 70]],
+      [0.75, [75, 180, 50]],
+      [0.90, [120, 195, 45]],
+      [1.0,  [150, 210, 50]],
+    ];
+
+    // Classic Negative Red ramp: dark muted red -> vivid red -> soft red/peach
+    const CLASSIC_NEG_RAMP: Array<[number, Rgb]> = [
+      [0.0,  [24, 16, 16]],
+      [0.15, [75, 24, 24]],
+      [0.35, [125, 32, 32]],
+      [0.55, [160, 38, 38]],
+      [0.75, [180, 50, 50]],
+      [0.90, [195, 75, 75]],
+      [1.0,  [210, 100, 100]],
+    ];
+
     const mixColor = (c1: Rgb, c2: Rgb, f: number): Rgb => {
       const factor = Math.max(0, Math.min(1, f));
       return [
@@ -153,11 +177,15 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       return stops[stops.length - 1][1];
     };
 
-    const getAtlasColor = (normalized: number): string => {
+    const getHeatmapColor = (normalized: number): string => {
       const val = Math.max(-1, Math.min(1, normalized));
       const abs = Math.abs(val);
       if (abs < 0.015) return '#0a0e17'; // Deep dark Atlas navy background for low GEX
-      const rgb = val >= 0 ? rampLookup(POS_RAMP, abs) : rampLookup(NEG_RAMP, abs);
+      
+      const posStops = colorTheme === 'classic' ? CLASSIC_POS_RAMP : POS_RAMP;
+      const negStops = colorTheme === 'classic' ? CLASSIC_NEG_RAMP : NEG_RAMP;
+      
+      const rgb = val >= 0 ? rampLookup(posStops, abs) : rampLookup(negStops, abs);
       return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
     };
 
@@ -225,8 +253,8 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
           }
           pct = Math.max(-1, Math.min(1, pct));
 
-          // Draw cell using Atlas signature color scheme
-          ctx.fillStyle = getAtlasColor(pct);
+          // Draw cell using selected color scheme
+          ctx.fillStyle = getHeatmapColor(pct);
 
           const y = margin.top + chartHeight - (yIdx + 1) * cellHeight + rowGap / 2;
           ctx.fillRect(x, y, cellWidth + 0.5, drawCellHeight);
@@ -539,7 +567,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [history, currentTimestamp, strikeCount, metric]);
+  }, [history, currentTimestamp, strikeCount, metric, colorTheme]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

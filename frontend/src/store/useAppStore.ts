@@ -24,6 +24,9 @@ interface AppState {
   // Selected metric displayed in the heatmap
   selectedMetric: Metric;
 
+  // Color theme settings: 'atlas' (vibrant theme) or 'classic' (red/green)
+  colorTheme: 'atlas' | 'classic';
+
   // Number of strike rows shown in the mock heatmap
   strikeCount: number;
 
@@ -92,10 +95,11 @@ interface AppState {
   setHeatmapForTicker: (ticker: string, snapshot: HeatmapSnapshot | null) => void;
   applyDiff: (payload: WsPatchPayload) => void;
   setWsConnected: (connected: boolean) => void;
-  setHoveredCell: (cell: CellDetail | null) => void;
   setSelectedDate: (date: string) => void;
   setIsLoadingHistory: (loading: boolean) => void;
   toggleSidebar: () => void;
+  setColorTheme: (theme: 'atlas' | 'classic') => void;
+  setHoveredCell: (cell: CellDetail | null) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -105,6 +109,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeTicker: '',
   openTickers: [],
   selectedMetric: 'net_gex',
+  colorTheme: (localStorage.getItem('atlas_color_theme') as 'atlas' | 'classic') || 'atlas',
   strikeCount: 40,
   evolutionWindow: 'prev_snapshot',
   snapshotsHistory: {},
@@ -127,6 +132,10 @@ export const useAppStore = create<AppState>((set) => ({
   
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setColorTheme: (theme) => {
+    localStorage.setItem('atlas_color_theme', theme);
+    set({ colorTheme: theme });
+  },
 
   setTicker: (ticker) =>
     set((state) => {
@@ -340,6 +349,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
 
-  setHoveredCell: (cell) => set({ hoveredCell: cell }),
+  setHoveredCell: (cell: CellDetail | null) => set({ hoveredCell: cell }),
 }));
 

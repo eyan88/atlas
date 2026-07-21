@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { NetFlowData } from '../../api/gammaFlowClient';
+import { useAppStore } from '../../store/useAppStore';
 
 interface NetFlowChartProps {
   history: NetFlowData[];
@@ -17,6 +18,7 @@ function formatUSD(value: number): string {
 
 export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const colorTheme = useAppStore((s) => s.colorTheme);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -200,8 +202,10 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
         // Draw Call premium line (green)
         drawLine(visibleCalls, '#00e676', 'rgba(0, 230, 118, 0.12)');
 
-        // Draw Put premium line (red)
-        drawLine(visiblePuts, '#ff3d00', 'rgba(255, 61, 0, 0.12)');
+        // Draw Put premium line (red in classic, purple/violet in atlas)
+        const putColor = colorTheme === 'classic' ? '#ff3d00' : '#c084fc';
+        const putGradient = colorTheme === 'classic' ? 'rgba(255, 61, 0, 0.12)' : 'rgba(192, 132, 252, 0.12)';
+        drawLine(visiblePuts, putColor, putGradient);
 
         // 3. Draw Spot Price Line Overlay (Glowing Dotted Path)
         ctx.beginPath();
@@ -348,10 +352,10 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
             ctx.fillStyle = '#00e676';
             ctx.fillText(`Calls: ${formatUSD(callVal)}`, tooltipX + 10, tooltipY + 40);
 
-            ctx.fillStyle = '#ff3d00';
+            ctx.fillStyle = colorTheme === 'classic' ? '#ff3d00' : '#c084fc';
             ctx.fillText(`Puts: ${formatUSD(putVal)}`, tooltipX + 10, tooltipY + 55);
 
-            ctx.fillStyle = netVal >= 0 ? '#00e676' : '#ff3d00';
+            ctx.fillStyle = netVal >= 0 ? '#00e676' : (colorTheme === 'classic' ? '#ff3d00' : '#c084fc');
             ctx.fillText(`Net Prem: ${formatUSD(netVal)}`, tooltipX + 10, tooltipY + 70);
           }
         }

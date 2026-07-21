@@ -52,6 +52,28 @@ const NEG_RAMP: Array<[number, Rgb]> = [
   [1.0,  [88, 28, 155]],      // Rich deep purple (dominant negative node)
 ];
 
+// Classic Positive Green ramp: dark muted green -> vivid green -> bright call green
+const CLASSIC_POS_RAMP: Array<[number, Rgb]> = [
+  [0.0,  [16, 32, 22]],
+  [0.15, [22, 60, 30]],
+  [0.35, [28, 105, 45]],
+  [0.55, [34, 150, 60]],
+  [0.75, [40, 195, 75]],
+  [0.90, [60, 230, 90]],
+  [1.0,  [100, 255, 120]],
+];
+
+// Classic Negative Red ramp: dark muted red -> vivid red -> bright put red
+const CLASSIC_NEG_RAMP: Array<[number, Rgb]> = [
+  [0.0,  [32, 16, 16]],
+  [0.15, [65, 24, 24]],
+  [0.35, [115, 30, 30]],
+  [0.55, [165, 36, 36]],
+  [0.75, [215, 42, 42]],
+  [0.90, [240, 60, 60]],
+  [1.0,  [255, 95, 95]],
+];
+
 function rampLookup(stops: Array<[number, Rgb]>, t: number): Rgb {
   const clamped = Math.max(0, Math.min(1, t));
   for (let i = 0; i < stops.length - 1; i++) {
@@ -71,12 +93,9 @@ function rampLookup(stops: Array<[number, Rgb]>, t: number): Rgb {
  * @param normalized  — value in [-1, 1] where the sign indicates direction
  *                      and the magnitude indicates how dominant this cell is
  *                      relative to the peak/trough in its expiry column.
- *
- * Positive values ramp through green → neon yellow.
- * Negative values ramp through dark purple → vivid purple.
- * Near-zero values of either sign settle into dark muted tones.
+ * @param colorTheme  — color theme ('atlas' or 'classic')
  */
-function valueToColor(normalized: number): [number, number, number, number] {
+function valueToColor(normalized: number, colorTheme: 'atlas' | 'classic'): [number, number, number, number] {
   const val = Math.max(-1, Math.min(1, normalized));
   const mag = Math.abs(val);
 
@@ -84,14 +103,20 @@ function valueToColor(normalized: number): [number, number, number, number] {
   const alpha = 0.45 + mag * 0.50; // range: 0.45 → 0.95
 
   let rgb: Rgb;
-  if (val >= 0) {
-    // Use a power curve to push contrast toward the dominant node
-    // This makes the top node much brighter while mid-range stays greener
-    const curved = Math.pow(mag, 0.65);
-    rgb = rampLookup(POS_RAMP, curved);
+  const curved = Math.pow(mag, 0.65);
+  
+  if (colorTheme === 'classic') {
+    if (val >= 0) {
+      rgb = rampLookup(CLASSIC_POS_RAMP, curved);
+    } else {
+      rgb = rampLookup(CLASSIC_NEG_RAMP, curved);
+    }
   } else {
-    const curved = Math.pow(mag, 0.65);
-    rgb = rampLookup(NEG_RAMP, curved);
+    if (val >= 0) {
+      rgb = rampLookup(POS_RAMP, curved);
+    } else {
+      rgb = rampLookup(NEG_RAMP, curved);
+    }
   }
 
   return [rgb[0], rgb[1], rgb[2], alpha];
@@ -156,6 +181,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
   const setHovered  = useAppStore((s) => s.setHoveredCell);
   const evolutionWindow = useAppStore((s) => s.evolutionWindow);
   const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
+  const colorTheme  = useAppStore((s) => s.colorTheme);
 
   const CELL_W = isCompassMode ? 160 : 106;
   const CELL_H = isCompassMode ? 26 : 42;
@@ -366,7 +392,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           const normVal = norm[r][c];
           
           // Map absolute exposure to color (warm gold for positive, violet for negative)
-          const [r_, g_, b_, a] = valueToColor(normVal);
+          const [r_, g_, b_, a] = valueToColor(normVal, colorTheme);
 
           // Cell background (colored by absolute dealer exposure value)
           ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;

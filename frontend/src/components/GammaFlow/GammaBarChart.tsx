@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { GammaStrike } from '../../api/gammaFlowClient';
+import { useAppStore } from '../../store/useAppStore';
 
 interface GammaBarChartProps {
   strikes: GammaStrike[];
@@ -8,6 +9,7 @@ interface GammaBarChartProps {
 
 export function GammaBarChart({ strikes, spot }: GammaBarChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const colorTheme = useAppStore((s) => s.colorTheme);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -92,8 +94,13 @@ export function GammaBarChart({ strikes, spot }: GammaBarChartProps) {
       const isPositive = s.dealer_gamma_vol >= 0;
 
       // Draw Bar
-      ctx.fillStyle = isPositive ? 'rgba(74, 222, 128, 0.75)' : 'rgba(248, 113, 113, 0.75)';
-      ctx.strokeStyle = isPositive ? '#4ade80' : '#f87171';
+      const isClassic = colorTheme === 'classic';
+      ctx.fillStyle = isPositive 
+        ? (isClassic ? 'rgba(74, 222, 128, 0.75)' : 'rgba(0, 230, 118, 0.75)') 
+        : (isClassic ? 'rgba(248, 113, 113, 0.75)' : 'rgba(192, 132, 252, 0.75)');
+      ctx.strokeStyle = isPositive 
+        ? (isClassic ? '#4ade80' : '#00e676') 
+        : (isClassic ? '#f87171' : '#c084fc');
       ctx.lineWidth = 1;
 
       const barY = y + rowHeight * 0.15;
@@ -150,7 +157,7 @@ export function GammaBarChart({ strikes, spot }: GammaBarChartProps) {
       ctx.textAlign = 'left';
       ctx.fillText(`Spot: $${spot.toFixed(2)}`, margin.left + 5, spotY - 4);
     }
-  }, [strikes, spot]);
+  }, [strikes, spot, colorTheme]);
 
   // Helper to interpolate spot Y coordinate
   function getSpotY(sortedStrikes: GammaStrike[], spot: number, topMargin: number, rowHeight: number): number | null {

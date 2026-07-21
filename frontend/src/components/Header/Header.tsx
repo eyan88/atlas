@@ -14,6 +14,8 @@ export function Header() {
   const setSelectedDate = useAppStore((s) => s.setSelectedDate);
   const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const colorTheme    = useAppStore((s) => s.colorTheme);
+  const setColorTheme = useAppStore((s) => s.setColorTheme);
   const [tickerInput, setTickerInput] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -126,6 +128,19 @@ export function Header() {
               {n}
             </option>
           ))}
+        </select>
+      </label>
+
+      <label className={styles.strikeControl} title="Select Heatmap & Chart Color Theme">
+        <span className={styles.strikeLabel}>Theme</span>
+        <select
+          className={styles.strikeSelect}
+          value={colorTheme}
+          onChange={(e) => setColorTheme(e.target.value as 'atlas' | 'classic')}
+          aria-label="Color Theme"
+        >
+          <option value="atlas">Atlas</option>
+          <option value="classic">Classic</option>
         </select>
       </label>
 

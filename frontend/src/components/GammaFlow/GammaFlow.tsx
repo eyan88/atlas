@@ -46,6 +46,7 @@ export function GammaFlow() {
   const selectedDate = useAppStore((s) => s.selectedDate);
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
   const setTimelineData = useAppStore((s) => s.setTimelineData);
+  const colorTheme = useAppStore((s) => s.colorTheme);
 
   const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
   const [currentTicker, setCurrentTicker] = useState(() => {
@@ -553,15 +554,15 @@ export function GammaFlow() {
               <div className={styles.topStatsPanel}>
                 <div className={styles.statMetric}>
                   <span className={styles.statLabel}>Net Call Prem</span>
-                  <span className={`${styles.statVal} ${styles.positive}`}>▲ {formatUSD(netFlow.net_call_prem)}</span>
+                  <span className={styles.statVal} style={{ color: '#00e676' }}>▲ {formatUSD(netFlow.net_call_prem)}</span>
                 </div>
                 <div className={styles.statMetric}>
                   <span className={styles.statLabel}>Net Put Prem</span>
-                  <span className={`${styles.statVal} ${styles.negative}`}>▼ {formatUSD(netFlow.net_put_prem)}</span>
+                  <span className={styles.statVal} style={{ color: colorTheme === 'classic' ? '#ff3d00' : '#c084fc' }}>▼ {formatUSD(netFlow.net_put_prem)}</span>
                 </div>
                 <div className={styles.statMetric}>
                   <span className={styles.statLabel}>Net Premium</span>
-                  <span className={`${styles.statVal} ${isNetPremiumPositive ? styles.positive : styles.negative}`}>
+                  <span className={styles.statVal} style={{ color: isNetPremiumPositive ? '#00e676' : (colorTheme === 'classic' ? '#ff3d00' : '#c084fc') }}>
                     {isNetPremiumPositive ? '▲ +' : '▼ '}{formatUSD(netFlow.net_premium)}
                   </span>
                 </div>
@@ -598,9 +599,15 @@ export function GammaFlow() {
                 <div className={styles.chartHeader}>
                   <h2 className={styles.chartTitle}>Cumulative Option Premium Flow (Intraday)</h2>
                   <div className={styles.legend}>
-                    <span className={styles.legendItem}><span className={`${styles.dot} ${styles.bgPositive}`} /> Call Premium</span>
-                    <span className={styles.legendItem}><span className={`${styles.dot} ${styles.bgNegative}`} /> Put Premium</span>
-                    <span className={styles.legendItem}><span className={`${styles.dot}`} style={{ background: '#f59e0b', borderRadius: '0', width: '8px', height: '2px' }} /> Spot Price</span>
+                    <span className={styles.legendItem}>
+                      <span className={styles.dot} style={{ background: '#00e676' }} /> Call Premium
+                    </span>
+                    <span className={styles.legendItem}>
+                      <span className={styles.dot} style={{ background: colorTheme === 'classic' ? '#ff3d00' : '#c084fc' }} /> Put Premium
+                    </span>
+                    <span className={styles.legendItem}>
+                      <span className={styles.dot} style={{ background: '#f59e0b', borderRadius: '0', width: '8px', height: '2px' }} /> Spot Price
+                    </span>
                   </div>
                 </div>
                 <div className={styles.chartBody}>
@@ -773,7 +780,10 @@ export function GammaFlow() {
 
                     <div className={styles.cardFooter}>
                       <div className={styles.footerLabel}>Net Premium</div>
-                      <div className={`${styles.footerVal} ${!data ? '' : isPositive ? styles.positive : styles.negative}`}>
+                      <div
+                        className={styles.footerVal}
+                        style={{ color: !data ? undefined : (isPositive ? '#00e676' : (colorTheme === 'classic' ? '#ff3d00' : '#c084fc')) }}
+                      >
                         {data ? `${isPositive ? '▲ +' : '▼ '}${formatUSD(netPrem)}` : '--'}
                       </div>
                     </div>
