@@ -4,6 +4,7 @@ import { Header } from './components/Header/Header';
 import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer';
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
 import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
+import { GammaFlow } from './components/GammaFlow/GammaFlow';
 import { useAppStore, toSeconds } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
@@ -145,13 +146,17 @@ export function App() {
             ) : (
               <div style={{ flex: 1 }} />
             )}
-            <div className={styles.controlsGroup}>
-              <MetricControls />
-              <EvolutionControls />
-            </div>
+            {activeTab !== 'gamma-flow' && (
+              <div className={styles.controlsGroup}>
+                <MetricControls />
+                <EvolutionControls />
+              </div>
+            )}
           </div>
-          <div className={`${styles.paneStrip} ${activeTab === 'compass' ? styles.compassStrip : ''}`}>
-            {activeTab === 'heatmap' ? (
+          <div className={`${styles.paneStrip} ${activeTab === 'compass' ? styles.compassStrip : ''}`} style={activeTab === 'gamma-flow' ? { display: 'flex', flex: 1, height: '100%' } : {}}>
+            {activeTab === 'gamma-flow' ? (
+              <GammaFlow />
+            ) : activeTab === 'heatmap' ? (
               openTickers.map((ticker) => (
                 <div
                   key={ticker}
