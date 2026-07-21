@@ -93,7 +93,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       ctx.fillStyle = '#0d0f14';
       ctx.fillRect(0, 0, observedWidth, observedHeight);
 
-      const margin = { top: 20, right: 60, bottom: 30, left: 60 };
+      const margin = { top: 16, right: 65, bottom: 25, left: 65 };
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
@@ -138,13 +138,13 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
           if (abs >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
           return `$${v.toFixed(0)}`;
         };
-        ctx.fillText(formattedPrem(val), margin.left - 8, y);
+        ctx.fillText(formattedPrem(val), margin.left - 6, y);
 
         // Right axis label (Spot price)
         const spotVal = spotMax - (i / 4) * spotScaleRange;
         ctx.fillStyle = '#f59e0b'; // Amber color for spot
         ctx.textAlign = 'left';
-        ctx.fillText(`$${spotVal.toFixed(2)}`, margin.left + chartWidth + 8, y);
+        ctx.fillText(`$${spotVal.toFixed(2)}`, margin.left + chartWidth + 6, y);
       }
 
       // Filter history down to the currently visible segments
@@ -199,24 +199,21 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
         for (let i = 1; i < visibleHistory.length; i++) {
           ctx.lineTo(getX(visibleHistory[i].timestamp), getSpotY(visibleHistory[i].price));
         }
-        // Glowing highlight (thin, clean profile)
-        ctx.shadowColor = 'rgba(245, 158, 11, 0.5)';
+
+        ctx.shadowColor = 'rgba(245, 158, 11, 0.65)';
         ctx.shadowBlur = 5;
         ctx.strokeStyle = '#f59e0b';
         ctx.lineWidth = 1.8;
-        ctx.setLineDash([3, 3]); // dotted line to differentiate from flows
         ctx.stroke();
-        ctx.setLineDash([]); // reset
         ctx.shadowBlur = 0; // reset shadow
       }
 
       // 4. Draw X-axis Time stamps exactly at standard session hours
       ctx.fillStyle = '#94a3b8';
       ctx.font = '10px Inter';
-      ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      tickTimes.forEach((ts) => {
+      tickTimes.forEach((ts, idx) => {
         const x = getX(ts);
         const date = new Date(ts * 1000);
         const timeStr = date.toLocaleTimeString('en-US', {
@@ -225,7 +222,14 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
           timeZone: 'America/New_York',
           hour12: false
         });
-        ctx.fillText(timeStr, x, margin.top + chartHeight + 8);
+        if (idx === 0) {
+          ctx.textAlign = 'left';
+        } else if (idx === tickTimes.length - 1) {
+          ctx.textAlign = 'right';
+        } else {
+          ctx.textAlign = 'center';
+        }
+        ctx.fillText(timeStr, x, margin.top + chartHeight + 6);
       });
 
       // 5. Draw Hover Indicator crosshair and Tooltip box

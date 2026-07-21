@@ -218,17 +218,20 @@
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 8px;
-  gap: 6px;
+  padding-bottom: 6px;
+  gap: 4px;
   width: 100%;
   box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
 .cardLeftControls {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .cardGrip {
@@ -246,8 +249,9 @@
 .cardRightControls {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .cardSelector {

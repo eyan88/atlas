@@ -109,7 +109,18 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
     const activeMatrix = metric === 'rel_pm' ? rateMatrix : rawMatrix;
 
-    // Find max absolute value in active matrix for dynamic color scaling
+    // Compute colMax for per-column normalization (perTime / rel_pm mode from gamma-exposure repo)
+    const colMax: Record<number, number> = {};
+    timestamps.forEach((ts) => {
+      let maxAbs = 0;
+      rawStrikes.forEach((strike) => {
+        const a = Math.abs(activeMatrix[`${ts}:${strike}`] || 0);
+        if (a > maxAbs) maxAbs = a;
+      });
+      colMax[ts] = maxAbs > 0 ? maxAbs : 1e-9;
+    });
+
+    // Find max absolute value in active matrix for global GEX scaling
     const maxValAbs = Math.max(
       ...Object.values(activeMatrix).map((v) => Math.abs(v)),
       1e3
@@ -131,7 +142,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       ctx.fillStyle = '#0d0d0d';
       ctx.fillRect(0, 0, observedWidth, observedHeight);
 
-      const margin = { top: 20, right: 55, bottom: 30, left: 20 };
+      const margin = { top: 16, right: 65, bottom: 25, left: 35 };
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
@@ -164,7 +175,13 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
         strikes.forEach((strike, yIdx) => {
           const val = activeMatrix[`${ts}:${strike}`] || 0;
-          const pct = maxValAbs > 0 ? val / maxValAbs : 0; // ranges -1 to 1
+          let pct = 0;
+          if (metric === 'rel_pm') {
+            pct = val / colMax[ts]; // Per-minute column peak normalization from gamma-exposure repo
+          } else {
+            pct = maxValAbs > 0 ? val / maxValAbs : 0; // Global GEX normalization
+          }
+          pct = Math.max(-1, Math.min(1, pct));
 
           // Boosted non-linear opacity ramp for rich gamma-exposure contrast
           const opacity = Math.pow(Math.abs(pct), 0.65);
@@ -181,7 +198,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 1;
 
-      // Y-Axis Strike Labels (Draw on the RIGHT side instead of left)
+      // Y-Axis Strike Labels (Draw on the RIGHT side outside the chart plot)
       const yTickInterval = Math.max(1, Math.floor(strikes.length / 6));
       ctx.fillStyle = '#94a3b8';
       ctx.font = '10px Inter';
@@ -196,14 +213,13 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
         ctx.lineTo(margin.left + chartWidth, y);
         ctx.stroke();
 
-        ctx.fillText(strike.toFixed(1), margin.left + chartWidth + 8, y);
+        ctx.fillText(`$${strike.toFixed(1)}`, margin.left + chartWidth + 6, y);
       }
 
       // X-Axis Time Labels (Draw exactly at the fixed tickTimes trading hours)
-      ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
 
-      tickTimes.forEach((ts) => {
+      tickTimes.forEach((ts, idx) => {
         const x = getX(ts);
         const date = new Date(ts * 1000);
         const timeStr = date.toLocaleTimeString('en-US', {
@@ -212,7 +228,14 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
           timeZone: 'America/New_York',
           hour12: false
         });
-        ctx.fillText(timeStr, x, margin.top + chartHeight + 8);
+        if (idx === 0) {
+          ctx.textAlign = 'left';
+        } else if (idx === tickTimes.length - 1) {
+          ctx.textAlign = 'right';
+        } else {
+          ctx.textAlign = 'center';
+        }
+        ctx.fillText(timeStr, x, margin.top + chartHeight + 6);
       });
 
       // 4. Draw Price Line Overlay (Glowing Spot Path - Plotted up to latest allowed timestamp)
