@@ -80,9 +80,8 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
         .sort((a, b) => a - b);
     }
 
-    // Build lookup maps for raw GEX and relative per-minute rate matrix
+    // Build lookup maps for raw GEX and spot prices
     const rawMatrix: Record<string, number> = {};
-    const rateMatrix: Record<string, number> = {};
     const spotPrices: Record<number, number> = {};
 
     history.forEach((h) => {
@@ -90,41 +89,48 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       spotPrices[h.timestamp] = h.price;
     });
 
-    // Compute per-minute rate matrix for rel_pm mode
-    for (let xIdx = 0; xIdx < timestamps.length; xIdx++) {
-      const ts = timestamps[xIdx];
-      const prevTs = xIdx > 0 ? timestamps[xIdx - 1] : null;
-      const deltaMin = prevTs !== null ? Math.max(0.1, (ts - prevTs) / 60) : 1;
-
-      rawStrikes.forEach((strike) => {
-        const curVal = rawMatrix[`${ts}:${strike}`] || 0;
-        if (prevTs !== null) {
-          const prevVal = rawMatrix[`${prevTs}:${strike}`] || 0;
-          rateMatrix[`${ts}:${strike}`] = (curVal - prevVal) / deltaMin;
-        } else {
-          rateMatrix[`${ts}:${strike}`] = 0;
-        }
-      });
-    }
-
-    const activeMatrix = metric === 'rel_pm' ? rateMatrix : rawMatrix;
-
     // Compute colMax for per-column normalization (perTime / rel_pm mode from gamma-exposure repo)
     const colMax: Record<number, number> = {};
     timestamps.forEach((ts) => {
       let maxAbs = 0;
-      rawStrikes.forEach((strike) => {
-        const a = Math.abs(activeMatrix[`${ts}:${strike}`] || 0);
+      strikes.forEach((strike) => {
+        const a = Math.abs(rawMatrix[`${ts}:${strike}`] || 0);
         if (a > maxAbs) maxAbs = a;
       });
       colMax[ts] = maxAbs > 0 ? maxAbs : 1e-9;
     });
 
-    // Find max absolute value in active matrix for global GEX scaling
+    // Find max absolute GEX value across visible matrix for global GEX scaling
     const maxValAbs = Math.max(
-      ...Object.values(activeMatrix).map((v) => Math.abs(v)),
+      ...Object.values(rawMatrix).map((v) => Math.abs(v)),
       1e3
     );
+
+    // Exact color palette interpolation from gamma-exposure repository divColor()
+    const C_MID = [38, 38, 42];      // #26262a
+    const C_POS = [25, 158, 112];    // #199e70 (Emerald)
+    const C_POS2 = [165, 230, 200];  // #a5e6c8 (Mint)
+    const C_NEG = [230, 103, 103];   // #e66767 (Coral)
+    const C_NEG2 = [246, 193, 179];  // #f6c1b3 (Peach)
+
+    const mixColor = (c1: number[], c2: number[], f: number) => {
+      const factor = Math.max(0, Math.min(1, f));
+      return [
+        Math.round(c1[0] + (c2[0] - c1[0]) * factor),
+        Math.round(c1[1] + (c2[1] - c1[1]) * factor),
+        Math.round(c1[2] + (c2[2] - c1[2]) * factor),
+      ];
+    };
+
+    const getDivColor = (val: number) => {
+      const clamped = Math.max(-1, Math.min(1, val));
+      const a = Math.abs(clamped);
+      if (a < 0.015) return '#141416'; // Dark subtle background for near-zero GEX
+      const pole = clamped >= 0 ? C_POS : C_NEG;
+      const pole2 = clamped >= 0 ? C_POS2 : C_NEG2;
+      const c = a <= 0.78 ? mixColor(C_MID, pole, a / 0.78) : mixColor(pole, pole2, (a - 0.78) / 0.22);
+      return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+    };
 
     const draw = () => {
       if (observedWidth === 0 || observedHeight === 0) return;
@@ -179,20 +185,17 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
         const cellWidth = Math.max(1.5, nextX - x);
 
         strikes.forEach((strike, yIdx) => {
-          const val = activeMatrix[`${ts}:${strike}`] || 0;
+          const val = rawMatrix[`${ts}:${strike}`] || 0;
           let pct = 0;
           if (metric === 'rel_pm') {
-            pct = val / colMax[ts]; // Per-minute column peak normalization from gamma-exposure repo
+            pct = val / colMax[ts]; // Exact perTime normalization from gamma-exposure repo
           } else {
-            pct = maxValAbs > 0 ? val / maxValAbs : 0; // Global GEX normalization
+            pct = maxValAbs > 0 ? val / maxValAbs : 0; // Global GEX mode
           }
           pct = Math.max(-1, Math.min(1, pct));
 
-          // Boosted non-linear opacity ramp for rich gamma-exposure contrast
-          const opacity = Math.pow(Math.abs(pct), 0.65);
-          ctx.fillStyle = pct >= 0
-            ? `rgba(25, 158, 112, ${opacity * 0.95})` // Vibrant Emerald Green (#199e70) from gamma-exposure
-            : `rgba(230, 103, 103, ${opacity * 0.95})`; // Coral Red (#e66767) from gamma-exposure
+          // Draw cell using exact gamma-exposure divColor mapping
+          ctx.fillStyle = getDivColor(pct);
 
           const y = margin.top + chartHeight - (yIdx + 1) * cellHeight;
           ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5);
@@ -358,10 +361,10 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
           // Gather metrics
           const spotPrice = spotPrices[activeTs] || 0;
-          const activeVal = activeMatrix[`${activeTs}:${hoveredStrike}`] || 0;
+          const activeVal = rawMatrix[`${activeTs}:${hoveredStrike}`] || 0;
 
           // Tooltip box dimensions
-          const tooltipW = 145;
+          const tooltipW = 155;
           const tooltipH = 80;
           let tooltipX = xPos + 15;
           if (tooltipX + tooltipW > observedWidth) {
@@ -393,9 +396,11 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
           ctx.fillText(`Strike: ${hoveredStrike.toFixed(1)}`, tooltipX + 10, tooltipY + 42);
 
           if (metric === 'rel_pm') {
-            const rateStr = formatUSD(activeVal) + '/m';
+            const cMax = colMax[activeTs] || 1e-9;
+            const relPct = Math.max(-100, Math.min(100, (activeVal / cMax) * 100));
+            const pctSign = relPct >= 0 ? '+' : '';
             ctx.fillStyle = activeVal >= 0 ? '#199e70' : '#e66767';
-            ctx.fillText(`Rel/Min: ${rateStr}`, tooltipX + 10, tooltipY + 58);
+            ctx.fillText(`Rel/Min: ${pctSign}${relPct.toFixed(0)}% (${formatUSD(activeVal)})`, tooltipX + 10, tooltipY + 58);
           } else {
             const gexStr = formatUSD(activeVal);
             ctx.fillStyle = activeVal >= 0 ? '#199e70' : '#e66767';
