@@ -20,12 +20,13 @@ interface Widget {
   type: ChartType;
   group: LinkGroup;
   strikeCount?: number;
+  metric?: 'gex' | 'rel_pm';
 }
 
 const DEFAULT_WIDGETS: Widget[] = [
-  { id: 'w1', ticker: 'QQQ', type: 'heatmap', group: 'A', strikeCount: 12 },
+  { id: 'w1', ticker: 'QQQ', type: 'heatmap', group: 'A', strikeCount: 12, metric: 'gex' },
   { id: 'w2', ticker: 'QQQ', type: 'net_flow', group: 'A' },
-  { id: 'w3', ticker: 'SPY', type: 'heatmap', group: 'B', strikeCount: 12 },
+  { id: 'w3', ticker: 'SPY', type: 'heatmap', group: 'B', strikeCount: 12, metric: 'gex' },
   { id: 'w4', ticker: 'SPY', type: 'net_flow', group: 'B' },
 ];
 
@@ -53,11 +54,18 @@ export function GammaFlow() {
     return localStorage.getItem('atlas_gamma_flow_current_ticker') || activeTicker || 'SPY';
   });
 
-  // Focus View specific GEX heatmap strike count setting
+  // Focus View specific GEX heatmap strike count and metric setting
   const [focusStrikeCount, setFocusStrikeCount] = useState<number>(() => {
     const saved = localStorage.getItem('atlas_gamma_flow_focus_strike_count');
     return saved ? Number(saved) : 12;
   });
+  const [focusMetric, setFocusMetric] = useState<'gex' | 'rel_pm'>(() => {
+    return (localStorage.getItem('atlas_gamma_flow_focus_metric') as 'gex' | 'rel_pm') || 'gex';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('atlas_gamma_flow_focus_metric', focusMetric);
+  }, [focusMetric]);
 
   // Widget state for Dashboard Grid
   const [widgets, setWidgets] = useState<Widget[]>(() => {
@@ -348,6 +356,13 @@ export function GammaFlow() {
     );
   };
 
+  // Update Metric for a specific widget card (Absolute GEX vs Relative Per Minute)
+  const handleWidgetMetricChange = (id: string, metric: 'gex' | 'rel_pm') => {
+    setWidgets((current) =>
+      current.map((w) => (w.id === id ? { ...w, metric } : w))
+    );
+  };
+
   // Update Link Group Color channel for a specific widget
   const handleWidgetGroupChange = (id: string, nextGroup: LinkGroup) => {
     setWidgets((current) =>
@@ -485,6 +500,19 @@ export function GammaFlow() {
                     <option value={0}>All strikes</option>
                   </select>
                 </div>
+
+                {/* Focus View Metric selector control */}
+                <div className={styles.topControlGroup}>
+                  <span className={styles.topControlLabel}>Metric:</span>
+                  <select
+                    className={styles.cardSelector}
+                    value={focusMetric}
+                    onChange={(e) => setFocusMetric(e.target.value as 'gex' | 'rel_pm')}
+                  >
+                    <option value="gex">Abs GEX ($)</option>
+                    <option value="rel_pm">Rel / Min ($/m)</option>
+                  </select>
+                </div>
               </>
             )}
 
@@ -525,11 +553,11 @@ export function GammaFlow() {
               {/* Top: GEX Heatmap Chart */}
               <section className={styles.chartWrapper}>
                 <div className={styles.chartHeader}>
-                  <h2 className={styles.chartTitle}>Dealer Gamma Exposure Profile (Intraday Heatmap) — {currentTicker}</h2>
+                  <h2 className={styles.chartTitle}>Dealer Gamma Exposure Profile ({focusMetric === 'rel_pm' ? 'Relative Per Minute' : 'Intraday Heatmap'}) — {currentTicker}</h2>
                   <span className={styles.spotBadge}>Spot price: ${spot.toFixed(2)}</span>
                 </div>
                 <div className={styles.chartBody}>
-                  <GammaHeatmap history={gammaHistory} currentTimestamp={currentTimestamp} strikeCount={focusStrikeCount === 0 ? undefined : focusStrikeCount} />
+                  <GammaHeatmap history={gammaHistory} currentTimestamp={currentTimestamp} strikeCount={focusStrikeCount === 0 ? undefined : focusStrikeCount} metric={focusMetric} />
                 </div>
               </section>
 
@@ -610,23 +638,38 @@ export function GammaFlow() {
                           <option value="bar_chart">Bar Chart</option>
                         </select>
 
-                        {/* strikes setting dropdown (only visible on heatmap types) */}
+                        {/* strikes and metric setting dropdowns (only visible on heatmap types) */}
                         {widget.type === 'heatmap' && (
-                          <select
-                            className={styles.cardSelector}
-                            value={widget.strikeCount ?? 12}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleWidgetStrikeCountChange(widget.id, Number(e.target.value));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            title="Adjust visible strike counts on the GEX Heatmap"
-                          >
-                            <option value={6}>6 Strk</option>
-                            <option value={12}>12 Strk</option>
-                            <option value={20}>20 Strk</option>
-                            <option value={0}>All Strk</option>
-                          </select>
+                          <>
+                            <select
+                              className={styles.cardSelector}
+                              value={widget.strikeCount ?? 12}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleWidgetStrikeCountChange(widget.id, Number(e.target.value));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Adjust visible strike counts on the GEX Heatmap"
+                            >
+                              <option value={6}>6 Strk</option>
+                              <option value={12}>12 Strk</option>
+                              <option value={20}>20 Strk</option>
+                              <option value={0}>All Strk</option>
+                            </select>
+                            <select
+                              className={styles.cardSelector}
+                              value={widget.metric ?? 'gex'}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleWidgetMetricChange(widget.id, e.target.value as 'gex' | 'rel_pm');
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Select Heatmap Metric (Abs GEX vs Relative Per Minute)"
+                            >
+                              <option value="gex">Abs GEX</option>
+                              <option value="rel_pm">Rel / Min</option>
+                            </select>
+                          </>
                         )}
                       </div>
 
@@ -688,7 +731,7 @@ export function GammaFlow() {
                           <span>Fetching {widget.ticker} data...</span>
                         </div>
                       ) : widget.type === 'heatmap' ? (
-                        <GammaHeatmap history={data.gammaHistory} currentTimestamp={currentTimestamp} strikeCount={widget.strikeCount} />
+                        <GammaHeatmap history={data.gammaHistory} currentTimestamp={currentTimestamp} strikeCount={widget.strikeCount} metric={widget.metric ?? 'gex'} />
                       ) : widget.type === 'net_flow' ? (
                         <NetFlowChart history={data.netFlowHistory} currentTimestamp={currentTimestamp} />
                       ) : (

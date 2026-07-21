@@ -3,7 +3,7 @@ import { METRIC_LABELS } from '../../../types';
 import type { Metric } from '../../../types';
 import styles from './MetricControls.module.css';
 
-const METRICS: Metric[] = ['net_gex', 'net_dex', 'vanna', 'charm', 'call_oi', 'put_oi', 'volume', 'rel_pm'];
+const METRICS: Metric[] = ['net_gex', 'net_dex', 'vanna', 'charm', 'call_oi', 'put_oi', 'volume'];
 
 export function MetricControls() {
   const selectedMetric = useAppStore((s) => s.selectedMetric);

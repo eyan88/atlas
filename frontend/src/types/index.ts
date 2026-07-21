@@ -7,8 +7,7 @@ export type Metric =
   | 'charm'
   | 'call_oi'
   | 'put_oi'
-  | 'volume'
-  | 'rel_pm';
+  | 'volume';
 
 export const METRIC_LABELS: Record<Metric, string> = {
   net_gex: 'Net GEX',
@@ -18,7 +17,6 @@ export const METRIC_LABELS: Record<Metric, string> = {
   call_oi: 'Call OI',
   put_oi: 'Put OI',
   volume: 'Volume',
-  rel_pm: 'Rel / Min',
 };
 
 // ─── Ticker ───────────────────────────────────────────────────────────────────

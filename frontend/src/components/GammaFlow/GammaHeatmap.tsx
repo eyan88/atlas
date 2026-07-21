@@ -5,6 +5,7 @@ interface GammaHeatmapProps {
   history: GammaStrike[];
   currentTimestamp?: number | null;
   strikeCount?: number;
+  metric?: 'gex' | 'rel_pm';
 }
 
 function formatUSD(value: number): string {
@@ -16,7 +17,7 @@ function formatUSD(value: number): string {
   return `${sign}$${abs.toFixed(2)}`;
 }
 
-export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHeatmapProps) {
+export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 'gex' }: GammaHeatmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -79,19 +80,39 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         .sort((a, b) => a - b);
     }
 
-    // Build lookup map and gather spot prices per timestamp
-    const matrix: Record<string, number> = {};
+    // Build lookup maps for raw GEX and relative per-minute rate matrix
+    const rawMatrix: Record<string, number> = {};
+    const rateMatrix: Record<string, number> = {};
     const spotPrices: Record<number, number> = {};
 
     history.forEach((h) => {
-      matrix[`${h.timestamp}:${h.strike}`] = h.dealer_gamma_vol;
+      rawMatrix[`${h.timestamp}:${h.strike}`] = h.dealer_gamma_vol;
       spotPrices[h.timestamp] = h.price;
     });
 
-    // Find global max absolute GEX for color scaling
-    const maxGexAbs = Math.max(
-      ...history.map((h) => Math.abs(h.dealer_gamma_vol)),
-      1e6
+    // Compute per-minute rate matrix for rel_pm mode
+    for (let xIdx = 0; xIdx < timestamps.length; xIdx++) {
+      const ts = timestamps[xIdx];
+      const prevTs = xIdx > 0 ? timestamps[xIdx - 1] : null;
+      const deltaMin = prevTs !== null ? Math.max(0.1, (ts - prevTs) / 60) : 1;
+
+      rawStrikes.forEach((strike) => {
+        const curVal = rawMatrix[`${ts}:${strike}`] || 0;
+        if (prevTs !== null) {
+          const prevVal = rawMatrix[`${prevTs}:${strike}`] || 0;
+          rateMatrix[`${ts}:${strike}`] = (curVal - prevVal) / deltaMin;
+        } else {
+          rateMatrix[`${ts}:${strike}`] = 0;
+        }
+      });
+    }
+
+    const activeMatrix = metric === 'rel_pm' ? rateMatrix : rawMatrix;
+
+    // Find max absolute value in active matrix for dynamic color scaling
+    const maxValAbs = Math.max(
+      ...Object.values(activeMatrix).map((v) => Math.abs(v)),
+      1e3
     );
 
     const draw = () => {
@@ -106,8 +127,8 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
       canvas.height = observedHeight * dpr;
       ctx.scale(dpr, dpr);
 
-      // Clear canvas
-      ctx.fillStyle = '#0d0f14';
+      // Clear canvas (gamma-exposure dark base)
+      ctx.fillStyle = '#0d0d0d';
       ctx.fillRect(0, 0, observedWidth, observedHeight);
 
       const margin = { top: 20, right: 55, bottom: 30, left: 20 };
@@ -142,14 +163,14 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
         const cellWidth = Math.max(1.5, nextX - x);
 
         strikes.forEach((strike, yIdx) => {
-          const val = matrix[`${ts}:${strike}`] || 0;
-          const pct = val / maxGexAbs; // ranges -1 to 1
+          const val = activeMatrix[`${ts}:${strike}`] || 0;
+          const pct = maxValAbs > 0 ? val / maxValAbs : 0; // ranges -1 to 1
 
-          // Boosted non-linear scale to make low/mid-range exposure levels vivid and clear
-          const boostedOpacity = Math.pow(Math.abs(pct), 0.6); // lowered from 0.75 for much greater visibility
+          // Boosted non-linear opacity ramp for rich gamma-exposure contrast
+          const opacity = Math.pow(Math.abs(pct), 0.65);
           ctx.fillStyle = pct >= 0
-            ? `rgba(0, 230, 118, ${boostedOpacity * 0.95})` // Vivid Neon Emerald Green
-            : `rgba(255, 61, 0, ${boostedOpacity * 0.95})`;  // Vivid Coral Crimson Red
+            ? `rgba(25, 158, 112, ${opacity * 0.95})` // Vibrant Emerald Green (#199e70) from gamma-exposure
+            : `rgba(230, 103, 103, ${opacity * 0.95})`; // Coral Red (#e66767) from gamma-exposure
 
           const y = getRowY(yIdx) - cellHeight / 2;
           ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5); // Add 0.5px to prevent rendering gaps
@@ -308,12 +329,11 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
           }
 
           // Gather metrics
-          const gexValue = matrix[`${activeTs}:${hoveredStrike}`] || 0;
           const spotPrice = spotPrices[activeTs] || 0;
-          // Use already declared timeStr and date variables for tooltip
+          const activeVal = activeMatrix[`${activeTs}:${hoveredStrike}`] || 0;
 
           // Tooltip box dimensions
-          const tooltipW = 140;
+          const tooltipW = 145;
           const tooltipH = 80;
           let tooltipX = xPos + 15;
           if (tooltipX + tooltipW > observedWidth) {
@@ -344,9 +364,15 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
           ctx.fillStyle = '#94a3b8';
           ctx.fillText(`Strike: ${hoveredStrike.toFixed(1)}`, tooltipX + 10, tooltipY + 42);
 
-          const gexStr = formatUSD(gexValue);
-          ctx.fillStyle = gexValue >= 0 ? '#00e676' : '#ff3d00';
-          ctx.fillText(`GEX: ${gexStr}`, tooltipX + 10, tooltipY + 58);
+          if (metric === 'rel_pm') {
+            const rateStr = formatUSD(activeVal) + '/m';
+            ctx.fillStyle = activeVal >= 0 ? '#199e70' : '#e66767';
+            ctx.fillText(`Rel/Min: ${rateStr}`, tooltipX + 10, tooltipY + 58);
+          } else {
+            const gexStr = formatUSD(activeVal);
+            ctx.fillStyle = activeVal >= 0 ? '#199e70' : '#e66767';
+            ctx.fillText(`GEX: ${gexStr}`, tooltipX + 10, tooltipY + 58);
+          }
         }
       }
     };
@@ -390,7 +416,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount }: GammaHe
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [history, currentTimestamp, strikeCount]);
+  }, [history, currentTimestamp, strikeCount, metric]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
