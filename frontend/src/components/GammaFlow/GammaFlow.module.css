@@ -254,21 +254,45 @@
   margin-left: auto;
 }
 
-.cardSelector {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.cardSelector,
+.topControlGroup select,
+.addCardSelect {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 4px;
-  border-radius: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
   cursor: pointer;
   outline: none;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.cardSelector option {
-  background: #0f111a;
-  color: var(--text-primary);
+.cardSelector:hover,
+.topControlGroup select:hover,
+.addCardSelect:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.cardSelector:focus,
+.topControlGroup select:focus,
+.addCardSelect:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.cardSelector option,
+.topControlGroup select option,
+.addCardSelect option {
+  background: #0b0f19;
+  color: #f1f5f9;
+  font-weight: 600;
 }
 
 .cardSpot {
@@ -276,49 +300,57 @@
   font-weight: 800;
   color: #f59e0b;
   background: rgba(245, 158, 11, 0.09);
-  border: 1px solid rgba(245, 158, 11, 0.22);
+  border: 1px solid rgba(245, 158, 11, 0.25);
   padding: 2px 6px;
-  border-radius: 5px;
+  border-radius: 6px;
   letter-spacing: -0.01em;
   white-space: nowrap;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(245, 158, 11, 0.15);
 }
 
 .cardGroupSelector {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2px 4px;
-  border-radius: 4px;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 6px;
   cursor: pointer;
   outline: none;
   text-align: center;
-  transition: all 0.15s ease;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
   user-select: none;
 }
 
 .groupA {
-  background: rgba(56, 189, 248, 0.12) !important;
-  border-color: rgba(56, 189, 248, 0.3) !important;
+  background: rgba(56, 189, 248, 0.15) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
   color: #38bdf8 !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupB {
-  background: rgba(192, 132, 252, 0.12) !important;
-  border-color: rgba(192, 132, 252, 0.3) !important;
+  background: rgba(192, 132, 252, 0.15) !important;
+  border-color: rgba(192, 132, 252, 0.4) !important;
   color: #c084fc !important;
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupC {
-  background: rgba(74, 222, 128, 0.12) !important;
-  border-color: rgba(74, 222, 128, 0.3) !important;
+  background: rgba(74, 222, 128, 0.15) !important;
+  border-color: rgba(74, 222, 128, 0.4) !important;
   color: #4ade80 !important;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupNone {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border-color: rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
   color: var(--text-secondary) !important;
 }
 
