@@ -4,6 +4,13 @@ import { METRIC_LABELS } from '../../types';
 import styles from './HoverTooltip.module.css';
 
 function formatValue(value: number, metric: string): string {
+  if (metric === 'rel_pm') {
+    const abs = Math.abs(value);
+    if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B/min`;
+    if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M/min`;
+    if (abs >= 1e3) return `${(value / 1e3).toFixed(1)}K/min`;
+    return `${value.toFixed(2)}/min`;
+  }
   if (metric.includes('oi') || metric === 'volume') {
     if (Math.abs(value) >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
     if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(1)}K`;

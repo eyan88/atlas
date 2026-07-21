@@ -30,26 +30,26 @@ function mixColor(a: Rgb, b: Rgb, t: number): Rgb {
 //
 // This makes the "walls" and significant nodes pop while everything else recedes.
 
-// Positive ramp: muted teal/green (low significance) → emerald → lime → neon yellow (dominant)
+// Positive ramp: muted teal/green (low significance) → vibrant emerald (#199e70) → lime → neon yellow (dominant)
 const POS_RAMP: Array<[number, Rgb]> = [
-  [0.0,  [30, 58, 74]],       // Dark muted teal (near-zero positive → blends into background)
-  [0.15, [20, 100, 90]],      // Deep teal-green
-  [0.35, [16, 145, 100]],     // Medium emerald
-  [0.55, [34, 180, 85]],      // Vivid green
-  [0.75, [120, 210, 40]],     // Lime green
-  [0.90, [200, 235, 30]],     // Yellow-lime
-  [1.0,  [250, 245, 50]],     // Neon yellow (dominant positive node)
+  [0.0,  [25, 55, 65]],       // Dark muted teal
+  [0.15, [25, 120, 95]],      // Deep emerald teal
+  [0.35, [25, 158, 112]],     // Vibrant emerald green (#199e70 gamma-exposure style)
+  [0.55, [45, 190, 100]],     // Bright green
+  [0.75, [140, 220, 45]],     // Lime green
+  [0.90, [210, 240, 35]],     // Yellow-lime
+  [1.0,  [255, 250, 60]],     // Neon yellow (dominant positive node)
 ];
 
-// Negative ramp: muted dark purple (low significance) → medium violet → vivid deep purple (dominant)
+// Negative ramp: muted dark plum (low significance) → coral red (#e66767) → deep purple/violet (dominant)
 const NEG_RAMP: Array<[number, Rgb]> = [
-  [0.0,  [35, 25, 60]],       // Very dark muted purple (near-zero negative → blends into background)
-  [0.15, [50, 30, 85]],       // Dark plum
-  [0.35, [70, 35, 120]],      // Medium-dark purple
-  [0.55, [95, 40, 160]],      // Medium violet
-  [0.75, [120, 45, 200]],     // Vivid violet
-  [0.90, [105, 30, 185]],     // Deep vivid purple
-  [1.0,  [88, 28, 155]],      // Rich deep purple (dominant negative node)
+  [0.0,  [45, 25, 35]],       // Dark muted plum
+  [0.15, [120, 40, 50]],      // Deep muted red
+  [0.35, [230, 103, 103]],    // Vibrant coral red (#e66767 gamma-exposure style)
+  [0.55, [195, 60, 120]],     // Deep magenta-violet
+  [0.75, [140, 45, 180]],     // Vivid violet
+  [0.90, [110, 30, 175]],     // Deep purple
+  [1.0,  [90, 25, 160]],      // Rich deep purple (dominant negative node)
 ];
 
 function rampLookup(stops: Array<[number, Rgb]>, t: number): Rgb {
@@ -213,6 +213,32 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
     };
   }, [refSnap, isCompassMode]);
 
+  const selectedMetric = useAppStore((s) => s.selectedMetric);
+
+  // Compute cell matrix data (for 'rel_pm', calculates rate of metric change per minute)
+  const cellMatrix = useMemo(() => {
+    if (!displaySnap) return [];
+    if (selectedMetric !== 'rel_pm') return displaySnap.data;
+
+    const rows = displaySnap.rows;
+    const cols = displaySnap.columns;
+    const curSec = displaySnap.timestamp ? Math.floor(new Date(displaySnap.timestamp).getTime() / 1000) : 0;
+    const refSec = displayRefSnap && displayRefSnap.timestamp ? Math.floor(new Date(displayRefSnap.timestamp).getTime() / 1000) : 0;
+    let deltaMin = (curSec > 0 && refSec > 0 && curSec > refSec) ? (curSec - refSec) / 60 : 1;
+    if (deltaMin <= 0) deltaMin = 1;
+
+    return rows.map((_, r) => {
+      return cols.map((_, c) => {
+        const curVal = displaySnap.data[r][c];
+        let refVal = curVal;
+        if (displayRefSnap && displayRefSnap.data && displayRefSnap.data[r]) {
+          refVal = displayRefSnap.data[r][c] ?? curVal;
+        }
+        return (curVal - refVal) / deltaMin;
+      });
+    });
+  }, [displaySnap, displayRefSnap, selectedMetric]);
+
   // ─── Draw ──────────────────────────────────────────────────────────────────
 
   const draw = useCallback(
@@ -268,8 +294,10 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         }
       }
 
+      const activeData = cellMatrix.length > 0 ? cellMatrix : snap.data;
+
       // Normalize absolute exposures for color intensities
-      const norm = normalizeMatrixPerColumn(snap.data);
+      const norm = normalizeMatrixPerColumn(activeData);
 
       // Find the expiry-specific Call Wall and Put Wall index for each column (expiration)
       const colCallWallRows = new Array(cols.length).fill(-1);
@@ -282,7 +310,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         let minNegRowIdx = -1;
 
         for (let r = 0; r < rows.length; r++) {
-          const val = snap.data[r][c];
+          const val = activeData[r][c];
           if (val > 0 && val > maxPositiveVal) {
             maxPositiveVal = val;
             maxPosRowIdx = r;
@@ -303,7 +331,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
 
       for (let r = 0; r < rows.length; r++) {
         for (let c = 0; c < cols.length; c++) {
-          const absVal = Math.abs(snap.data[r][c]);
+          const absVal = Math.abs(activeData[r][c]);
           if (absVal > maxAbsValue) {
             maxAbsValue = absVal;
             maxAbsRowIdx = r;
@@ -403,14 +431,21 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
             ctx.fillText('★', x + CELL_W - 4, y + 4);
           }
 
-          // Line 1: Absolute Value
-          const raw = snap.data[r][c];
+          // Line 1: Value
+          const raw = activeData[r][c];
           const absV = Math.abs(raw);
           let label = '';
-          if      (absV >= 1e9) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e9).toFixed(1)}B`;
-          else if (absV >= 1e6) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e6).toFixed(1)}M`;
-          else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
-          else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
+          if (selectedMetric === 'rel_pm') {
+            if      (absV >= 1e9) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e9).toFixed(1)}B/m`;
+            else if (absV >= 1e6) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e6).toFixed(1)}M/m`;
+            else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K/m`;
+            else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}/m`;
+          } else {
+            if      (absV >= 1e9) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e9).toFixed(1)}B`;
+            else if (absV >= 1e6) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e6).toFixed(1)}M`;
+            else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
+            else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
+          }
 
           // Fill main text
           
@@ -525,7 +560,8 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         rIdx >= 0 &&
         rIdx < displaySnap.rows.length
       ) {
-        const value = displaySnap.data[rIdx][cIdx];
+        const metric = useAppStore.getState().selectedMetric;
+        let value = displaySnap.data[rIdx][cIdx];
         
         // Find reference value for absolute/percent change
         let refValue = null;
@@ -533,11 +569,22 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           refValue = displayRefSnap.data[rIdx][cIdx];
         }
 
-        const pctChange = (refValue !== null && refValue !== 0) ? ((value - refValue) / Math.abs(refValue)) * 100 : 0;
+        if (metric === 'rel_pm') {
+          const curVal = value;
+          const refVal = refValue ?? curVal;
+          const curSec = displaySnap.timestamp ? Math.floor(new Date(displaySnap.timestamp).getTime() / 1000) : 0;
+          const refSec = displayRefSnap && displayRefSnap.timestamp ? Math.floor(new Date(displayRefSnap.timestamp).getTime() / 1000) : 0;
+          let deltaMin = (curSec > 0 && refSec > 0 && curSec > refSec) ? (curSec - refSec) / 60 : 1;
+          if (deltaMin <= 0) deltaMin = 1;
+          value = (curVal - refVal) / deltaMin;
+        }
+
+        const rawVal = displaySnap.data[rIdx][cIdx];
+        const pctChange = (refValue !== null && refValue !== 0) ? ((rawVal - refValue) / Math.abs(refValue)) * 100 : 0;
 
         setHovered({
           ticker,
-          metric: useAppStore.getState().selectedMetric,
+          metric,
           strike: displaySnap.rows[rIdx],
           expiration: displaySnap.columns[cIdx],
           value,
