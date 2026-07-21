@@ -310,33 +310,60 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(245, 158, 11, 0.15);
 }
 
+/* Card Group Container Borders (Matching button colors with subtle glow) */
 .cardGroupA {
-  border-color: rgba(56, 189, 248, 0.45) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(56, 189, 248, 0.18) !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(56, 189, 248, 0.2) !important;
 }
 
 .cardGroupB {
-  border-color: rgba(192, 132, 252, 0.45) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(192, 132, 252, 0.18) !important;
+  border: 1px solid #c084fc !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(192, 132, 252, 0.2) !important;
 }
 
 .cardGroupC {
-  border-color: rgba(74, 222, 128, 0.45) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(74, 222, 128, 0.18) !important;
+  border: 1px solid #4ade80 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 8px rgba(74, 222, 128, 0.2) !important;
+}
+
+.cardGroupA:hover {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 12px rgba(56, 189, 248, 0.3) !important;
+}
+
+.cardGroupB:hover {
+  border-color: #c084fc !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 12px rgba(192, 132, 252, 0.3) !important;
+}
+
+.cardGroupC:hover {
+  border-color: #4ade80 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 12px rgba(74, 222, 128, 0.3) !important;
+}
+
+/* Glassmorphic Group Cycle Button Toggle */
+.groupDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }
 
 .cardGroupSelector {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
-  font-size: 11px;
-  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
   border-radius: 6px;
   cursor: pointer;
   outline: none;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -344,30 +371,35 @@
   user-select: none;
 }
 
+.cardGroupSelector:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+}
+
 .groupA {
-  background: rgba(56, 189, 248, 0.15) !important;
-  border-color: rgba(56, 189, 248, 0.4) !important;
+  background: rgba(56, 189, 248, 0.16) !important;
+  border-color: #38bdf8 !important;
   color: #38bdf8 !important;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupB {
-  background: rgba(192, 132, 252, 0.15) !important;
-  border-color: rgba(192, 132, 252, 0.4) !important;
+  background: rgba(192, 132, 252, 0.16) !important;
+  border-color: #c084fc !important;
   color: #c084fc !important;
-  box-shadow: 0 0 8px rgba(192, 132, 252, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 8px rgba(192, 132, 252, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupC {
-  background: rgba(74, 222, 128, 0.15) !important;
-  border-color: rgba(74, 222, 128, 0.4) !important;
+  background: rgba(74, 222, 128, 0.16) !important;
+  border-color: #4ade80 !important;
   color: #4ade80 !important;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
 
 .groupNone {
   background: rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
   color: var(--text-secondary) !important;
 }
 

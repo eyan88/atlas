@@ -424,6 +424,13 @@ export function GammaFlow() {
     return '';
   };
 
+  const getGroupDotColor = (group: LinkGroup) => {
+    if (group === 'A') return '#38bdf8';
+    if (group === 'B') return '#c084fc';
+    if (group === 'C') return '#4ade80';
+    return 'rgba(255, 255, 255, 0.3)';
+  };
+
   // Helper to resolve CSS classes for group select color badges
   const getGroupSelectClass = (group: LinkGroup) => {
     if (group === 'A') return `${styles.cardGroupSelector} ${styles.groupA}`;
@@ -703,7 +710,6 @@ export function GammaFlow() {
                           {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
                         </span>
                         
-                        {/* Link Group Channel Color Cycle Toggle Button (🔵, 🟣, 🟢 or ⚪) */}
                         <button
                           type="button"
                           className={getGroupSelectClass(widget.group)}
@@ -713,7 +719,8 @@ export function GammaFlow() {
                           }}
                           title={`Link Channel: ${widget.group === 'none' ? 'Unlinked' : 'Group ' + widget.group} (Click to cycle)`}
                         >
-                          {widget.group === 'A' ? '🔵' : widget.group === 'B' ? '🟣' : widget.group === 'C' ? '🟢' : '⚪'}
+                          <span className={styles.groupDot} style={{ background: getGroupDotColor(widget.group) }} />
+                          <span>{widget.group === 'none' ? 'Unlinked' : `Group ${widget.group}`}</span>
                         </button>
 
                         {/* Open Focus View Button */}
