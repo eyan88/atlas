@@ -703,13 +703,7 @@ export function GammaFlow() {
                             </select>
                           </>
                         )}
-                      </div>
-
-                      <div className={styles.cardRightControls}>
-                        <span className={styles.cardSpot}>
-                          {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
-                        </span>
-                        
+                        {/* Link Group Channel Color Cycle Toggle Button */}
                         <button
                           type="button"
                           className={getGroupSelectClass(widget.group)}
@@ -722,8 +716,15 @@ export function GammaFlow() {
                           <span className={styles.groupDot} style={{ background: getGroupDotColor(widget.group) }} />
                           <span>{widget.group === 'none' ? 'Unlinked' : `Group ${widget.group}`}</span>
                         </button>
+                      </div>
 
-                        {/* Open Focus View Button */}
+                      <div className={styles.cardRightControls}>
+                        {/* Spot Price Badge always at top right */}
+                        <span className={styles.cardSpot}>
+                          {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
+                        </span>
+                        
+                        {/* Open Focus View Expand Button */}
                         <button
                           type="button"
                           className={styles.cardFocusBtn}
@@ -737,17 +738,20 @@ export function GammaFlow() {
                           ⤢
                         </button>
 
-                        {/* Close/Delete Card Button */}
-                        <button
-                          type="button"
-                          className={styles.cardDeleteBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteWidget(widget.id);
-                          }}
-                        >
-                          ×
-                        </button>
+                        {/* Delete Widget X Button */}
+                        {widgets.length > 1 && (
+                          <button
+                            type="button"
+                            className={styles.cardDeleteBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWidget(widget.id);
+                            }}
+                            title="Remove Widget"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     </div>
                     
