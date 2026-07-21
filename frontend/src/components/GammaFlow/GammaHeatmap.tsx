@@ -106,14 +106,32 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       1e3
     );
 
-    // Exact color palette interpolation from gamma-exposure repository divColor() with contrast curve p=1.5
-    const C_MID = [18, 20, 26];      // Deep dark charcoal background (#12141a)
-    const C_POS = [25, 158, 112];    // Vibrant Emerald Green (#199e70)
-    const C_POS2 = [140, 220, 185];  // Mint Green Highlight (#8cdcbb)
-    const C_NEG = [230, 103, 103];   // Vibrant Coral Red (#e66767)
-    const C_NEG2 = [235, 160, 150];  // Peach Red Highlight (#eba096)
+    // Atlas Signature Color Palette
+    type Rgb = [number, number, number];
 
-    const mixColor = (c1: number[], c2: number[], f: number) => {
+    // Positive ramp: Muted Teal -> Emerald -> Lime -> Neon Yellow (Dominant Positive Node)
+    const POS_RAMP: Array<[number, Rgb]> = [
+      [0.0,  [16, 26, 35]],       // Near-zero positive (blends smoothly into dark background)
+      [0.15, [20, 95, 85]],       // Muted teal-green
+      [0.35, [25, 150, 95]],      // Medium emerald
+      [0.55, [45, 185, 80]],      // Vivid green
+      [0.75, [130, 215, 35]],     // Lime green
+      [0.90, [210, 235, 30]],     // Yellow-lime highlight
+      [1.0,  [252, 246, 60]],     // Neon yellow (peak positive node)
+    ];
+
+    // Negative ramp: Muted Dark Plum -> Violet -> Deep Purple (Dominant Negative Node)
+    const NEG_RAMP: Array<[number, Rgb]> = [
+      [0.0,  [22, 16, 32]],       // Near-zero negative (blends smoothly into dark background)
+      [0.15, [55, 30, 85]],       // Dark plum
+      [0.35, [80, 35, 125]],      // Medium purple
+      [0.55, [110, 40, 170]],     // Vivid violet
+      [0.75, [140, 45, 215]],     // Bright violet
+      [0.90, [115, 32, 195]],     // Deep vivid purple
+      [1.0,  [90, 25, 165]],      // Rich deep purple (peak negative node)
+    ];
+
+    const mixColor = (c1: Rgb, c2: Rgb, f: number): Rgb => {
       const factor = Math.max(0, Math.min(1, f));
       return [
         Math.round(c1[0] + (c2[0] - c1[0]) * factor),
@@ -122,16 +140,25 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       ];
     };
 
-    const getDivColor = (val: number) => {
-      const clamped = Math.max(-1, Math.min(1, val));
-      const sign = Math.sign(clamped);
-      // Apply contrast power curve p = 1.5 from gamma-exposure repo to prevent overly washed-out bright colors
-      const a = Math.pow(Math.abs(clamped), 1.5);
-      if (a < 0.02) return '#0d0d0d'; // Deep sleek dark base for low/zero GEX
-      const pole = sign >= 0 ? C_POS : C_NEG;
-      const pole2 = sign >= 0 ? C_POS2 : C_NEG2;
-      const c = a <= 0.80 ? mixColor(C_MID, pole, a / 0.80) : mixColor(pole, pole2, (a - 0.80) / 0.20);
-      return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+    const rampLookup = (stops: Array<[number, Rgb]>, t: number): Rgb => {
+      const clamped = Math.max(0, Math.min(1, t));
+      for (let i = 0; i < stops.length - 1; i++) {
+        const [s0, c0] = stops[i];
+        const [s1, c1] = stops[i + 1];
+        if (clamped <= s1) {
+          const frac = (clamped - s0) / (s1 - s0 || 1);
+          return mixColor(c0, c1, Math.max(0, Math.min(1, frac)));
+        }
+      }
+      return stops[stops.length - 1][1];
+    };
+
+    const getAtlasColor = (normalized: number): string => {
+      const val = Math.max(-1, Math.min(1, normalized));
+      const abs = Math.abs(val);
+      if (abs < 0.015) return '#0a0e17'; // Deep dark Atlas navy background for low GEX
+      const rgb = val >= 0 ? rampLookup(POS_RAMP, abs) : rampLookup(NEG_RAMP, abs);
+      return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
     };
 
     const draw = () => {
@@ -146,8 +173,8 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       canvas.height = observedHeight * dpr;
       ctx.scale(dpr, dpr);
 
-      // Clear canvas (gamma-exposure dark base)
-      ctx.fillStyle = '#0d0d0d';
+      // Clear canvas (Atlas dark navy base)
+      ctx.fillStyle = '#0a0e17';
       ctx.fillRect(0, 0, observedWidth, observedHeight);
 
       const margin = { top: 16, right: 65, bottom: 25, left: 35 };
@@ -156,6 +183,8 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
       // Calculate vertical height of a single heatmap cell
       const cellHeight = chartHeight / strikes.length;
+      const rowGap = 1.0; // 1px clean row separation between strike prices
+      const drawCellHeight = Math.max(1, cellHeight - rowGap);
 
       // Helper coordinates (stabilized against fixed trading hours minTime/maxTime)
       const getX = (ts: number) => {
@@ -170,7 +199,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       // Resolve maximum timestamp currently allowed to display
       const latestAllowedTs = currentTimestamp ?? maxTime;
 
-      // 2. Draw Heatmap Cells (Strictly clipped to Inner Plot Area)
+      // 2. Draw Heatmap Cells (Strictly clipped to Inner Plot Area with 1px row gap separation)
       ctx.save();
       ctx.beginPath();
       ctx.rect(margin.left, margin.top, chartWidth, chartHeight);
@@ -196,11 +225,11 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
           }
           pct = Math.max(-1, Math.min(1, pct));
 
-          // Draw cell using exact gamma-exposure divColor mapping
-          ctx.fillStyle = getDivColor(pct);
+          // Draw cell using Atlas signature color scheme
+          ctx.fillStyle = getAtlasColor(pct);
 
-          const y = margin.top + chartHeight - (yIdx + 1) * cellHeight;
-          ctx.fillRect(x, y, cellWidth + 0.5, cellHeight + 0.5);
+          const y = margin.top + chartHeight - (yIdx + 1) * cellHeight + rowGap / 2;
+          ctx.fillRect(x, y, cellWidth + 0.5, drawCellHeight);
         });
       }
 
@@ -302,7 +331,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
         ctx.fillText(timeStr, x, margin.top + chartHeight + 6);
       });
 
-      // 5. Draw Hover Indicator crosshair and Tooltip box
+      // 5. Draw Hover Indicator (Vertical time tracking line, horizontal strike guide, spot dot & Tooltip)
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
         const xRatio = (mouseX - margin.left) / chartWidth;
         const targetTs = minTime + xRatio * (maxTime - minTime);
@@ -325,7 +354,16 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
             hour12: false
           });
 
-          // Draw highlighted time badge at the bottom axis (instead of vertical crosshair line)
+          // Draw vertical time guide line (Sky Blue tracking line across full chart height)
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(xPos, margin.top);
+          ctx.lineTo(xPos, margin.top + chartHeight);
+          ctx.stroke();
+
+          // Draw highlighted time badge at the bottom axis
           const badgeW = 44;
           const badgeH = 16;
           const badgeX = xPos - badgeW / 2;
@@ -353,12 +391,40 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
             hoveredStrike = strikes[Math.max(0, Math.min(strikes.length - 1, targetStrikeIdx))];
             const yPos = getRowY(targetStrikeIdx);
 
-            // Draw horizontal crosshair line
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            // Draw horizontal crosshair guide line
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
             ctx.beginPath();
             ctx.moveTo(margin.left, yPos);
             ctx.lineTo(margin.left + chartWidth, yPos);
             ctx.stroke();
+          }
+          ctx.setLineDash([]); // Reset line dash
+
+          // Highlight Spot Price Marker Dot on spot curve at time xPos
+          const activeSpot = spotPrices[activeTs];
+          if (activeSpot !== undefined && strikes.length > 1) {
+            const minStrike = strikes[0];
+            const maxStrike = strikes[strikes.length - 1];
+            if (activeSpot >= minStrike && activeSpot <= maxStrike) {
+              for (let y = 0; y < strikes.length - 1; y++) {
+                const lower = strikes[y];
+                const upper = strikes[y + 1];
+                if (activeSpot >= lower && activeSpot <= upper) {
+                  const idxPos = y + (activeSpot - lower) / (upper - lower);
+                  const spotY = getRowY(idxPos);
+
+                  // Glowing Amber Spot Marker Dot
+                  ctx.beginPath();
+                  ctx.arc(xPos, spotY, 4.5, 0, Math.PI * 2);
+                  ctx.fillStyle = '#f59e0b';
+                  ctx.fill();
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.lineWidth = 1.5;
+                  ctx.stroke();
+                  break;
+                }
+              }
+            }
           }
 
           // Gather metrics
