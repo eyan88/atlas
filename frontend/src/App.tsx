@@ -5,6 +5,7 @@ import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
 import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
 import { GammaFlow } from './components/GammaFlow/GammaFlow';
+import { CompassChart } from './components/HeatmapContainer/CompassChart';
 import { useAppStore, toSeconds } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
@@ -172,6 +173,7 @@ export function App() {
               ))
             ) : (
               <>
+                <CompassChart />
                 <HeatmapContainer key="SPY-compass" ticker="SPY" isCompassMode />
                 <HeatmapContainer key="QQQ-compass" ticker="QQQ" isCompassMode />
                 <HeatmapContainer key="IWM-compass" ticker="IWM" isCompassMode />

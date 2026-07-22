@@ -1,0 +1,408 @@
+import { useEffect, useRef, useState } from 'react';
+import { createChart, LineStyle, IChartApi, CandlestickSeries, createSeriesMarkers } from 'lightweight-charts';
+import { useAppStore } from '../../store/useAppStore';
+import styles from './CompassChart.module.css';
+
+const CHART_TICKERS = ['SPY', 'QQQ', 'IWM'];
+
+interface CandleData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  spot_price?: number;
+  call_wall?: number | null;
+  put_wall?: number | null;
+  gamma_flip?: number | null;
+}
+
+export function CompassChart() {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candlestickSeriesRef = useRef<any>(null);
+  const seriesMarkersRef = useRef<any>(null);
+
+  // References for dynamic price lines to update on replay slider
+  const spotLineRef = useRef<any>(null);
+  const callLineRef = useRef<any>(null);
+  const putLineRef = useRef<any>(null);
+  const flipLineRef = useRef<any>(null);
+
+  // Zustand Store queries
+  const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
+  const currentTimestamp = useAppStore((s) => s.currentTimestamp);
+  const colorTheme = useAppStore((s) => s.colorTheme);
+
+  // Local chart ticker selection (defaults to SPY)
+  const [activeChartTicker, setActiveChartTicker] = useState('SPY');
+  const [hoveredCandle, setHoveredCandle] = useState<CandleData | null>(null);
+
+  // Get snapshots history for active chart ticker
+  const tickerHistory = snapshotsHistory[activeChartTicker] ?? {};
+  const historyTimestamps = Object.keys(tickerHistory)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  // Re-generate candlestick series data
+  const candles: CandleData[] = [];
+  for (let i = 0; i < historyTimestamps.length; i++) {
+    const ts = historyTimestamps[i];
+    const snap = tickerHistory[ts];
+    if (!snap || snap.spot_price == null) continue;
+
+    const price = snap.spot_price;
+    const prevPrice =
+      i > 0
+        ? tickerHistory[historyTimestamps[i - 1]]?.spot_price ?? price
+        : price;
+
+    const open = prevPrice;
+    const close = price;
+    const range = Math.abs(close - open);
+    const noise = range > 0 ? range * 0.15 : price * 0.0003;
+    const high = Math.max(open, close) + noise;
+    const low = Math.min(open, close) - noise;
+
+    candles.push({
+      time: ts as any,
+      open,
+      high,
+      low,
+      close,
+      spot_price: price,
+      call_wall: snap.call_wall,
+      put_wall: snap.put_wall,
+      gamma_flip: snap.gamma_flip,
+    });
+  }
+
+  // Find currently active candle data matching the timeline slider playhead
+  const activeCandle =
+    candles.find((c) => c.time === currentTimestamp) ||
+    candles[candles.length - 1] ||
+    null;
+
+  // Initialize Lightweight Chart instance
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    // Create container element
+    const container = chartContainerRef.current;
+
+    const chart = createChart(container, {
+      layout: {
+        background: { color: '#080b10' },
+        textColor: '#8b949e',
+        fontSize: 10,
+        fontFamily: "'Inter', sans-serif",
+      },
+      grid: {
+        vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        textColor: '#8b949e',
+      },
+      timeScale: {
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        vertLine: {
+          color: 'rgba(56, 189, 248, 0.4)',
+          width: 1,
+          style: 3, // Dotted
+        },
+        horzLine: {
+          color: 'rgba(255, 255, 255, 0.2)',
+          width: 1,
+          style: 3, // Dotted
+        },
+      },
+      width: container.clientWidth,
+      height: container.clientHeight || 400,
+    });
+
+    // Custom colors matching selected colorTheme (Atlas vs Classic)
+    const isClassic = colorTheme === 'classic';
+    const upColor = isClassic ? '#22c55e' : '#00e676';
+    const downColor = isClassic ? '#ef4444' : '#c084fc';
+
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+      upColor,
+      downColor,
+      borderUpColor: upColor,
+      borderDownColor: downColor,
+      wickUpColor: upColor,
+      wickDownColor: downColor,
+    });
+
+    // Initialize series markers plugin api
+    seriesMarkersRef.current = createSeriesMarkers(candlestickSeries, []);
+
+    chartRef.current = chart;
+    candlestickSeriesRef.current = candlestickSeries;
+
+    // Subscribe to crosshair hover moves to update legends display
+    chart.subscribeCrosshairMove((param) => {
+      if (param.time) {
+        const data = param.seriesData.get(candlestickSeries) as CandleData | undefined;
+        if (data) {
+          // Re-attach timestamp time
+          setHoveredCandle({
+            ...data,
+            time: param.time as number,
+          });
+        }
+      } else {
+        setHoveredCandle(null);
+      }
+    });
+
+    // Auto resize chart container
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          chart.resize(width, height);
+        }
+      }
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.removeSeries(candlestickSeries);
+      chart.remove();
+      chartRef.current = null;
+      candlestickSeriesRef.current = null;
+      seriesMarkersRef.current = null;
+    };
+  }, [activeChartTicker, colorTheme]); // Recreate chart if ticker or theme switches
+
+  // Reactively load/update Candlestick Data, Price Lines, and GEX Bubbles (Markers)
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series || candles.length === 0) return;
+
+    // Load series data
+    series.setData(candles);
+
+    // Dynamic price lines management
+    // 1. Remove previous price lines
+    if (spotLineRef.current) {
+      series.removePriceLine(spotLineRef.current);
+      spotLineRef.current = null;
+    }
+    if (callLineRef.current) {
+      series.removePriceLine(callLineRef.current);
+      callLineRef.current = null;
+    }
+    if (putLineRef.current) {
+      series.removePriceLine(putLineRef.current);
+      putLineRef.current = null;
+    }
+    if (flipLineRef.current) {
+      series.removePriceLine(flipLineRef.current);
+      flipLineRef.current = null;
+    }
+
+    // 2. Fetch current replay snap
+    const currentSnap = currentTimestamp ? tickerHistory[currentTimestamp] : null;
+    if (currentSnap) {
+      // Spot Price Line
+      if (currentSnap.spot_price) {
+        spotLineRef.current = series.createPriceLine({
+          price: currentSnap.spot_price,
+          color: '#f59e0b',
+          lineWidth: 2, // Must be 1, 2, 3 or 4
+          lineStyle: LineStyle.Solid,
+          axisLabelVisible: true,
+          title: 'Spot Price',
+        });
+      }
+      // Call Wall Line (Mint Green / Emerald)
+      if (currentSnap.call_wall) {
+        callLineRef.current = series.createPriceLine({
+          price: currentSnap.call_wall,
+          color: '#00e676',
+          lineWidth: 1, // Must be 1, 2, 3 or 4
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'Call Wall',
+        });
+      }
+      // Put Wall Line (Coral Red vs Purple)
+      if (currentSnap.put_wall) {
+        putLineRef.current = series.createPriceLine({
+          price: currentSnap.put_wall,
+          color: colorTheme === 'classic' ? '#ff3d00' : '#c084fc',
+          lineWidth: 1, // Must be 1, 2, 3 or 4
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'Put Wall',
+        });
+      }
+      // Gamma Flip Line (Gold/Amber)
+      if (currentSnap.gamma_flip) {
+        flipLineRef.current = series.createPriceLine({
+          price: currentSnap.gamma_flip,
+          color: '#fbbf24',
+          lineWidth: 1, // Must be 1, 2, 3 or 4
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: true,
+          title: 'Flip Level',
+        });
+      }
+    }
+
+    // 3. Populate dynamic bubble markers: Shifts + Active Wall Highlights
+    const markers: any[] = [];
+    let prevCall: number | null = null;
+    let prevPut: number | null = null;
+
+    candles.forEach((c) => {
+      // Place static circular markers on historical shifts to see when walls changed
+      if (c.call_wall && c.call_wall !== prevCall) {
+        markers.push({
+          time: c.time as any,
+          position: 'aboveBar',
+          color: '#00e676',
+          shape: 'circle',
+          text: `C-Wall: $${c.call_wall.toFixed(0)}`,
+        });
+        prevCall = c.call_wall;
+      }
+      if (c.put_wall && c.put_wall !== prevPut) {
+        markers.push({
+          time: c.time as any,
+          position: 'belowBar',
+          color: colorTheme === 'classic' ? '#ff3d00' : '#c084fc',
+          shape: 'circle',
+          text: `P-Wall: $${c.put_wall.toFixed(0)}`,
+        });
+        prevPut = c.put_wall;
+      }
+
+      // Add a distinct highlight exactly at the current active playhead timestamp
+      if (currentTimestamp !== null && c.time === currentTimestamp) {
+        if (c.spot_price) {
+          markers.push({
+            time: c.time as any,
+            position: 'inBar',
+            color: '#fbbf24',
+            shape: 'circle',
+            text: `Replay Head ($${c.spot_price.toFixed(2)})`,
+          });
+        }
+      }
+    });
+
+    if (seriesMarkersRef.current) {
+      seriesMarkersRef.current.setMarkers(markers);
+    }
+  }, [candles.length, currentTimestamp, activeChartTicker, colorTheme]);
+
+  // Handle manual ticker switch
+  const handleTickerSwitch = (t: string) => {
+    setActiveChartTicker(t);
+  };
+
+  // Helper to format values
+  const displayCandle = hoveredCandle || activeCandle;
+  const isUp = displayCandle ? displayCandle.close >= displayCandle.open : true;
+  const ohlcColorClass = isUp ? styles.up : styles.down;
+
+  return (
+    <div className={styles.container}>
+      {/* Header controls for Compass chart component */}
+      <div className={styles.header}>
+        <div className={styles.titleArea}>
+          <h3 className={styles.title}>
+            <span>Compass Chart</span>
+            <span className={styles.badge}>TradingView</span>
+          </h3>
+        </div>
+
+        {/* Ticker selector tab buttons */}
+        <div className={styles.tickerSelector}>
+          {CHART_TICKERS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`${styles.tickerBtn} ${t === activeChartTicker ? styles.tickerBtnActive : ''}`}
+              onClick={() => handleTickerSwitch(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Candlestick & Levels display viewport */}
+      <div className={styles.chartArea}>
+        {candles.length === 0 ? (
+          <div className={styles.noData}>
+            <div className={styles.spinner} />
+            <span>Preloading {activeChartTicker} candlestick feed...</span>
+          </div>
+        ) : (
+          <>
+            {/* Tooltip Overlay showing active/hovered OHLC and Gamma levels */}
+            <div className={styles.overlay}>
+              {displayCandle && (
+                <div className={styles.ohlcBar}>
+                  <span className={styles.ohlcLabel}>O</span>
+                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.open.toFixed(2)}</span>
+                  <span className={styles.ohlcLabel}>H</span>
+                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.high.toFixed(2)}</span>
+                  <span className={styles.ohlcLabel}>L</span>
+                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.low.toFixed(2)}</span>
+                  <span className={styles.ohlcLabel}>C</span>
+                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.close.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Gamma Wall badges corresponding to displayCandle's moment */}
+              {displayCandle && (
+                <div className={styles.statsGrid}>
+                  {displayCandle.spot_price && (
+                    <div className={styles.statItem} style={{ borderLeft: '3px solid #f59e0b' }}>
+                      <span className={styles.statLabel}>Spot</span>
+                      <span className={styles.statVal}>${displayCandle.spot_price.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {displayCandle.call_wall && (
+                    <div className={styles.statItem} style={{ borderLeft: '3px solid #34d399' }}>
+                      <span className={styles.statLabel}>Call Wall</span>
+                      <span className={styles.statVal}>${displayCandle.call_wall.toFixed(0)}</span>
+                    </div>
+                  )}
+                  {displayCandle.put_wall && (
+                    <div className={styles.statItem} style={{ borderLeft: `3px solid ${colorTheme === 'classic' ? '#f87171' : '#c084fc'}` }}>
+                      <span className={styles.statLabel}>Put Wall</span>
+                      <span className={styles.statVal}>${displayCandle.put_wall.toFixed(0)}</span>
+                    </div>
+                  )}
+                  {displayCandle.gamma_flip && (
+                    <div className={styles.statItem} style={{ borderLeft: '3px solid #fbbf24' }}>
+                      <span className={styles.statLabel}>Flip</span>
+                      <span className={styles.statVal}>${displayCandle.gamma_flip.toFixed(0)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Core HTML Canvas wrapper */}
+            <div ref={chartContainerRef} className={styles.chartContainer} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+export default CompassChart;
