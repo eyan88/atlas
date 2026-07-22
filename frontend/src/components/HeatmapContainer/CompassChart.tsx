@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createChart, LineStyle, IChartApi, CandlestickSeries, createSeriesMarkers, LineSeries } from 'lightweight-charts';
 import { useAppStore } from '../../store/useAppStore';
 import type { HeatmapSnapshot } from '../../types';
+import { api } from '../../api/client';
 import styles from './CompassChart.module.css';
 
 const CHART_TICKERS = ['SPY', 'QQQ', 'IWM'];
@@ -36,10 +37,69 @@ export function CompassChart() {
   const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
   const colorTheme = useAppStore((s) => s.colorTheme);
+  const selectedDate = useAppStore((s) => s.selectedDate);
 
   // Local chart ticker selection (defaults to SPY)
   const [activeChartTicker, setActiveChartTicker] = useState('SPY');
   const [hoveredCandle, setHoveredCandle] = useState<CandleData | null>(null);
+
+  // State to track settled options levels from previous trading session EOD
+  const [prevEodLevels, setPrevEodLevels] = useState<{
+    call_wall: number | null;
+    put_wall: number | null;
+    gamma_flip: number | null;
+  } | null>(null);
+
+  // Utility to locate the previous active trading day
+  const getPreviousTradingDay = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay();
+    let offset = 1;
+    if (day === 1) {
+      offset = 3; // Monday -> Friday
+    } else if (day === 0) {
+      offset = 2; // Sunday -> Friday
+    } else if (day === 6) {
+      offset = 1; // Saturday -> Friday
+    }
+    const prev = new Date(d.getTime() - offset * 24 * 60 * 60 * 1000);
+    return prev.toISOString().split('T')[0];
+  };
+
+  // Fetch previous session EOD settled levels dynamically
+  useEffect(() => {
+    let active = true;
+    const fetchPrevEod = async () => {
+      try {
+        const prevDate = getPreviousTradingDay(selectedDate);
+        const data = await api.getHeatmapHistory(activeChartTicker, {
+          date: prevDate,
+          strikeCount: 40,
+        });
+        if (!active) return;
+
+        const keys = Object.keys(data.history).map(Number).sort((a, b) => a - b);
+        if (keys.length > 0) {
+          const latestSnap = data.history[keys[keys.length - 1]];
+          setPrevEodLevels({
+            call_wall: latestSnap.call_wall,
+            put_wall: latestSnap.put_wall,
+            gamma_flip: latestSnap.gamma_flip,
+          });
+        } else {
+          setPrevEodLevels(null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch previous EOD settled options levels:", err);
+        if (active) setPrevEodLevels(null);
+      }
+    };
+
+    fetchPrevEod();
+    return () => {
+      active = false;
+    };
+  }, [activeChartTicker, selectedDate]);
 
   // Get snapshots history for active chart ticker
   const tickerHistory = snapshotsHistory[activeChartTicker] ?? {};
@@ -69,6 +129,10 @@ export function CompassChart() {
       const high = Math.max(open, close) + noise;
       const low = Math.min(open, close) - noise;
 
+      const callWall = prevEodLevels ? prevEodLevels.call_wall : snap.call_wall;
+      const putWall = prevEodLevels ? prevEodLevels.put_wall : snap.put_wall;
+      const flip = prevEodLevels ? prevEodLevels.gamma_flip : snap.gamma_flip;
+
       candles.push({
         time: ts as any,
         open,
@@ -76,9 +140,9 @@ export function CompassChart() {
         low,
         close,
         spot_price: price,
-        call_wall: snap.call_wall,
-        put_wall: snap.put_wall,
-        gamma_flip: snap.gamma_flip,
+        call_wall: callWall,
+        put_wall: putWall,
+        gamma_flip: flip,
       });
     }
   } else if (historyTimestamps.length === 1) {
@@ -142,6 +206,10 @@ export function CompassChart() {
     close: number,
     snap: HeatmapSnapshot
   ) {
+    const callWall = prevEodLevels ? prevEodLevels.call_wall : snap.call_wall;
+    const putWall = prevEodLevels ? prevEodLevels.put_wall : snap.put_wall;
+    const flip = prevEodLevels ? prevEodLevels.gamma_flip : snap.gamma_flip;
+
     arr.push({
       time: time as any,
       open,
@@ -149,9 +217,9 @@ export function CompassChart() {
       low,
       close,
       spot_price: close,
-      call_wall: snap.call_wall,
-      put_wall: snap.put_wall,
-      gamma_flip: snap.gamma_flip,
+      call_wall: callWall,
+      put_wall: putWall,
+      gamma_flip: flip,
     });
   }
 
