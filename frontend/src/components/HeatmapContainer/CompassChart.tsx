@@ -31,6 +31,7 @@ export function CompassChart() {
   const flipLineRef = useRef<any>(null);
 
   // Zustand Store queries
+  const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
   const colorTheme = useAppStore((s) => s.colorTheme);
   const selectedDate = useAppStore((s) => s.selectedDate);
@@ -40,86 +41,40 @@ export function CompassChart() {
   const [candles, setCandles] = useState<CandleData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hoveredCandle, setHoveredCandle] = useState<CandleData | null>(null);
-  
-  // State to track settled options levels from previous trading session EOD
-  const [prevEodLevels, setPrevEodLevels] = useState<{
-    date: string;
-    call_wall: number | null;
-    put_wall: number | null;
-    gamma_flip: number | null;
-  } | null>(null);
 
-  // Utility to locate the previous active trading day
-  const getPreviousTradingDay = (dateStr: string): string => {
-    const d = new Date(dateStr + 'T00:00:00');
-    const day = d.getDay();
-    let offset = 1;
-    if (day === 1) {
-      offset = 3; // Monday -> Friday
-    } else if (day === 0) {
-      offset = 2; // Sunday -> Friday
-    } else if (day === 6) {
-      offset = 1; // Saturday -> Friday
-    }
-    const prev = new Date(d.getTime() - offset * 24 * 60 * 60 * 1000);
-    return prev.toISOString().split('T')[0];
-  };
+  const tickerHistory = snapshotsHistory[activeChartTicker] ?? {};
 
-  // Fetch actual price action candles and previous GEX levels dynamically when ticker/date changes
+  // Fetch actual price action candles dynamically when ticker/date changes
   useEffect(() => {
     let active = true;
     const loadChartData = async () => {
       setIsLoading(true);
       try {
-        // 1. Fetch previous day's EOD settled options levels
-        const prevDate = getPreviousTradingDay(selectedDate);
-        let walls: {
-          call_wall: number | null;
-          put_wall: number | null;
-          gamma_flip: number | null;
-        } = { call_wall: null, put_wall: null, gamma_flip: null };
-        try {
-          const prevData = await api.getHeatmapHistory(activeChartTicker, {
-            date: prevDate,
-            strikeCount: 40,
-          });
-          const keys = Object.keys(prevData.history).map(Number).sort((a, b) => a - b);
-          if (keys.length > 0) {
-            const latestSnap = prevData.history[keys[keys.length - 1]];
-            walls = {
-              call_wall: latestSnap.call_wall,
-              put_wall: latestSnap.put_wall,
-              gamma_flip: latestSnap.gamma_flip,
-            };
-            if (active) {
-              setPrevEodLevels({
-                date: prevDate,
-                ...walls,
-              });
-            }
-          } else {
-            if (active) setPrevEodLevels(null);
-          }
-        } catch (err) {
-          console.warn("Could not load previous day GEX levels, falling back:", err);
-          if (active) setPrevEodLevels(null);
-        }
-
-        // 2. Fetch actual intraday price candles from backend
+        // Fetch actual intraday price candles from backend
         const priceCandles = await api.getStockCandles(activeChartTicker, selectedDate);
         if (!active) return;
 
-        const formattedCandles = priceCandles.map((c) => ({
-          time: c.time,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-          spot_price: c.close,
-          call_wall: walls.call_wall,
-          put_wall: walls.put_wall,
-          gamma_flip: walls.gamma_flip,
-        }));
+        // Map GEX levels onto each candle from the corresponding snapshot in snapshotsHistory
+        const formattedCandles = priceCandles.map((c) => {
+          // Find option snapshot at exact timestamp or closest within 2.5 minutes
+          const snapKey = Object.keys(tickerHistory)
+            .map(Number)
+            .find((ts) => Math.abs(ts - c.time) < 150);
+          
+          const snap = snapKey ? tickerHistory[snapKey] : null;
+
+          return {
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            spot_price: c.close,
+            call_wall: snap?.call_wall ?? null,
+            put_wall: snap?.put_wall ?? null,
+            gamma_flip: snap?.gamma_flip ?? null,
+          };
+        });
 
         setCandles(formattedCandles);
       } catch (err) {
@@ -134,18 +89,18 @@ export function CompassChart() {
     return () => {
       active = false;
     };
-  }, [activeChartTicker, selectedDate]);
+  }, [activeChartTicker, selectedDate, tickerHistory]);
 
   // Find currently active candle matching the timeline slider playhead (closest 2.5-minute match)
   const activeCandle = currentTimestamp
     ? candles.find((c) => Math.abs(c.time - currentTimestamp) < 150) || candles[candles.length - 1]
     : candles[candles.length - 1];
 
-  // Selected level values for display
+  // Selected level values for display (matching the active candle/playhead)
   const spotPriceVal = activeCandle?.close;
-  const callWallVal = prevEodLevels?.call_wall;
-  const putWallVal = prevEodLevels?.put_wall;
-  const flipVal = prevEodLevels?.gamma_flip;
+  const callWallVal = activeCandle?.call_wall;
+  const putWallVal = activeCandle?.put_wall;
+  const flipVal = activeCandle?.gamma_flip;
 
   // Render OHLC values for hovered candle or active candle
   const displayCandle = hoveredCandle || activeCandle || null;
@@ -337,11 +292,6 @@ export function CompassChart() {
       <div className={styles.header}>
         <div className={styles.titleArea}>
           <span className={styles.title}>Real-Time Chart</span>
-          {prevEodLevels && (
-            <span className={styles.subtitle}>
-              GEX levels settled on {prevEodLevels.date}
-            </span>
-          )}
         </div>
 
         {/* Dynamic GEX Options levels readout */}
