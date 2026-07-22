@@ -49,6 +49,15 @@ export const api = {
       `/heatmap/${ticker}/history?${params.toString()}`
     );
   },
+
+  /** GET /api/v1/stock/{ticker}/candles?date=YYYY-MM-DD */
+  getStockCandles: (
+    ticker: string,
+    date: string
+  ): Promise<{ time: number; open: number; high: number; low: number; close: number }[]> =>
+    get<{ time: number; open: number; high: number; low: number; close: number }[]>(
+      `/stock/${ticker}/candles?date=${date}`
+    ),
 };
 
 // ─── Mock data for development (no backend required) ─────────────────────────

@@ -110,44 +110,77 @@
   width: 100%;
 }
 
-.widgetContainer {
+.chartContainer {
   width: 100%;
   height: 100%;
-  background: #0d1117;
-  overflow: hidden;
 }
 
-.widgetIframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-/* GEX Level Depth Ruler overlay */
-.ruler {
+/* Floating OHLC Legend overlay */
+.overlay {
   position: absolute;
-  top: 48px; /* Offset to stay clear of TradingView top widget controls */
-  bottom: 48px; /* Offset to stay clear of TradingView bottom time controls */
-  right: 68px; /* Positioned precisely inline with the TradingView price y-axis */
-  width: 90px;
-  z-index: 100;
-  pointer-events: none; /* Let all click actions flow to the TradingView chart */
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+  pointer-events: none;
 }
 
-.levelBubble {
-  position: absolute;
-  right: 0;
-  transform: translateY(50%); /* Centers the absolute bottom offset point */
-  padding: 3px 8px;
-  font-size: 8px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(13, 17, 23, 0.88);
+.ohlcBar {
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-  white-space: nowrap;
-  transition: bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.ohlcLabel {
+  color: var(--text-secondary);
+}
+
+.ohlcVal {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.ohlcVal.up {
+  color: #00e676;
+}
+
+.ohlcVal.down {
+  color: #ff3d00;
+}
+
+/* Loading Panel */
+.noData {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  color: var(--text-secondary);
+  gap: 8px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

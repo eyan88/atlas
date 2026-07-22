@@ -418,3 +418,69 @@ def get_heatmap_history(
             print(f"Redis cache write error for history: {e}")
 
     return result
+
+@router.get("/stock/{ticker}/candles")
+def get_stock_candles(
+    ticker: str,
+    date: str = Query(...), # YYYY-MM-DD
+    db: Session = Depends(get_db)
+):
+    """
+    Returns actual intraday 5-minute price candles for the ticker on the target date.
+    Fetches from Yahoo Finance and returns the OHLC data.
+    """
+    import requests
+    from datetime import datetime, time as py_time, timezone
+    
+    ticker = ticker.upper()
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    # Convert date to UTC boundaries
+    start_ts = int(datetime.combine(dt, py_time.min).replace(tzinfo=timezone.utc).timestamp())
+    end_ts = int(datetime.combine(dt, py_time.max).replace(tzinfo=timezone.utc).timestamp())
+
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?period1={start_ts}&period2={end_ts}&interval=5m"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code != 200:
+            return []
+            
+        data = res.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return []
+            
+        chart_data = result[0]
+        timestamps = chart_data.get("timestamp", [])
+        indicators = chart_data.get("indicators", {}).get("quote", [{}])[0]
+        
+        opens = indicators.get("open", [])
+        highs = indicators.get("high", [])
+        lows = indicators.get("low", [])
+        closes = indicators.get("close", [])
+        
+        candles = []
+        for i in range(len(timestamps)):
+            if (i < len(opens) and opens[i] is not None and
+                i < len(highs) and highs[i] is not None and
+                i < len(lows) and lows[i] is not None and
+                i < len(closes) and closes[i] is not None):
+                
+                candles.append({
+                    "time": int(timestamps[i]),
+                    "open": float(opens[i]),
+                    "high": float(highs[i]),
+                    "low": float(lows[i]),
+                    "close": float(closes[i])
+                })
+        return candles
+    except Exception as e:
+        print(f"Error fetching Yahoo Finance candles for {ticker} on {date}: {e}")
+        return []
