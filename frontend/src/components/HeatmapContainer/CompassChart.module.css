@@ -163,11 +163,17 @@
 }
 
 .noData {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-base);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  z-index: 20;
   color: var(--text-secondary);
   gap: 8px;
 }

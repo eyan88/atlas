@@ -344,63 +344,63 @@ export function CompassChart() {
 
       {/* Candlestick & Levels display viewport */}
       <div className={styles.chartArea}>
-        {candles.length === 0 ? (
+        {candles.length === 0 && (
           <div className={styles.noData}>
             <div className={styles.spinner} />
             <span>Preloading {activeChartTicker} candlestick feed...</span>
           </div>
-        ) : (
-          <>
-            {/* Tooltip Overlay showing active/hovered OHLC and Gamma levels */}
-            <div className={styles.overlay}>
-              {displayCandle && (
-                <div className={styles.ohlcBar}>
-                  <span className={styles.ohlcLabel}>O</span>
-                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.open.toFixed(2)}</span>
-                  <span className={styles.ohlcLabel}>H</span>
-                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.high.toFixed(2)}</span>
-                  <span className={styles.ohlcLabel}>L</span>
-                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.low.toFixed(2)}</span>
-                  <span className={styles.ohlcLabel}>C</span>
-                  <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.close.toFixed(2)}</span>
-                </div>
-              )}
-
-              {/* Gamma Wall badges corresponding to displayCandle's moment */}
-              {displayCandle && (
-                <div className={styles.statsGrid}>
-                  {displayCandle.spot_price && (
-                    <div className={styles.statItem} style={{ borderLeft: '3px solid #f59e0b' }}>
-                      <span className={styles.statLabel}>Spot</span>
-                      <span className={styles.statVal}>${displayCandle.spot_price.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {displayCandle.call_wall && (
-                    <div className={styles.statItem} style={{ borderLeft: '3px solid #34d399' }}>
-                      <span className={styles.statLabel}>Call Wall</span>
-                      <span className={styles.statVal}>${displayCandle.call_wall.toFixed(0)}</span>
-                    </div>
-                  )}
-                  {displayCandle.put_wall && (
-                    <div className={styles.statItem} style={{ borderLeft: `3px solid ${colorTheme === 'classic' ? '#f87171' : '#c084fc'}` }}>
-                      <span className={styles.statLabel}>Put Wall</span>
-                      <span className={styles.statVal}>${displayCandle.put_wall.toFixed(0)}</span>
-                    </div>
-                  )}
-                  {displayCandle.gamma_flip && (
-                    <div className={styles.statItem} style={{ borderLeft: '3px solid #fbbf24' }}>
-                      <span className={styles.statLabel}>Flip</span>
-                      <span className={styles.statVal}>${displayCandle.gamma_flip.toFixed(0)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Core HTML Canvas wrapper */}
-            <div ref={chartContainerRef} className={styles.chartContainer} />
-          </>
         )}
+
+        {candles.length > 0 && (
+          /* Tooltip Overlay showing active/hovered OHLC and Gamma levels */
+          <div className={styles.overlay}>
+            {displayCandle && (
+              <div className={styles.ohlcBar}>
+                <span className={styles.ohlcLabel}>O</span>
+                <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.open.toFixed(2)}</span>
+                <span className={styles.ohlcLabel}>H</span>
+                <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.high.toFixed(2)}</span>
+                <span className={styles.ohlcLabel}>L</span>
+                <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.low.toFixed(2)}</span>
+                <span className={styles.ohlcLabel}>C</span>
+                <span className={`${styles.ohlcVal} ${ohlcColorClass}`}>${displayCandle.close.toFixed(2)}</span>
+              </div>
+            )}
+
+            {/* Gamma Wall badges corresponding to displayCandle's moment */}
+            {displayCandle && (
+              <div className={styles.statsGrid}>
+                {displayCandle.spot_price && (
+                  <div className={styles.statItem} style={{ borderLeft: '3px solid #f59e0b' }}>
+                    <span className={styles.statLabel}>Spot</span>
+                    <span className={styles.statVal}>${displayCandle.spot_price.toFixed(2)}</span>
+                  </div>
+                )}
+                {displayCandle.call_wall && (
+                  <div className={styles.statItem} style={{ borderLeft: '3px solid #34d399' }}>
+                    <span className={styles.statLabel}>Call Wall</span>
+                    <span className={styles.statVal}>${displayCandle.call_wall.toFixed(0)}</span>
+                  </div>
+                )}
+                {displayCandle.put_wall && (
+                  <div className={styles.statItem} style={{ borderLeft: `3px solid ${colorTheme === 'classic' ? '#f87171' : '#c084fc'}` }}>
+                    <span className={styles.statLabel}>Put Wall</span>
+                    <span className={styles.statVal}>${displayCandle.put_wall.toFixed(0)}</span>
+                  </div>
+                )}
+                {displayCandle.gamma_flip && (
+                  <div className={styles.statItem} style={{ borderLeft: '3px solid #fbbf24' }}>
+                    <span className={styles.statLabel}>Flip</span>
+                    <span className={styles.statVal}>${displayCandle.gamma_flip.toFixed(0)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Core HTML Canvas wrapper - permanently rendered to prevent null ref initialization */}
+        <div ref={chartContainerRef} className={styles.chartContainer} />
       </div>
     </div>
   );
