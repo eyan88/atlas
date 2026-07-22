@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, LineStyle, IChartApi, CandlestickSeries, createSeriesMarkers } from 'lightweight-charts';
+import { createChart, IChartApi, CandlestickSeries, createSeriesMarkers } from 'lightweight-charts';
 import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../api/client';
 import styles from './CompassChart.module.css';
@@ -20,15 +20,10 @@ interface CandleData {
 
 export function CompassChart() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<any>(null);
   const seriesMarkersRef = useRef<any>(null);
-
-  // References for horizontal GEX price lines on the chart
-  const spotLineRef = useRef<any>(null);
-  const callLineRef = useRef<any>(null);
-  const putLineRef = useRef<any>(null);
-  const flipLineRef = useRef<any>(null);
 
   // Zustand Store queries
   const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
@@ -36,32 +31,99 @@ export function CompassChart() {
   const colorTheme = useAppStore((s) => s.colorTheme);
   const selectedDate = useAppStore((s) => s.selectedDate);
 
-  // Local chart ticker and candle states
+  // Local chart ticker, source and candle states
   const [activeChartTicker, setActiveChartTicker] = useState('SPY');
+  const [gexSource, setGexSource] = useState<'active' | 'prior'>('active');
   const [candles, setCandles] = useState<CandleData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hoveredCandle, setHoveredCandle] = useState<CandleData | null>(null);
+  
+  // State to track settled options levels from previous trading session EOD
+  const [prevEodLevels, setPrevEodLevels] = useState<{
+    date: string;
+    call_wall: number | null;
+    put_wall: number | null;
+    gamma_flip: number | null;
+  } | null>(null);
 
   const tickerHistory = snapshotsHistory[activeChartTicker] ?? {};
 
-  // Fetch actual price action candles dynamically when ticker/date changes
+  // Utility to locate the previous active trading day
+  const getPreviousTradingDay = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay();
+    let offset = 1;
+    if (day === 1) {
+      offset = 3; // Monday -> Friday
+    } else if (day === 0) {
+      offset = 2; // Sunday -> Friday
+    } else if (day === 6) {
+      offset = 1; // Saturday -> Friday
+    }
+    const prev = new Date(d.getTime() - offset * 24 * 60 * 60 * 1000);
+    return prev.toISOString().split('T')[0];
+  };
+
+  // Fetch actual price action candles and previous GEX levels dynamically when ticker/date changes
   useEffect(() => {
     let active = true;
     const loadChartData = async () => {
       setIsLoading(true);
       try {
-        // Fetch actual intraday price candles from backend
+        // 1. Fetch previous day's EOD settled options levels
+        const prevDate = getPreviousTradingDay(selectedDate);
+        let walls: {
+          call_wall: number | null;
+          put_wall: number | null;
+          gamma_flip: number | null;
+        } = { call_wall: null, put_wall: null, gamma_flip: null };
+        try {
+          const prevData = await api.getHeatmapHistory(activeChartTicker, {
+            date: prevDate,
+            strikeCount: 40,
+          });
+          const keys = Object.keys(prevData.history).map(Number).sort((a, b) => a - b);
+          if (keys.length > 0) {
+            const latestSnap = prevData.history[keys[keys.length - 1]];
+            walls = {
+              call_wall: latestSnap.call_wall,
+              put_wall: latestSnap.put_wall,
+              gamma_flip: latestSnap.gamma_flip,
+            };
+            if (active) {
+              setPrevEodLevels({
+                date: prevDate,
+                ...walls,
+              });
+            }
+          } else {
+            if (active) setPrevEodLevels(null);
+          }
+        } catch (err) {
+          console.warn("Could not load previous day GEX levels, falling back:", err);
+          if (active) setPrevEodLevels(null);
+        }
+
+        // 2. Fetch actual intraday price candles from backend
         const priceCandles = await api.getStockCandles(activeChartTicker, selectedDate);
         if (!active) return;
 
-        // Map GEX levels onto each candle from the corresponding snapshot in snapshotsHistory
+        // Map GEX levels onto each candle
         const formattedCandles = priceCandles.map((c) => {
-          // Find option snapshot at exact timestamp or closest within 2.5 minutes
-          const snapKey = Object.keys(tickerHistory)
-            .map(Number)
-            .find((ts) => Math.abs(ts - c.time) < 150);
-          
-          const snap = snapKey ? tickerHistory[snapKey] : null;
+          // If using prior levels, assign previous day EOD walls. Otherwise look up corresponding active day snapshot
+          let callWall = walls.call_wall;
+          let putWall = walls.put_wall;
+          let flip = walls.gamma_flip;
+
+          if (gexSource === 'active') {
+            const snapKey = Object.keys(tickerHistory)
+              .map(Number)
+              .find((ts) => Math.abs(ts - c.time) < 150);
+            const snap = snapKey ? tickerHistory[snapKey] : null;
+            callWall = snap?.call_wall ?? null;
+            putWall = snap?.put_wall ?? null;
+            flip = snap?.gamma_flip ?? null;
+          }
 
           return {
             time: c.time,
@@ -70,9 +132,9 @@ export function CompassChart() {
             low: c.low,
             close: c.close,
             spot_price: c.close,
-            call_wall: snap?.call_wall ?? null,
-            put_wall: snap?.put_wall ?? null,
-            gamma_flip: snap?.gamma_flip ?? null,
+            call_wall: callWall,
+            put_wall: putWall,
+            gamma_flip: flip,
           };
         });
 
@@ -89,7 +151,7 @@ export function CompassChart() {
     return () => {
       active = false;
     };
-  }, [activeChartTicker, selectedDate, tickerHistory]);
+  }, [activeChartTicker, selectedDate, gexSource, tickerHistory]);
 
   // Find currently active candle matching the timeline slider playhead (closest 2.5-minute match)
   const activeCandle = currentTimestamp
@@ -199,7 +261,7 @@ export function CompassChart() {
     };
   }, [activeChartTicker, colorTheme]);
 
-  // 2. Reactively update candles, price lines, and markers
+  // 2. Reactively update candles data and active markers
   useEffect(() => {
     const series = candlestickSeriesRef.current;
     if (!series || candles.length === 0) return;
@@ -207,69 +269,7 @@ export function CompassChart() {
     // Load series data
     series.setData(candles);
 
-    // Clean up previous price lines
-    if (spotLineRef.current) {
-      series.removePriceLine(spotLineRef.current);
-      spotLineRef.current = null;
-    }
-    if (callLineRef.current) {
-      series.removePriceLine(callLineRef.current);
-      callLineRef.current = null;
-    }
-    if (putLineRef.current) {
-      series.removePriceLine(putLineRef.current);
-      putLineRef.current = null;
-    }
-    if (flipLineRef.current) {
-      series.removePriceLine(flipLineRef.current);
-      flipLineRef.current = null;
-    }
-
-    // 2. Draw static horizontal settled levels from previous EOD
-    if (callWallVal != null) {
-      callLineRef.current = series.createPriceLine({
-        price: callWallVal,
-        color: '#00e676',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: 'Call Wall',
-      });
-    }
-    if (putWallVal != null) {
-      putLineRef.current = series.createPriceLine({
-        price: putWallVal,
-        color: colorTheme === 'classic' ? '#f87171' : '#c084fc',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: 'Put Wall',
-      });
-    }
-    if (flipVal != null) {
-      flipLineRef.current = series.createPriceLine({
-        price: flipVal,
-        color: '#fbbf24',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
-        axisLabelVisible: true,
-        title: 'Gamma Flip',
-      });
-    }
-
-    // 3. Draw dynamic solid price line for active spot replay position
-    if (spotPriceVal != null) {
-      spotLineRef.current = series.createPriceLine({
-        price: spotPriceVal,
-        color: '#f59e0b',
-        lineWidth: 2,
-        lineStyle: LineStyle.Solid,
-        axisLabelVisible: true,
-        title: 'Spot Price',
-      });
-    }
-
-    // 4. Draw a dynamic marker bubble directly on the playhead candle
+    // Draw a dynamic marker bubble directly on the playhead candle
     const markers: any[] = [];
     if (activeCandle && activeCandle.close) {
       markers.push({
@@ -284,7 +284,121 @@ export function CompassChart() {
     if (seriesMarkersRef.current) {
       seriesMarkersRef.current.setMarkers(markers);
     }
-  }, [candles, spotPriceVal, callWallVal, putWallVal, flipVal, activeCandle, colorTheme]);
+  }, [candles, activeCandle]);
+
+  // 3. Draw options level bubbles dynamically sized on canvas overlay
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current;
+    const chart = chartRef.current;
+    const series = candlestickSeriesRef.current;
+    if (!canvas || !chart || !series || candles.length === 0) return;
+
+    let animFrameId: number;
+
+    const draw = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Match high DPI scaling
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.clientWidth * dpr;
+      canvas.height = canvas.clientHeight * dpr;
+      ctx.scale(dpr, dpr);
+
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      // Helper to sum up options net positioning (GEX/OI) at a specific strike
+      const getGexSumForStrike = (snap: any, strike: number) => {
+        if (!snap || !snap.rows || !snap.data) return 0;
+        const idx = snap.rows.indexOf(strike);
+        if (idx === -1) return 0;
+        return snap.data[idx].reduce((sum: number, val: number) => sum + Math.abs(val), 0);
+      };
+
+      // Loop through and draw bubbles for each candle
+      candles.forEach((c) => {
+        const x = chart.timeScale().timeToCoordinate(c.time as any);
+        if (x === null || x < 0 || x > canvas.clientWidth) return;
+
+        // Find active snapshot for this candle
+        const snapKey = Object.keys(tickerHistory)
+          .map(Number)
+          .find((ts) => Math.abs(ts - c.time) < 150);
+        const snap = snapKey ? tickerHistory[snapKey] : null;
+
+        // 1. Draw Call Wall bubble
+        if (c.call_wall != null) {
+          const y = series.priceToCoordinate(c.call_wall);
+          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
+            const gexSum = getGexSumForStrike(snap, c.call_wall);
+            // Dynamic radius: 4px to 16px based on GEX magnitude (normalized by billions)
+            const radius = 4 + Math.min(12, (gexSum / 1e9) * 2.5);
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(52, 211, 153, 0.22)';
+            ctx.strokeStyle = 'rgba(52, 211, 153, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        // 2. Draw Put Wall bubble
+        if (c.put_wall != null) {
+          const y = series.priceToCoordinate(c.put_wall);
+          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
+            const gexSum = getGexSumForStrike(snap, c.put_wall);
+            const radius = 4 + Math.min(12, (gexSum / 1e9) * 2.5);
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = colorTheme === 'classic'
+              ? 'rgba(248, 113, 113, 0.22)'
+              : 'rgba(192, 132, 252, 0.22)';
+            ctx.strokeStyle = colorTheme === 'classic'
+              ? 'rgba(248, 113, 113, 0.7)'
+              : 'rgba(192, 132, 252, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        // 3. Draw Gamma Flip bubble (small constant golden anchor indicator)
+        if (c.gamma_flip != null) {
+          const y = series.priceToCoordinate(c.gamma_flip);
+          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.35)';
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+      });
+    };
+
+    const triggerRedraw = () => {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = requestAnimationFrame(draw);
+    };
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(triggerRedraw);
+    chart.subscribeCrosshairMove(triggerRedraw);
+    triggerRedraw();
+
+    window.addEventListener('resize', triggerRedraw);
+
+    return () => {
+      cancelAnimationFrame(animFrameId);
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(triggerRedraw);
+      chart.unsubscribeCrosshairMove(triggerRedraw);
+      window.removeEventListener('resize', triggerRedraw);
+    };
+  }, [candles, colorTheme, gexSource, tickerHistory]);
 
   return (
     <div className={styles.container}>
@@ -292,6 +406,11 @@ export function CompassChart() {
       <div className={styles.header}>
         <div className={styles.titleArea}>
           <span className={styles.title}>Real-Time Chart</span>
+          {prevEodLevels && gexSource === 'prior' && (
+            <span className={styles.subtitle}>
+              Prior day close: {prevEodLevels.date}
+            </span>
+          )}
         </div>
 
         {/* Dynamic GEX Options levels readout */}
@@ -322,18 +441,37 @@ export function CompassChart() {
           )}
         </div>
 
-        {/* Ticker selector tabs */}
-        <div className={styles.tickerSelector}>
-          {CHART_TICKERS.map((t) => (
+        {/* Source Toggle + Ticker selectors */}
+        <div className={styles.controls}>
+          <div className={styles.toggleGroup}>
             <button
-              key={t}
               type="button"
-              className={`${styles.tickerBtn} ${t === activeChartTicker ? styles.tickerBtnActive : ''}`}
-              onClick={() => setActiveChartTicker(t)}
+              className={`${styles.toggleBtn} ${gexSource === 'active' ? styles.toggleBtnActive : ''}`}
+              onClick={() => setGexSource('active')}
             >
-              {t}
+              Active
             </button>
-          ))}
+            <button
+              type="button"
+              className={`${styles.toggleBtn} ${gexSource === 'prior' ? styles.toggleBtnActive : ''}`}
+              onClick={() => setGexSource('prior')}
+            >
+              Prior Day
+            </button>
+          </div>
+
+          <div className={styles.tickerSelector}>
+            {CHART_TICKERS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`${styles.tickerBtn} ${t === activeChartTicker ? styles.tickerBtnActive : ''}`}
+                onClick={() => setActiveChartTicker(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -361,6 +499,9 @@ export function CompassChart() {
             </div>
           </div>
         )}
+
+        {/* Transparent Overlay Canvas for drawing dynamic GEX bubbles */}
+        <canvas ref={overlayCanvasRef} className={styles.overlayCanvas} />
 
         {/* Core Canvas Element */}
         <div ref={chartContainerRef} className={styles.chartContainer} />
