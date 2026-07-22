@@ -286,7 +286,60 @@ export function CompassChart() {
     }
   }, [candles, activeCandle]);
 
-  // 3. Draw options level bubbles dynamically sized on canvas overlay
+  // Helper to segment a specific level (constant blocks) for horizontal capsule rendering
+  const getLevelSegments = (levelKey: 'call_wall' | 'put_wall' | 'gamma_flip') => {
+    const segments: {
+      price: number;
+      startIdx: number;
+      endIdx: number;
+      gexSum: number;
+    }[] = [];
+
+    let currentSeg: typeof segments[0] | null = null;
+
+    // Helper to sum options size at strike
+    const getGexSumForStrike = (snap: any, strike: number) => {
+      if (!snap || !snap.rows || !snap.data) return 0;
+      const idx = snap.rows.indexOf(strike);
+      if (idx === -1) return 0;
+      return snap.data[idx].reduce((sum: number, val: number) => sum + Math.abs(val), 0);
+    };
+
+    candles.forEach((c, idx) => {
+      const val = c[levelKey];
+      if (val === null || val === undefined) {
+        if (currentSeg) {
+          segments.push(currentSeg);
+          currentSeg = null;
+        }
+        return;
+      }
+
+      const snapKey = Object.keys(tickerHistory)
+        .map(Number)
+        .find((ts) => Math.abs(ts - c.time) < 150);
+      const snap = snapKey ? tickerHistory[snapKey] : null;
+      const gexSum = getGexSumForStrike(snap, val);
+
+      if (!currentSeg) {
+        currentSeg = { price: val, startIdx: idx, endIdx: idx, gexSum };
+      } else if (currentSeg.price === val) {
+        currentSeg.endIdx = idx;
+        currentSeg.gexSum = Math.max(currentSeg.gexSum, gexSum);
+      } else {
+        segments.push(currentSeg);
+        currentSeg = { price: val, startIdx: idx, endIdx: idx, gexSum };
+      }
+    });
+
+    if (currentSeg) {
+      segments.push(currentSeg);
+    }
+
+    return segments;
+  };
+
+  // 3. Draw options level capsules dynamically sized on canvas overlay
   useEffect(() => {
     const canvas = overlayCanvasRef.current;
     const chart = chartRef.current;
@@ -307,78 +360,64 @@ export function CompassChart() {
 
       ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-      // Helper to sum up options net positioning (GEX/OI) at a specific strike
-      const getGexSumForStrike = (snap: any, strike: number) => {
-        if (!snap || !snap.rows || !snap.data) return 0;
-        const idx = snap.rows.indexOf(strike);
-        if (idx === -1) return 0;
-        return snap.data[idx].reduce((sum: number, val: number) => sum + Math.abs(val), 0);
+      // Segment the levels to draw capsules instead of repeating circles
+      const callSegments = getLevelSegments('call_wall');
+      const putSegments = getLevelSegments('put_wall');
+      const flipSegments = getLevelSegments('gamma_flip');
+
+      // Helper to draw horizontal capsule pills
+      const drawSegmentPills = (
+        segments: any[],
+        colorFill: string,
+        colorStroke: string,
+        isFlip = false
+      ) => {
+        segments.forEach((seg) => {
+          const x1 = chart.timeScale().timeToCoordinate(candles[seg.startIdx].time as any);
+          const x2 = chart.timeScale().timeToCoordinate(candles[seg.endIdx].time as any);
+          
+          if (x1 === null || x2 === null) return;
+          
+          // Limit rendering points slightly outside container limits for smooth scrolling
+          const visibleX1 = Math.max(-50, Math.min(canvas.clientWidth + 50, x1));
+          const visibleX2 = Math.max(-50, Math.min(canvas.clientWidth + 50, x2));
+
+          const y = series.priceToCoordinate(seg.price);
+          if (y === null || y < 0 || y > canvas.clientHeight) return;
+
+          // Determine capsule radius/thickness based on GEX magnitude
+          const radius = isFlip ? 3 : (4 + Math.min(12, (seg.gexSum / 1e9) * 2.5));
+
+          ctx.beginPath();
+          if (Math.abs(visibleX2 - visibleX1) < 2) {
+            // Draw a standard circle if width is tiny
+            ctx.arc(visibleX1, y, radius, 0, 2 * Math.PI);
+          } else {
+            // Draw a horizontal capsule pill
+            ctx.arc(visibleX1, y, radius, 0.5 * Math.PI, 1.5 * Math.PI); // left rounded cap
+            ctx.lineTo(visibleX2, y - radius); // top side
+            ctx.arc(visibleX2, y, radius, 1.5 * Math.PI, 0.5 * Math.PI); // right rounded cap
+            ctx.lineTo(visibleX1, y + radius); // bottom side
+          }
+          ctx.closePath();
+          ctx.fillStyle = colorFill;
+          ctx.strokeStyle = colorStroke;
+          ctx.lineWidth = 1;
+          ctx.fill();
+          ctx.stroke();
+        });
       };
 
-      // Loop through and draw bubbles for each candle
-      candles.forEach((c) => {
-        const x = chart.timeScale().timeToCoordinate(c.time as any);
-        if (x === null || x < 0 || x > canvas.clientWidth) return;
+      // Draw Call Wall capsules (Green)
+      drawSegmentPills(callSegments, 'rgba(52, 211, 153, 0.16)', 'rgba(52, 211, 153, 0.65)');
 
-        // Find active snapshot for this candle
-        const snapKey = Object.keys(tickerHistory)
-          .map(Number)
-          .find((ts) => Math.abs(ts - c.time) < 150);
-        const snap = snapKey ? tickerHistory[snapKey] : null;
+      // Draw Put Wall capsules (Purple/Classic Red)
+      const putFill = colorTheme === 'classic' ? 'rgba(248, 113, 113, 0.16)' : 'rgba(192, 132, 252, 0.16)';
+      const putStroke = colorTheme === 'classic' ? 'rgba(248, 113, 113, 0.65)' : 'rgba(192, 132, 252, 0.65)';
+      drawSegmentPills(putSegments, putFill, putStroke);
 
-        // 1. Draw Call Wall bubble
-        if (c.call_wall != null) {
-          const y = series.priceToCoordinate(c.call_wall);
-          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
-            const gexSum = getGexSumForStrike(snap, c.call_wall);
-            // Dynamic radius: 4px to 16px based on GEX magnitude (normalized by billions)
-            const radius = 4 + Math.min(12, (gexSum / 1e9) * 2.5);
-
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = 'rgba(52, 211, 153, 0.22)';
-            ctx.strokeStyle = 'rgba(52, 211, 153, 0.7)';
-            ctx.lineWidth = 1;
-            ctx.fill();
-            ctx.stroke();
-          }
-        }
-
-        // 2. Draw Put Wall bubble
-        if (c.put_wall != null) {
-          const y = series.priceToCoordinate(c.put_wall);
-          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
-            const gexSum = getGexSumForStrike(snap, c.put_wall);
-            const radius = 4 + Math.min(12, (gexSum / 1e9) * 2.5);
-
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = colorTheme === 'classic'
-              ? 'rgba(248, 113, 113, 0.22)'
-              : 'rgba(192, 132, 252, 0.22)';
-            ctx.strokeStyle = colorTheme === 'classic'
-              ? 'rgba(248, 113, 113, 0.7)'
-              : 'rgba(192, 132, 252, 0.7)';
-            ctx.lineWidth = 1;
-            ctx.fill();
-            ctx.stroke();
-          }
-        }
-
-        // 3. Draw Gamma Flip bubble (small constant golden anchor indicator)
-        if (c.gamma_flip != null) {
-          const y = series.priceToCoordinate(c.gamma_flip);
-          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
-            ctx.beginPath();
-            ctx.arc(x, y, 3, 0, 2 * Math.PI);
-            ctx.fillStyle = 'rgba(251, 191, 36, 0.35)';
-            ctx.strokeStyle = 'rgba(251, 191, 36, 0.8)';
-            ctx.lineWidth = 1;
-            ctx.fill();
-            ctx.stroke();
-          }
-        }
-      });
+      // Draw Gamma Flip capsules (Yellow/Amber line indicator)
+      drawSegmentPills(flipSegments, 'rgba(251, 191, 36, 0.25)', 'rgba(251, 191, 36, 0.75)', true);
     };
 
     const triggerRedraw = () => {
@@ -395,7 +434,7 @@ export function CompassChart() {
     return () => {
       cancelAnimationFrame(animFrameId);
       chart.timeScale().unsubscribeVisibleTimeRangeChange(triggerRedraw);
-      chart.unsubscribeCrosshairMove(triggerRedraw);
+      chart.subscribeCrosshairMove(triggerRedraw);
       window.removeEventListener('resize', triggerRedraw);
     };
   }, [candles, colorTheme, gexSource, tickerHistory]);
