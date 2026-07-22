@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, LineStyle, IChartApi, CandlestickSeries, createSeriesMarkers } from 'lightweight-charts';
+import { createChart, LineStyle, IChartApi, CandlestickSeries, createSeriesMarkers, LineSeries } from 'lightweight-charts';
 import { useAppStore } from '../../store/useAppStore';
+import type { HeatmapSnapshot } from '../../types';
 import styles from './CompassChart.module.css';
 
 const CHART_TICKERS = ['SPY', 'QQQ', 'IWM'];
@@ -23,11 +24,13 @@ export function CompassChart() {
   const candlestickSeriesRef = useRef<any>(null);
   const seriesMarkersRef = useRef<any>(null);
 
+  // Refs for continuous line series
+  const callSeriesRef = useRef<any>(null);
+  const putSeriesRef = useRef<any>(null);
+  const flipSeriesRef = useRef<any>(null);
+
   // References for dynamic price lines to update on replay slider
   const spotLineRef = useRef<any>(null);
-  const callLineRef = useRef<any>(null);
-  const putLineRef = useRef<any>(null);
-  const flipLineRef = useRef<any>(null);
 
   // Zustand Store queries
   const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
@@ -46,31 +49,106 @@ export function CompassChart() {
 
   // Re-generate candlestick series data
   const candles: CandleData[] = [];
-  for (let i = 0; i < historyTimestamps.length; i++) {
-    const ts = historyTimestamps[i];
-    const snap = tickerHistory[ts];
-    if (!snap || snap.spot_price == null) continue;
+  if (historyTimestamps.length > 1) {
+    // We have a full intraday snapshots history
+    for (let i = 0; i < historyTimestamps.length; i++) {
+      const ts = historyTimestamps[i];
+      const snap = tickerHistory[ts];
+      if (!snap || snap.spot_price == null) continue;
 
-    const price = snap.spot_price;
-    const prevPrice =
-      i > 0
-        ? tickerHistory[historyTimestamps[i - 1]]?.spot_price ?? price
-        : price;
+      const price = snap.spot_price;
+      const prevPrice =
+        i > 0
+          ? tickerHistory[historyTimestamps[i - 1]]?.spot_price ?? price
+          : price;
 
-    const open = prevPrice;
-    const close = price;
-    const range = Math.abs(close - open);
-    const noise = range > 0 ? range * 0.15 : price * 0.0003;
-    const high = Math.max(open, close) + noise;
-    const low = Math.min(open, close) - noise;
+      const open = prevPrice;
+      const close = price;
+      const range = Math.abs(close - open);
+      const noise = range > 0 ? range * 0.15 : price * 0.0003;
+      const high = Math.max(open, close) + noise;
+      const low = Math.min(open, close) - noise;
 
-    candles.push({
-      time: ts as any,
+      candles.push({
+        time: ts as any,
+        open,
+        high,
+        low,
+        close,
+        spot_price: price,
+        call_wall: snap.call_wall,
+        put_wall: snap.put_wall,
+        gamma_flip: snap.gamma_flip,
+      });
+    }
+  } else if (historyTimestamps.length === 1) {
+    // Only one snapshot (usually historical End-of-Day). Generate a simulated 78-candle trading day (9:30 AM to 4:00 PM Eastern, 5m bars)
+    const T = historyTimestamps[0];
+    const snap = tickerHistory[T];
+    if (snap && snap.spot_price != null) {
+      const EOD_price = snap.spot_price;
+      const baseDate = new Date(T * 1000);
+      const year = baseDate.getUTCFullYear();
+      const month = baseDate.getUTCMonth();
+      const day = baseDate.getUTCDate();
+
+      // Session start standard UTC hour based on timezone shifts: 13:30 UTC / 14:30 UTC
+      const startHour = baseDate.getUTCHours() < 14 ? 13 : 14;
+      const startMin = 30;
+      const minTimeDate = new Date(Date.UTC(year, month, day, startHour, startMin, 0));
+      const minTime = Math.floor(minTimeDate.getTime() / 1000);
+
+      // Generate 78 simulated 5-minute ticks
+      const simulatedTimestamps: number[] = [];
+      for (let j = 0; j < 78; j++) {
+        simulatedTimestamps.push(minTime + j * 5 * 60);
+      }
+
+      // Simulated random walk ending exactly at EOD_price
+      const priceRange = EOD_price * 0.012; // 1.2% maximum variance
+      // Pseudo-random deterministic seed offset based on ticker to keep it stable
+      const seedOffset = activeChartTicker === 'QQQ' ? 0.3 : activeChartTicker === 'IWM' ? -0.2 : 0.05;
+      const startPrice = EOD_price - (0.5 + seedOffset) * priceRange;
+
+      let lastPrice = startPrice;
+      for (let j = 0; j < 78; j++) {
+        const ts = simulatedTimestamps[j];
+        const progress = j / 77;
+        // Glide towards final EOD close price
+        const target = startPrice + (EOD_price - startPrice) * progress;
+        // Pseudo-random noise
+        const walk = (Math.sin(j * 0.45) * 0.3 + Math.cos(j * 0.95) * 0.2) * (EOD_price * 0.0006);
+        const close = j === 77 ? EOD_price : target + walk;
+
+        const open = lastPrice;
+        const range = Math.abs(close - open);
+        const noise = range > 0 ? range * 0.12 : close * 0.00025;
+        const high = Math.max(open, close) + noise;
+        const low = Math.min(open, close) - noise;
+
+        simulatedCandlesPushHelper(candles, ts, open, high, low, close, snap);
+        lastPrice = close;
+      }
+    }
+  }
+
+  // Local helper function to satisfy TypeScript compiler
+  function simulatedCandlesPushHelper(
+    arr: CandleData[],
+    time: number,
+    open: number,
+    high: number,
+    low: number,
+    close: number,
+    snap: HeatmapSnapshot
+  ) {
+    arr.push({
+      time: time as any,
       open,
       high,
       low,
       close,
-      spot_price: price,
+      spot_price: close,
       call_wall: snap.call_wall,
       put_wall: snap.put_wall,
       gamma_flip: snap.gamma_flip,
@@ -140,11 +218,37 @@ export function CompassChart() {
       wickDownColor: downColor,
     });
 
+    // Create continuous LineSeries for GEX levels
+    const callSeries = chart.addSeries(LineSeries, {
+      color: '#00e676',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      title: 'Call Wall',
+      priceLineVisible: false,
+    });
+    const putSeries = chart.addSeries(LineSeries, {
+      color: isClassic ? '#ff3d00' : '#c084fc',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      title: 'Put Wall',
+      priceLineVisible: false,
+    });
+    const flipSeries = chart.addSeries(LineSeries, {
+      color: '#fbbf24',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dotted,
+      title: 'Flip Level',
+      priceLineVisible: false,
+    });
+
     // Initialize series markers plugin api
     seriesMarkersRef.current = createSeriesMarkers(candlestickSeries, []);
 
     chartRef.current = chart;
     candlestickSeriesRef.current = candlestickSeries;
+    callSeriesRef.current = callSeries;
+    putSeriesRef.current = putSeries;
+    flipSeriesRef.current = flipSeries;
 
     // Subscribe to crosshair hover moves to update legends display
     chart.subscribeCrosshairMove((param) => {
@@ -176,9 +280,15 @@ export function CompassChart() {
     return () => {
       resizeObserver.disconnect();
       chart.removeSeries(candlestickSeries);
+      chart.removeSeries(callSeries);
+      chart.removeSeries(putSeries);
+      chart.removeSeries(flipSeries);
       chart.remove();
       chartRef.current = null;
       candlestickSeriesRef.current = null;
+      callSeriesRef.current = null;
+      putSeriesRef.current = null;
+      flipSeriesRef.current = null;
       seriesMarkersRef.current = null;
     };
   }, [activeChartTicker, colorTheme]); // Recreate chart if ticker or theme switches
@@ -191,72 +301,40 @@ export function CompassChart() {
     // Load series data
     series.setData(candles);
 
-    // Dynamic price lines management
-    // 1. Remove previous price lines
+    // Load continuous GEX line series data
+    const callData = candles
+      .filter((c) => c.call_wall != null)
+      .map((c) => ({ time: c.time as any, value: c.call_wall as number }));
+    const putData = candles
+      .filter((c) => c.put_wall != null)
+      .map((c) => ({ time: c.time as any, value: c.put_wall as number }));
+    const flipData = candles
+      .filter((c) => c.gamma_flip != null)
+      .map((c) => ({ time: c.time as any, value: c.gamma_flip as number }));
+
+    if (callSeriesRef.current) callSeriesRef.current.setData(callData);
+    if (putSeriesRef.current) putSeriesRef.current.setData(putData);
+    if (flipSeriesRef.current) flipSeriesRef.current.setData(flipData);
+
+    // Dynamic price lines management (only Spot Price line dynamically tracks scrubber)
     if (spotLineRef.current) {
       series.removePriceLine(spotLineRef.current);
       spotLineRef.current = null;
     }
-    if (callLineRef.current) {
-      series.removePriceLine(callLineRef.current);
-      callLineRef.current = null;
-    }
-    if (putLineRef.current) {
-      series.removePriceLine(putLineRef.current);
-      putLineRef.current = null;
-    }
-    if (flipLineRef.current) {
-      series.removePriceLine(flipLineRef.current);
-      flipLineRef.current = null;
-    }
 
-    // 2. Fetch current replay snap
-    const currentSnap = currentTimestamp ? tickerHistory[currentTimestamp] : null;
-    if (currentSnap) {
-      // Spot Price Line
-      if (currentSnap.spot_price) {
-        spotLineRef.current = series.createPriceLine({
-          price: currentSnap.spot_price,
-          color: '#f59e0b',
-          lineWidth: 2, // Must be 1, 2, 3 or 4
-          lineStyle: LineStyle.Solid,
-          axisLabelVisible: true,
-          title: 'Spot Price',
-        });
-      }
-      // Call Wall Line (Mint Green / Emerald)
-      if (currentSnap.call_wall) {
-        callLineRef.current = series.createPriceLine({
-          price: currentSnap.call_wall,
-          color: '#00e676',
-          lineWidth: 1, // Must be 1, 2, 3 or 4
-          lineStyle: LineStyle.Dashed,
-          axisLabelVisible: true,
-          title: 'Call Wall',
-        });
-      }
-      // Put Wall Line (Coral Red vs Purple)
-      if (currentSnap.put_wall) {
-        putLineRef.current = series.createPriceLine({
-          price: currentSnap.put_wall,
-          color: colorTheme === 'classic' ? '#ff3d00' : '#c084fc',
-          lineWidth: 1, // Must be 1, 2, 3 or 4
-          lineStyle: LineStyle.Dashed,
-          axisLabelVisible: true,
-          title: 'Put Wall',
-        });
-      }
-      // Gamma Flip Line (Gold/Amber)
-      if (currentSnap.gamma_flip) {
-        flipLineRef.current = series.createPriceLine({
-          price: currentSnap.gamma_flip,
-          color: '#fbbf24',
-          lineWidth: 1, // Must be 1, 2, 3 or 4
-          lineStyle: LineStyle.Dotted,
-          axisLabelVisible: true,
-          title: 'Flip Level',
-        });
-      }
+    // Resolve the current spot price matching the timeline playhead scrubber
+    // Since history might only have 1 timestamp (EOD) and candles has simulated intraday session,
+    // match playhead close value to activeCandle
+    const resolvedPrice = activeCandle ? activeCandle.close : null;
+    if (resolvedPrice != null) {
+      spotLineRef.current = series.createPriceLine({
+        price: resolvedPrice,
+        color: '#f59e0b',
+        lineWidth: 2, // Solid playhead line
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: 'Spot Price',
+      });
     }
 
     // 3. Populate dynamic bubble markers: Shifts + Active Wall Highlights
@@ -288,7 +366,11 @@ export function CompassChart() {
       }
 
       // Add a distinct highlight exactly at the current active playhead timestamp
-      if (currentTimestamp !== null && c.time === currentTimestamp) {
+      const activeMatch = currentTimestamp !== null 
+        ? (c.time === currentTimestamp) 
+        : (activeCandle && c.time === activeCandle.time);
+
+      if (activeMatch) {
         if (c.spot_price) {
           markers.push({
             time: c.time as any,
@@ -304,7 +386,7 @@ export function CompassChart() {
     if (seriesMarkersRef.current) {
       seriesMarkersRef.current.setMarkers(markers);
     }
-  }, [candles.length, currentTimestamp, activeChartTicker, colorTheme]);
+  }, [candles.length, currentTimestamp, activeChartTicker, colorTheme, activeCandle]);
 
   // Handle manual ticker switch
   const handleTickerSwitch = (t: string) => {
