@@ -95,6 +95,17 @@ export function CompassChart() {
   const putWallVal = prevEodLevels?.put_wall ?? activeSnap?.put_wall;
   const flipVal = prevEodLevels?.gamma_flip ?? activeSnap?.gamma_flip;
 
+  // Calculate day high/low boundaries from snapshots to position dynamic overlay bubbles
+  const prices = historyTimestamps.map((t) => tickerHistory[t]?.spot_price).filter((p): p is number => p != null);
+  const dayLow = prices.length > 0 ? Math.min(...prices) * 0.995 : 0;
+  const dayHigh = prices.length > 0 ? Math.max(...prices) * 1.005 : 100;
+
+  const getVerticalPercent = (val: number | null | undefined) => {
+    if (!val || dayHigh === dayLow) return 0;
+    const pct = ((val - dayLow) / (dayHigh - dayLow)) * 100;
+    return Math.max(5, Math.min(95, pct)); // clamp safety margin
+  };
+
   // Initialize TradingView Advanced Real-Time Chart widget
   const containerId = `tv-advanced-chart-${activeChartTicker.toLowerCase()}`;
   
@@ -154,6 +165,34 @@ export function CompassChart() {
           )}
         </div>
 
+        {/* Dynamic Options Levels readout inside the header */}
+        <div className={styles.headerStats}>
+          {spotPriceVal != null && (
+            <div className={styles.headerStatItem} style={{ borderLeft: '3px solid #f59e0b' }}>
+              <span className={styles.statLabel}>Spot</span>
+              <span className={styles.statVal}>${spotPriceVal.toFixed(2)}</span>
+            </div>
+          )}
+          {callWallVal != null && (
+            <div className={styles.headerStatItem} style={{ borderLeft: '3px solid #34d399' }}>
+              <span className={styles.statLabel}>Call Wall</span>
+              <span className={styles.statVal}>${callWallVal.toFixed(0)}</span>
+            </div>
+          )}
+          {putWallVal != null && (
+            <div className={styles.headerStatItem} style={{ borderLeft: `3px solid ${colorTheme === 'classic' ? '#f87171' : '#c084fc'}` }}>
+              <span className={styles.statLabel}>Put Wall</span>
+              <span className={styles.statVal}>${putWallVal.toFixed(0)}</span>
+            </div>
+          )}
+          {flipVal != null && (
+            <div className={styles.headerStatItem} style={{ borderLeft: '3px solid #fbbf24' }}>
+              <span className={styles.statLabel}>Flip</span>
+              <span className={styles.statVal}>${flipVal.toFixed(0)}</span>
+            </div>
+          )}
+        </div>
+
         {/* Ticker selector tabs */}
         <div className={styles.tickerSelector}>
           {CHART_TICKERS.map((t) => (
@@ -175,34 +214,58 @@ export function CompassChart() {
           <div id={containerId} className={styles.widgetIframe} />
         </div>
 
-        {/* Floating options levels indicator dashboard */}
-        <div className={styles.overlay}>
-          <div className={styles.statsGrid}>
-            {spotPriceVal != null && (
-              <div className={styles.statItem} style={{ borderLeft: '3px solid #f59e0b' }}>
-                <span className={styles.statLabel}>Spot Price</span>
-                <span className={styles.statVal}>${spotPriceVal.toFixed(2)}</span>
-              </div>
-            )}
-            {callWallVal != null && (
-              <div className={styles.statItem} style={{ borderLeft: '3px solid #34d399' }}>
-                <span className={styles.statLabel}>Call Wall</span>
-                <span className={styles.statVal}>${callWallVal.toFixed(0)}</span>
-              </div>
-            )}
-            {putWallVal != null && (
-              <div className={styles.statItem} style={{ borderLeft: `3px solid ${colorTheme === 'classic' ? '#f87171' : '#c084fc'}` }}>
-                <span className={styles.statLabel}>Put Wall</span>
-                <span className={styles.statVal}>${putWallVal.toFixed(0)}</span>
-              </div>
-            )}
-            {flipVal != null && (
-              <div className={styles.statItem} style={{ borderLeft: '3px solid #fbbf24' }}>
-                <span className={styles.statLabel}>Gamma Flip</span>
-                <span className={styles.statVal}>${flipVal.toFixed(0)}</span>
-              </div>
-            )}
-          </div>
+        {/* Floating vertical depth gauge overlay showing options level bubbles */}
+        <div className={styles.ruler}>
+          {callWallVal != null && (
+            <div
+              className={styles.levelBubble}
+              style={{
+                bottom: `${getVerticalPercent(callWallVal)}%`,
+                borderColor: '#34d399',
+                color: '#34d399',
+              }}
+            >
+              C-Wall: ${callWallVal.toFixed(0)}
+            </div>
+          )}
+          {flipVal != null && (
+            <div
+              className={styles.levelBubble}
+              style={{
+                bottom: `${getVerticalPercent(flipVal)}%`,
+                borderColor: '#fbbf24',
+                color: '#fbbf24',
+              }}
+            >
+              Flip: ${flipVal.toFixed(0)}
+            </div>
+          )}
+          {spotPriceVal != null && (
+            <div
+              className={styles.levelBubble}
+              style={{
+                bottom: `${getVerticalPercent(spotPriceVal)}%`,
+                borderColor: '#f59e0b',
+                color: '#f59e0b',
+                background: 'rgba(245, 158, 11, 0.15)',
+                fontWeight: 800,
+              }}
+            >
+              Spot: ${spotPriceVal.toFixed(2)}
+            </div>
+          )}
+          {putWallVal != null && (
+            <div
+              className={styles.levelBubble}
+              style={{
+                bottom: `${getVerticalPercent(putWallVal)}%`,
+                borderColor: colorTheme === 'classic' ? '#f87171' : '#c084fc',
+                color: colorTheme === 'classic' ? '#f87171' : '#c084fc',
+              }}
+            >
+              P-Wall: ${putWallVal.toFixed(0)}
+            </div>
+          )}
         </div>
       </div>
     </div>

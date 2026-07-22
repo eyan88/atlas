@@ -41,6 +41,40 @@
   opacity: 0.85;
 }
 
+/* Header GEX levels stats panel */
+.headerStats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.headerStatItem {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statLabel {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statVal {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Ticker selectors */
 .tickerSelector {
   display: flex;
   background: rgba(255, 255, 255, 0.03);
@@ -89,49 +123,31 @@
   border: none;
 }
 
-/* Tooltip & Info Overlay */
-.overlay {
+/* GEX Level Depth Ruler overlay */
+.ruler {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 48px; /* Offset to stay clear of TradingView top widget controls */
+  bottom: 48px; /* Offset to stay clear of TradingView bottom time controls */
+  right: 68px; /* Positioned precisely inline with the TradingView price y-axis */
+  width: 90px;
   z-index: 100;
-  pointer-events: none; /* Let cursor mouse actions pass through to TradingView map clicks */
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  pointer-events: none; /* Let all click actions flow to the TradingView chart */
 }
 
-.statsGrid {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  pointer-events: auto; /* Re-enable pointer events for stat tooltips/badges */
-}
-
-.statItem {
-  background: rgba(13, 17, 23, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 5px 10px;
-  border-radius: 6px;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-}
-
-.statLabel {
+.levelBubble {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%); /* Centers the absolute bottom offset point */
+  padding: 3px 8px;
   font-size: 8px;
   font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.statVal {
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-primary);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(13, 17, 23, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  transition: bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
