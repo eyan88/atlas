@@ -50,11 +50,16 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
     try:
         # 1. Retrieve the closing stock price
         print("Fetching underlying close price...")
-        df_stock = client.stock_history_eod(
-            symbol=ticker,
-            start_date=backfill_date,
-            end_date=backfill_date
-        )
+        try:
+            df_stock = client.stock_history_eod(
+                symbol=ticker,
+                start_date=backfill_date,
+                end_date=backfill_date
+            )
+        except Exception as e:
+            print(f"Notice: No EOD stock price available for {ticker} on {backfill_date}: {e}")
+            return
+
         if df_stock.empty:
             print(f"No pricing data found for {ticker} on {backfill_date}. Is the market closed?")
             return

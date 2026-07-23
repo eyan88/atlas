@@ -215,8 +215,10 @@ def get_replay_timeline(
     ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
     # If no snapshots exist for this ticker on this date, trigger on-the-fly backfill
-    # Only do this for historical dates, not today (where data might just be arriving or market is closed)
-    if not timestamps and query_date < py_date.today():
+    # Only do this for historical dates strictly before Eastern Time today
+    import zoneinfo
+    eastern_today = datetime.now(timezone.utc).astimezone(zoneinfo.ZoneInfo("America/New_York")).date()
+    if not timestamps and query_date < eastern_today:
         from app.core.config import settings
         if settings.DATA_PROVIDER == "thetadata":
             try:
