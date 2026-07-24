@@ -55,23 +55,25 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
     const minTimeDate = new Date(Date.UTC(year, month, day, startHour, startMin, 0));
     const minTime = Math.floor(minTimeDate.getTime() / 1000);
-    const maxTime = minTime + 23400; // Exactly 6.5 hours later (23,400 seconds)
+    const maxSessionTime = minTime + 23400; // 4:00 PM close
 
-    // Static clean 1.5-hour interval tick times: 9:30, 11:00, 12:30, 14:00, 15:30, 16:00 Eastern
-    const tickTimes = [
-      minTime,
-      minTime + 5400,   // 11:00 AM
-      minTime + 10800,  // 12:30 PM
-      minTime + 16200,  // 02:00 PM
-      minTime + 21600,  // 03:30 PM
-      maxTime,          // 04:00 PM
-    ];
+    const latestDataTs = timestamps[timestamps.length - 1] || maxSessionTime;
+    const effectiveMaxTime = currentTimestamp
+      ? Math.min(currentTimestamp, maxSessionTime)
+      : latestDataTs;
+
+    const timeSpan = Math.max(300, effectiveMaxTime - minTime);
+
+    // Dynamic clean interval tick times from market open to current scrub position
+    const numTicks = 5;
+    const tickTimes: number[] = [];
+    for (let i = 0; i < numTicks; i++) {
+      tickTimes.push(minTime + (timeSpan * i) / (numTicks - 1));
+    }
 
     // Find the latest spot price from the visible segment to orient our zoom window
-    const visibleSegment = currentTimestamp
-      ? history.filter((h) => h.timestamp <= currentTimestamp)
-      : history;
-    const lastHistoryItem = visibleSegment[visibleSegment.length - 1] || history[history.length - 1];
+    const visibleSegment = validHistory.filter((h) => h.timestamp <= effectiveMaxTime);
+    const lastHistoryItem = visibleSegment[visibleSegment.length - 1] || validHistory[validHistory.length - 1];
     const currentSpot = lastHistoryItem ? lastHistoryItem.price : rawStrikes[Math.floor(rawStrikes.length / 2)];
 
     // Filter strikes to the closest N strikes around the spot price
@@ -215,10 +217,10 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       const rowGap = 1.0; // 1px clean row separation between strike prices
       const drawCellHeight = Math.max(1, cellHeight - rowGap);
 
-      // Helper coordinates (stabilized against fixed trading hours minTime/maxTime)
+      // Helper coordinates (dynamically mapped to minTime -> effectiveMaxTime)
       const getX = (ts: number) => {
-        if (maxTime === minTime) return margin.left;
-        return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
+        if (timeSpan === 0) return margin.left;
+        return margin.left + ((ts - minTime) / timeSpan) * chartWidth;
       };
 
       const getRowY = (strikeIdx: number) => {
@@ -226,7 +228,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       };
 
       // Resolve maximum timestamp currently allowed to display
-      const latestAllowedTs = currentTimestamp ?? maxTime;
+      const latestAllowedTs = effectiveMaxTime;
 
       // 2. Draw Heatmap Cells (Strictly clipped to Inner Plot Area with 1px row gap separation)
       ctx.save();

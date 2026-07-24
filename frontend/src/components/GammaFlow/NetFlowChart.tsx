@@ -50,23 +50,32 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     const startHour = dateRef.getUTCHours() < 14 ? 13 : 14;
     const startMin = 30;
 
+    // Determine dynamic right boundary based on current scrub position or latest data point
     const minTimeDate = new Date(Date.UTC(year, month, day, startHour, startMin, 0));
     const minTime = Math.floor(minTimeDate.getTime() / 1000);
-    const maxTime = minTime + 23400; // Exactly 6.5 hours later (23,400 seconds)
+    const maxSessionTime = minTime + 23400; // 4:00 PM close
 
-    // Static clean 1.5-hour interval tick times: 9:30, 11:00, 12:30, 14:00, 15:30, 16:00 Eastern
-    const tickTimes = [
-      minTime,
-      minTime + 5400,   // 11:00 AM
-      minTime + 10800,  // 12:30 PM
-      minTime + 16200,  // 02:00 PM
-      minTime + 21600,  // 03:30 PM
-      maxTime,          // 04:00 PM
-    ];
+    const latestDataTs = sorted[sorted.length - 1].timestamp;
+    const effectiveMaxTime = currentTimestamp
+      ? Math.min(currentTimestamp, maxSessionTime)
+      : latestDataTs;
 
-    // Find min and max values across both premium lines for primary Y-axis
-    const calls = sorted.map((h) => h.net_call_prem);
-    const puts = sorted.map((h) => h.net_put_prem);
+    const timeSpan = Math.max(300, effectiveMaxTime - minTime);
+
+    // Dynamic clean interval tick times from market open to current scrub position
+    const numTicks = 5;
+    const tickTimes: number[] = [];
+    for (let i = 0; i < numTicks; i++) {
+      tickTimes.push(minTime + (timeSpan * i) / (numTicks - 1));
+    }
+
+    // Only render data points up to effectiveMaxTime
+    const visibleHistory = sorted.filter((h) => h.timestamp <= effectiveMaxTime);
+    if (visibleHistory.length === 0) return;
+
+    // Find min and max values across visible premium lines for primary Y-axis
+    const calls = visibleHistory.map((h) => h.net_call_prem);
+    const puts = visibleHistory.map((h) => h.net_put_prem);
     const rawMaxVal = Math.max(...calls, ...puts, 1e6);
     const rawMinVal = Math.min(...calls, ...puts, 0);
     const rawValRange = (rawMaxVal - rawMinVal) || 1e6;
@@ -77,7 +86,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     const valRange = maxVal - minVal;
 
     // Find min and max for spot prices (for secondary axis)
-    const spots = sorted.map((h) => h.price);
+    const spots = visibleHistory.map((h) => h.price);
     const maxSpot = Math.max(...spots);
     const minSpot = Math.min(...spots);
     const spotRange = maxSpot - minSpot;
@@ -107,10 +116,10 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
-      // Get screen coordinates helper (stabilized using fixed trading hours minTime/maxTime)
+      // Get screen coordinates helper (dynamically mapped to minTime -> effectiveMaxTime)
       const getX = (ts: number) => {
-        if (maxTime === minTime) return margin.left;
-        return margin.left + ((ts - minTime) / (maxTime - minTime)) * chartWidth;
+        if (timeSpan === 0) return margin.left;
+        return margin.left + ((ts - minTime) / timeSpan) * chartWidth;
       };
 
       // Primary Y-Axis coordinate (Premium Flow - Left axis)

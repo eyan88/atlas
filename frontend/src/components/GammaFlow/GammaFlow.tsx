@@ -137,17 +137,8 @@ export function GammaFlow() {
     let active = true;
     let timerId: any = null;
 
-    // Instant pre-fill from cached dashboard data if available to avoid loading flicker
-    const cached = dashboardData[currentTicker];
-    if (cached && cached.gammaHistory && cached.gammaHistory.length > 0) {
-      setSpot(cached.spot);
-      setNetFlow(cached.netFlow);
-      setNetFlowHistory(cached.netFlowHistory);
-      setGammaHistory(cached.gammaHistory);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
+    // Always show loading spinner on date change or ticker switch
+    setLoading(true);
 
     // 1. Fetch full historical baseline ONCE per ticker / date change
     const fetchHistory = async () => {
@@ -399,10 +390,7 @@ export function GammaFlow() {
       }
     };
 
-    if (Object.keys(dashboardData).length === 0) {
-      setLoading(true);
-    }
-
+    setLoading(true);
     fetchDashboardHistory();
 
     if (isToday) {
