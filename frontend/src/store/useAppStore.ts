@@ -219,10 +219,10 @@ export const useAppStore = create<AppState>((set) => ({
   setTimelineData: (ticker, timestamps, snapshots) =>
     set((state) => ({
       timelineTimestamps: timestamps,
-      snapshotsHistory: {
-        ...state.snapshotsHistory,
-        [ticker]: snapshots,
-      },
+      snapshotsHistory:
+        snapshots && Object.keys(snapshots).length > 0
+          ? { ...state.snapshotsHistory, [ticker]: snapshots }
+          : state.snapshotsHistory,
     })),
 
   setTimestamp: (ts) =>

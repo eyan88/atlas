@@ -164,12 +164,13 @@ export function GammaFlow() {
 
         // Feed timestamps into global playback controls
         const timestamps = Array.from(new Set(normalizedGamma.map((h) => h.timestamp))).sort((a, b) => a - b);
-        setTimelineData(currentTicker, timestamps, {});
+        const storeState = useAppStore.getState();
+        const existingSnaps = storeState.snapshotsHistory[currentTicker] || {};
+        setTimelineData(currentTicker, timestamps, existingSnaps);
 
         if (timestamps.length > 0) {
           const latestTs = timestamps[timestamps.length - 1];
           const isTodaySelected = selectedDate === todayStr;
-          const storeState = useAppStore.getState();
 
           if (storeState.currentTimestamp === null && !isTodaySelected) {
             storeState.setTimestamp(latestTs);
@@ -313,10 +314,11 @@ export function GammaFlow() {
         setError(null);
 
         if (mainTimestamps.length > 0) {
-          setTimelineData(uniqueTickers[0], mainTimestamps, {});
+          const storeState = useAppStore.getState();
+          const existingSnaps = storeState.snapshotsHistory[uniqueTickers[0]] || {};
+          setTimelineData(uniqueTickers[0], mainTimestamps, existingSnaps);
           const latestTs = mainTimestamps[mainTimestamps.length - 1];
           const isTodaySelected = selectedDate === todayStr;
-          const storeState = useAppStore.getState();
 
           if (storeState.currentTimestamp === null && !isTodaySelected) {
             storeState.setTimestamp(latestTs);
