@@ -167,7 +167,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       }
 
       // Filter history down to the currently visible segments
-      const latestAllowedTs = currentTimestamp ?? maxTime;
+      const latestAllowedTs = effectiveMaxTime;
       const visibleHistory = sorted.filter((h) => h.timestamp <= latestAllowedTs);
 
       // 2. Draw Call & Put Premium Lines (Strictly clipped to Inner Plot Area)
@@ -263,7 +263,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
         const xRatio = (mouseX - margin.left) / chartWidth;
-        const targetTs = minTime + xRatio * (maxTime - minTime);
+        const targetTs = minTime + xRatio * timeSpan;
 
         // Find closest timestamp present in visibleHistory
         if (visibleHistory.length > 0) {

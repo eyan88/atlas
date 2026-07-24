@@ -365,7 +365,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       // 5. Draw Hover Indicator (Vertical time tracking line, horizontal strike guide, spot dot & Tooltip)
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
         const xRatio = (mouseX - margin.left) / chartWidth;
-        const targetTs = minTime + xRatio * (maxTime - minTime);
+        const targetTs = minTime + xRatio * timeSpan;
 
         // Find closest timestamp present in history
         const activeTs = timestamps.reduce((prev, curr) => {
