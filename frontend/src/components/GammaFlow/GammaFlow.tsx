@@ -336,57 +336,62 @@ export function GammaFlow() {
     const fetchLiveDashboardTick = async () => {
       try {
         const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
+        const updates: Record<string, GammaFlowResponse> = {};
+
         await Promise.all(
           uniqueTickers.map(async (ticker) => {
             try {
               const currentData = await gammaFlowApi.getCurrentGamma(ticker);
-              if (!active) return;
-
-              setDashboardData((prev) => {
-                const existing = prev[ticker] || {
-                  spot: currentData.price,
-                  strikes: currentData.strikes,
-                  netFlow: currentData.net_flow,
-                  netFlowHistory: [],
-                  gammaHistory: [],
-                };
-
-                let updatedNetFlowHistory = existing.netFlowHistory;
-                if (isToday && currentData.net_flow) {
-                  const tickTs = toSeconds(currentData.net_flow.timestamp);
-                  const newTick = { ...currentData.net_flow, timestamp: tickTs };
-                  if (updatedNetFlowHistory.length === 0) {
-                    updatedNetFlowHistory = [newTick];
-                  } else {
-                    const lastIdx = updatedNetFlowHistory.length - 1;
-                    if (updatedNetFlowHistory[lastIdx].timestamp === tickTs) {
-                      updatedNetFlowHistory = [...updatedNetFlowHistory];
-                      updatedNetFlowHistory[lastIdx] = newTick;
-                    } else {
-                      updatedNetFlowHistory = [...updatedNetFlowHistory, newTick];
-                      if (updatedNetFlowHistory.length > MAX_HISTORY_POINTS) {
-                        updatedNetFlowHistory = updatedNetFlowHistory.slice(updatedNetFlowHistory.length - MAX_HISTORY_POINTS);
-                      }
-                    }
-                  }
-                }
-
-                return {
-                  ...prev,
-                  [ticker]: {
-                    ...existing,
-                    spot: currentData.price,
-                    strikes: currentData.strikes,
-                    netFlow: currentData.net_flow,
-                    netFlowHistory: updatedNetFlowHistory,
-                  },
-                };
-              });
+              updates[ticker] = currentData;
             } catch (err) {
               console.error(`Failed live tick for ${ticker}:`, err);
             }
           })
         );
+
+        if (!active || Object.keys(updates).length === 0) return;
+
+        setDashboardData((prev) => {
+          const next = { ...prev };
+          for (const [ticker, currentData] of Object.entries(updates)) {
+            const existing = next[ticker] || {
+              spot: currentData.price,
+              strikes: currentData.strikes,
+              netFlow: currentData.net_flow,
+              netFlowHistory: [],
+              gammaHistory: [],
+            };
+
+            let updatedNetFlowHistory = existing.netFlowHistory;
+            if (isToday && currentData.net_flow) {
+              const tickTs = toSeconds(currentData.net_flow.timestamp);
+              const newTick = { ...currentData.net_flow, timestamp: tickTs };
+              if (updatedNetFlowHistory.length === 0) {
+                updatedNetFlowHistory = [newTick];
+              } else {
+                const lastIdx = updatedNetFlowHistory.length - 1;
+                if (updatedNetFlowHistory[lastIdx].timestamp === tickTs) {
+                  updatedNetFlowHistory = [...updatedNetFlowHistory];
+                  updatedNetFlowHistory[lastIdx] = newTick;
+                } else {
+                  updatedNetFlowHistory = [...updatedNetFlowHistory, newTick];
+                  if (updatedNetFlowHistory.length > MAX_HISTORY_POINTS) {
+                    updatedNetFlowHistory = updatedNetFlowHistory.slice(updatedNetFlowHistory.length - MAX_HISTORY_POINTS);
+                  }
+                }
+              }
+            }
+
+            next[ticker] = {
+              ...existing,
+              spot: currentData.price,
+              strikes: currentData.strikes,
+              netFlow: currentData.net_flow,
+              netFlowHistory: updatedNetFlowHistory,
+            };
+          }
+          return next;
+        });
       } catch (err) {
         console.error('Failed to poll dashboard ticks:', err);
       }

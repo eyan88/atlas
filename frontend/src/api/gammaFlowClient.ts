@@ -237,7 +237,7 @@ export const gammaFlowApi = {
     try {
       const params = new URLSearchParams();
       if (opts.date) params.set('date', opts.date);
-      params.set('limit', String(opts.limit ?? 500));
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString() ? `?${params.toString()}` : '';
       return await get<HistoricalGammaResponse>(`/historical/${ticker}${qs}`);
     } catch (e) {
@@ -260,7 +260,7 @@ export const gammaFlowApi = {
     try {
       const params = new URLSearchParams();
       if (opts.date) params.set('date', opts.date);
-      params.set('limit', String(opts.limit ?? 500));
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString() ? `?${params.toString()}` : '';
       return await get<HistoricalNetFlowResponse>(`/net-flow/historical/${ticker}${qs}`);
     } catch (e) {
