@@ -50,28 +50,26 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     const startHour = dateRef.getUTCHours() < 14 ? 13 : 14;
     const startMin = 30;
 
-    // Determine dynamic right boundary based on current scrub position or latest data point
     const minTimeDate = new Date(Date.UTC(year, month, day, startHour, startMin, 0));
     const minTime = Math.floor(minTimeDate.getTime() / 1000);
-    const maxSessionTime = minTime + 23400; // 4:00 PM close
 
-    const latestDataTs = sorted[sorted.length - 1].timestamp;
-    const effectiveMaxTime = currentTimestamp
-      ? Math.min(currentTimestamp, maxSessionTime)
-      : latestDataTs;
+    // Filter visible history items up to current scrub position
+    const visibleHistory = currentTimestamp
+      ? sorted.filter((h) => h.timestamp <= currentTimestamp)
+      : sorted;
+    if (visibleHistory.length === 0) return;
 
-    const timeSpan = Math.max(300, effectiveMaxTime - minTime);
+    // Zoom X-axis to span from market open (domainMin) to latest visible timestamp (domainMax)
+    const domainMin = minTime;
+    const domainMax = Math.max(domainMin + 300, visibleHistory[visibleHistory.length - 1].timestamp);
+    const timeSpan = domainMax - domainMin;
 
-    // Dynamic clean interval tick times from market open to current scrub position
+    // Dynamic clean interval tick times spanning from market open to current scrub position
     const numTicks = 5;
     const tickTimes: number[] = [];
     for (let i = 0; i < numTicks; i++) {
-      tickTimes.push(minTime + (timeSpan * i) / (numTicks - 1));
+      tickTimes.push(domainMin + (timeSpan * i) / (numTicks - 1));
     }
-
-    // Only render data points up to effectiveMaxTime
-    const visibleHistory = sorted.filter((h) => h.timestamp <= effectiveMaxTime);
-    if (visibleHistory.length === 0) return;
 
     // Find min and max values across visible premium lines for primary Y-axis
     const calls = visibleHistory.map((h) => h.net_call_prem);
@@ -116,10 +114,10 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       const chartWidth = observedWidth - margin.left - margin.right;
       const chartHeight = observedHeight - margin.top - margin.bottom;
 
-      // Get screen coordinates helper (dynamically mapped to minTime -> effectiveMaxTime)
+      // Get screen coordinates helper (dynamically mapped to domainMin -> domainMax)
       const getX = (ts: number) => {
         if (timeSpan === 0) return margin.left;
-        return margin.left + ((ts - minTime) / timeSpan) * chartWidth;
+        return margin.left + ((ts - domainMin) / timeSpan) * chartWidth;
       };
 
       // Primary Y-Axis coordinate (Premium Flow - Left axis)
@@ -167,7 +165,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       }
 
       // Filter history down to the currently visible segments
-      const latestAllowedTs = effectiveMaxTime;
+      const latestAllowedTs = domainMax;
       const visibleHistory = sorted.filter((h) => h.timestamp <= latestAllowedTs);
 
       // 2. Draw Call & Put Premium Lines (Strictly clipped to Inner Plot Area)
@@ -263,7 +261,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
       // 5. Draw Hover Indicator crosshair and Tooltip box
       if (mouseX !== null && mouseX >= margin.left && mouseX <= margin.left + chartWidth) {
         const xRatio = (mouseX - margin.left) / chartWidth;
-        const targetTs = minTime + xRatio * timeSpan;
+        const targetTs = domainMin + xRatio * timeSpan;
 
         // Find closest timestamp present in visibleHistory
         if (visibleHistory.length > 0) {
