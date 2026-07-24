@@ -239,6 +239,9 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
       ctx.rect(margin.left, margin.top, chartWidth, chartHeight);
       ctx.clip();
 
+      // Collect cell rects into color batches to minimize Canvas state switches
+      const colorBatches = new Map<string, Array<[number, number, number, number]>>();
+
       for (let xIdx = 0; xIdx < timestamps.length; xIdx++) {
         const ts = timestamps[xIdx];
         if (ts > latestAllowedTs) continue; // Skip future cells
@@ -259,13 +262,25 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
           }
           pct = Math.max(-1, Math.min(1, pct));
 
-          // Draw cell using selected color scheme
-          ctx.fillStyle = getHeatmapColor(pct);
-
+          const color = getHeatmapColor(pct);
           const y = margin.top + chartHeight - (yIdx + 1) * cellHeight + rowGap / 2;
-          ctx.fillRect(x, y, cellWidth + 0.5, drawCellHeight);
+
+          let list = colorBatches.get(color);
+          if (!list) {
+            list = [];
+            colorBatches.set(color, list);
+          }
+          list.push([x, y, cellWidth + 0.5, drawCellHeight]);
         });
       }
+
+      // Draw all rects batched per fill style
+      colorBatches.forEach((rects, color) => {
+        ctx.fillStyle = color;
+        rects.forEach(([x, y, w, h]) => {
+          ctx.fillRect(x, y, w, h);
+        });
+      });
 
       // Draw Price Line Overlay (Glowing Spot Path) within clipped plot area
       ctx.beginPath();
