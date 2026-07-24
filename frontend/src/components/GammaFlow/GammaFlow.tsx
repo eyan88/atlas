@@ -125,6 +125,11 @@ export function GammaFlow() {
     }
   }, [activeTicker, openTickers]);
 
+  // Maximum history points kept in memory for constant O(1) memory footprint
+  const MAX_HISTORY_POINTS = 500;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isToday = selectedDate === todayStr;
+
   // Fetch Focus View Data
   useEffect(() => {
     if (viewMode !== 'focus') return;
@@ -144,22 +149,7 @@ export function GammaFlow() {
       setLoading(true);
     }
 
-    const fetchData = async () => {
-      try {
-        const data = await gammaFlowApi.getCurrentGamma(currentTicker);
-        if (!active) return;
-        setSpot(data.price);
-        setNetFlow(data.net_flow);
-        setIsMockDataActive(!!data.isMock);
-        setError(null);
-      } catch (err: any) {
-        if (!active) return;
-        setError(err.message || 'Failed to load live Gamma Flow data');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
+    // 1. Fetch full historical baseline ONCE per ticker / date change
     const fetchHistory = async () => {
       try {
         const [netFlowData, gammaData] = await Promise.all([
@@ -178,7 +168,6 @@ export function GammaFlow() {
 
         if (timestamps.length > 0) {
           const latestTs = timestamps[timestamps.length - 1];
-          const todayStr = new Date().toISOString().split('T')[0];
           const isTodaySelected = selectedDate === todayStr;
           const storeState = useAppStore.getState();
 
@@ -195,16 +184,81 @@ export function GammaFlow() {
       }
     };
 
-    fetchData();
-    fetchHistory();
+    // 2. Fetch live single-snapshot tick and append to history buffer
+    const fetchLiveTick = async () => {
+      try {
+        const data = await gammaFlowApi.getCurrentGamma(currentTicker);
+        if (!active) return;
+        setSpot(data.price);
+        setNetFlow(data.net_flow);
+        setIsMockDataActive(!!data.isMock);
+        setError(null);
 
-    timerId = setInterval(fetchData, REFRESH_INTERVAL_MS);
+        // Append live tick to history if viewing today's live session
+        if (isToday && data.net_flow) {
+          const tickTs = toSeconds(data.net_flow.timestamp);
+          const newTick = { ...data.net_flow, timestamp: tickTs };
+
+          setNetFlowHistory((prev) => {
+            if (prev.length === 0) return [newTick];
+            const lastIdx = prev.length - 1;
+            if (prev[lastIdx].timestamp === tickTs) {
+              const next = [...prev];
+              next[lastIdx] = newTick;
+              return next;
+            }
+            const next = [...prev, newTick];
+            return next.length > MAX_HISTORY_POINTS ? next.slice(next.length - MAX_HISTORY_POINTS) : next;
+          });
+        }
+      } catch (err: any) {
+        if (!active) return;
+        setError(err.message || 'Failed to load live Gamma Flow data');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchHistory();
+    fetchLiveTick();
+
+    // Only start polling if viewing today's active session
+    if (isToday) {
+      const startTimer = () => {
+        if (!timerId) {
+          timerId = setInterval(fetchLiveTick, REFRESH_INTERVAL_MS);
+        }
+      };
+      const stopTimer = () => {
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+      };
+
+      if (!document.hidden) startTimer();
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          stopTimer();
+        } else {
+          fetchLiveTick();
+          startTimer();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        active = false;
+        stopTimer();
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
 
     return () => {
       active = false;
-      clearInterval(timerId);
     };
-  }, [currentTicker, viewMode, selectedDate, setTimelineData]);
+  }, [currentTicker, viewMode, selectedDate, isToday, setTimelineData]);
 
   // Extract unique sorted list of tickers to cache requests
   const uniqueTickersKey = Array.from(new Set(widgets.map((w) => w.ticker))).sort().join(',');
@@ -216,52 +270,51 @@ export function GammaFlow() {
     let active = true;
     let timerId: any = null;
 
-    const fetchAllDashboardData = async () => {
+    // 1. Initial 1-time historical load for all unique dashboard tickers
+    const fetchDashboardHistory = async () => {
       try {
         const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
         const results: typeof dashboardData = { ...dashboardData };
         let mockActive = false;
         let mainTimestamps: number[] = [];
 
-        await Promise.all(uniqueTickers.map(async (ticker) => {
-          try {
-            const [currentData, netFlowHist, gammaHist] = await Promise.all([
-              gammaFlowApi.getCurrentGamma(ticker),
-              gammaFlowApi.getHistoricalNetFlow(ticker, { date: selectedDate }),
-              gammaFlowApi.getHistoricalGamma(ticker, { date: selectedDate }),
-            ]);
+        await Promise.all(
+          uniqueTickers.map(async (ticker) => {
+            try {
+              const [currentData, netFlowHist, gammaHist] = await Promise.all([
+                gammaFlowApi.getCurrentGamma(ticker),
+                gammaFlowApi.getHistoricalNetFlow(ticker, { date: selectedDate }),
+                gammaFlowApi.getHistoricalGamma(ticker, { date: selectedDate }),
+              ]);
 
-            const normalizedNetFlow = netFlowHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
-            const normalizedGamma = gammaHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
-            results[ticker] = {
-              spot: currentData.price,
-              strikes: currentData.strikes,
-              netFlow: currentData.net_flow,
-              netFlowHistory: normalizedNetFlow,
-              gammaHistory: normalizedGamma,
-            };
-            if (currentData.isMock) mockActive = true;
+              const normalizedNetFlow = netFlowHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+              const normalizedGamma = gammaHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+              results[ticker] = {
+                spot: currentData.price,
+                strikes: currentData.strikes,
+                netFlow: currentData.net_flow,
+                netFlowHistory: normalizedNetFlow,
+                gammaHistory: normalizedGamma,
+              };
+              if (currentData.isMock) mockActive = true;
 
-            // Pick one ticker timestamps to drive timeline controls
-            if (ticker === uniqueTickers[0]) {
-              mainTimestamps = Array.from(new Set(normalizedGamma.map((h) => h.timestamp))).sort((a, b) => a - b);
+              if (ticker === uniqueTickers[0]) {
+                mainTimestamps = Array.from(new Set(normalizedGamma.map((h) => h.timestamp))).sort((a, b) => a - b);
+              }
+            } catch (err) {
+              console.error(`Failed to fetch dashboard data for ${ticker}:`, err);
             }
-          } catch (err) {
-            console.error(`Failed to fetch dashboard data for ${ticker}:`, err);
-          }
-        }));
+          })
+        );
 
         if (!active) return;
         setDashboardData(results);
         setIsMockDataActive(mockActive);
         setError(null);
 
-        // Align global playback slider with widgets timeline
         if (mainTimestamps.length > 0) {
           setTimelineData(uniqueTickers[0], mainTimestamps, {});
-
           const latestTs = mainTimestamps[mainTimestamps.length - 1];
-          const todayStr = new Date().toISOString().split('T')[0];
           const isTodaySelected = selectedDate === todayStr;
           const storeState = useAppStore.getState();
 
@@ -279,20 +332,108 @@ export function GammaFlow() {
       }
     };
 
-    // Only trigger full-screen loading spinner if we don't have any cached data yet
+    // 2. Poll lightweight getCurrentGamma for live dashboard ticks
+    const fetchLiveDashboardTick = async () => {
+      try {
+        const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
+        await Promise.all(
+          uniqueTickers.map(async (ticker) => {
+            try {
+              const currentData = await gammaFlowApi.getCurrentGamma(ticker);
+              if (!active) return;
+
+              setDashboardData((prev) => {
+                const existing = prev[ticker] || {
+                  spot: currentData.price,
+                  strikes: currentData.strikes,
+                  netFlow: currentData.net_flow,
+                  netFlowHistory: [],
+                  gammaHistory: [],
+                };
+
+                let updatedNetFlowHistory = existing.netFlowHistory;
+                if (isToday && currentData.net_flow) {
+                  const tickTs = toSeconds(currentData.net_flow.timestamp);
+                  const newTick = { ...currentData.net_flow, timestamp: tickTs };
+                  if (updatedNetFlowHistory.length === 0) {
+                    updatedNetFlowHistory = [newTick];
+                  } else {
+                    const lastIdx = updatedNetFlowHistory.length - 1;
+                    if (updatedNetFlowHistory[lastIdx].timestamp === tickTs) {
+                      updatedNetFlowHistory = [...updatedNetFlowHistory];
+                      updatedNetFlowHistory[lastIdx] = newTick;
+                    } else {
+                      updatedNetFlowHistory = [...updatedNetFlowHistory, newTick];
+                      if (updatedNetFlowHistory.length > MAX_HISTORY_POINTS) {
+                        updatedNetFlowHistory = updatedNetFlowHistory.slice(updatedNetFlowHistory.length - MAX_HISTORY_POINTS);
+                      }
+                    }
+                  }
+                }
+
+                return {
+                  ...prev,
+                  [ticker]: {
+                    ...existing,
+                    spot: currentData.price,
+                    strikes: currentData.strikes,
+                    netFlow: currentData.net_flow,
+                    netFlowHistory: updatedNetFlowHistory,
+                  },
+                };
+              });
+            } catch (err) {
+              console.error(`Failed live tick for ${ticker}:`, err);
+            }
+          })
+        );
+      } catch (err) {
+        console.error('Failed to poll dashboard ticks:', err);
+      }
+    };
+
     if (Object.keys(dashboardData).length === 0) {
       setLoading(true);
     }
-    
-    fetchAllDashboardData();
 
-    timerId = setInterval(fetchAllDashboardData, REFRESH_INTERVAL_MS);
+    fetchDashboardHistory();
+
+    if (isToday) {
+      const startTimer = () => {
+        if (!timerId) {
+          timerId = setInterval(fetchLiveDashboardTick, REFRESH_INTERVAL_MS);
+        }
+      };
+      const stopTimer = () => {
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+      };
+
+      if (!document.hidden) startTimer();
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          stopTimer();
+        } else {
+          fetchLiveDashboardTick();
+          startTimer();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        active = false;
+        stopTimer();
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
 
     return () => {
       active = false;
-      clearInterval(timerId);
     };
-  }, [viewMode, uniqueTickersKey, selectedDate, setTimelineData]);
+  }, [viewMode, uniqueTickersKey, selectedDate, isToday, setTimelineData]);
 
   const handleTickerChange = (ticker: string) => {
     setCurrentTicker(ticker);

@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.core.config import settings
 from app.api.endpoints import tickers, heatmap, gamma_flow
 from app.api.websockets import feed
@@ -24,6 +25,9 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Enable Gzip compression for network egress optimization (responses > 500 bytes)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Set all CORS enabled origins
 app.add_middleware(
