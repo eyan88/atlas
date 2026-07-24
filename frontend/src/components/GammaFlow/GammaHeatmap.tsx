@@ -24,7 +24,7 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || history.length === 0) return;
+    if (!canvas || !history || !Array.isArray(history) || history.length === 0) return;
 
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -36,10 +36,11 @@ export function GammaHeatmap({ history, currentTimestamp, strikeCount, metric = 
     let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
     // 1. Process and sort timestamps
-    const timestamps = Array.from(new Set(history.map((h) => h.timestamp))).sort((a, b) => a - b);
-    const rawStrikes = Array.from(new Set(history.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order
+    const validHistory = history.filter((h) => h && typeof h.timestamp === 'number' && !isNaN(h.timestamp));
+    const timestamps = Array.from(new Set(validHistory.map((h) => h.timestamp))).sort((a, b) => a - b);
+    const rawStrikes = Array.from(new Set(validHistory.map((h) => h.strike))).sort((a, b) => a - b); // Ascending order
 
-    if (timestamps.length < 2 || rawStrikes.length < 2) return;
+    if (timestamps.length < 2 || rawStrikes.length < 2 || !timestamps[0]) return;
 
     // Fix the X-axis to represent exactly the standard trading session: 9:30 AM to 4:00 PM Eastern (America/New_York)
     const firstTs = timestamps[0];

@@ -13,7 +13,7 @@ export function GammaBarChart({ strikes, spot }: GammaBarChartProps) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || strikes.length === 0) return;
+    if (!canvas || !strikes || !Array.isArray(strikes) || strikes.length === 0) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;

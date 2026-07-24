@@ -916,11 +916,11 @@ export function GammaFlow() {
                           <span>Fetching {widget.ticker} data...</span>
                         </div>
                       ) : widget.type === 'heatmap' ? (
-                        <GammaHeatmap history={data.gammaHistory} currentTimestamp={currentTimestamp} strikeCount={widget.strikeCount} metric={widget.metric ?? 'gex'} />
+                        <GammaHeatmap history={data.gammaHistory || []} currentTimestamp={currentTimestamp} strikeCount={widget.strikeCount} metric={widget.metric ?? 'gex'} />
                       ) : widget.type === 'net_flow' ? (
-                        <NetFlowChart history={data.netFlowHistory} currentTimestamp={currentTimestamp} />
+                        <NetFlowChart history={data.netFlowHistory || []} currentTimestamp={currentTimestamp} />
                       ) : (
-                        <GammaBarChart strikes={data.strikes} spot={data.spot} />
+                        <GammaBarChart strikes={data.strikes || []} spot={data.spot ?? 0} />
                       )}
                     </div>
 

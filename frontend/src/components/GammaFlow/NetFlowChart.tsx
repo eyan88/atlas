@@ -22,7 +22,7 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || history.length === 0) return;
+    if (!canvas || !history || !Array.isArray(history) || history.length === 0) return;
 
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -34,10 +34,13 @@ export function NetFlowChart({ history, currentTimestamp }: NetFlowChartProps) {
     let observedHeight = parent.clientHeight || canvas.getBoundingClientRect().height || 300;
 
     // Sort full history by timestamp ascending
-    const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
+    const validHistory = history.filter((h) => h && typeof h.timestamp === 'number' && !isNaN(h.timestamp));
+    if (validHistory.length === 0) return;
+    const sorted = [...validHistory].sort((a, b) => a.timestamp - b.timestamp);
 
     // Fix the X-axis to represent exactly the standard trading session: 9:30 AM to 4:00 PM Eastern (America/New_York)
     const firstTs = sorted[0].timestamp;
+    if (!firstTs || isNaN(firstTs)) return;
     const dateRef = new Date(firstTs * 1000);
     const year = dateRef.getUTCFullYear();
     const month = dateRef.getUTCMonth();
