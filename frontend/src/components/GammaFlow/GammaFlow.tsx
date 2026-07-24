@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppStore, toSeconds } from '../../store/useAppStore';
-import { gammaFlowApi, type GammaStrike, type NetFlowData } from '../../api/gammaFlowClient';
+import { gammaFlowApi, type GammaStrike, type NetFlowData, type GammaFlowResponse } from '../../api/gammaFlowClient';
 import { GammaBarChart } from './GammaBarChart';
 import { NetFlowChart } from './NetFlowChart';
 import { GammaHeatmap } from './GammaHeatmap';
