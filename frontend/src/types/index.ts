@@ -114,18 +114,16 @@ export interface ReplayTimeline {
 // ─── Evolution Settings ───────────────────────────────────────────────────────
 
 export type EvolutionWindow =
-  | 'prev_snapshot'
-  | '5m'
+  | '1m'
   | '15m'
   | '1h'
   | 'open'
   | 'prev_day';
 
 export const EVOLUTION_WINDOW_LABELS: Record<EvolutionWindow, string> = {
-  prev_snapshot: 'Prev Snapshot',
-  '5m': 'Last 5 Minutes',
-  '15m': 'Last 15 Minutes',
-  '1h': 'Last Hour',
+  '1m': '1 Minute',
+  '15m': '15 Minutes',
+  '1h': '1 Hour',
   open: 'Since Open',
   prev_day: 'Prev Day',
 };

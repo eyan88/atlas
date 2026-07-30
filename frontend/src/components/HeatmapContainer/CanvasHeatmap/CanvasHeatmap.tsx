@@ -197,11 +197,8 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
     const currentIdx = historyTimestamps.indexOf(currentTs);
     const resolvedIdx = currentIdx !== -1 ? currentIdx : historyTimestamps.length - 1;
     
-    if (evolutionWindow === 'prev_snapshot') {
-      const refIdx = Math.max(0, resolvedIdx - 1);
-      refSnap = tickerHistory[historyTimestamps[refIdx]] ?? null;
-    } else if (evolutionWindow === '5m') {
-      const targetTs = currentTs - 5 * 60;
+    if (evolutionWindow === '1m') {
+      const targetTs = currentTs - 60;
       const refTs = historyTimestamps.reduce((prev, curr) => Math.abs(curr - targetTs) < Math.abs(prev - targetTs) ? curr : prev, historyTimestamps[0]);
       refSnap = tickerHistory[refTs] ?? null;
     } else if (evolutionWindow === '15m') {

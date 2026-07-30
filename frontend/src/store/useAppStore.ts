@@ -111,7 +111,7 @@ export const useAppStore = create<AppState>((set) => ({
   selectedMetric: 'net_gex',
   colorTheme: (localStorage.getItem('atlas_color_theme') as 'atlas' | 'classic') || 'atlas',
   strikeCount: 40,
-  evolutionWindow: 'prev_snapshot',
+  evolutionWindow: '1m',
   snapshotsHistory: {},
   timelineTimestamps: [],
   selectedDate: new Date().toISOString().split('T')[0],

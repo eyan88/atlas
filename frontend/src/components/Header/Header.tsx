@@ -156,15 +156,6 @@ export function Header() {
         />
       </label>
 
-      <button
-        type="button"
-        className={styles.sidebarToggle}
-        onClick={toggleSidebar}
-        title="Toggle Inspector Panel"
-      >
-        {isSidebarOpen ? 'Hide Inspector' : 'Show Inspector'}
-      </button>
-
       {/* Connection Status */}
       <div className={styles.status}>
         <span

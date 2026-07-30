@@ -23,12 +23,7 @@ interface Widget {
   metric?: 'gex' | 'rel_pm';
 }
 
-const DEFAULT_WIDGETS: Widget[] = [
-  { id: 'w1', ticker: 'QQQ', type: 'heatmap', group: 'A', strikeCount: 12, metric: 'gex' },
-  { id: 'w2', ticker: 'QQQ', type: 'net_flow', group: 'A' },
-  { id: 'w3', ticker: 'SPY', type: 'heatmap', group: 'B', strikeCount: 12, metric: 'gex' },
-  { id: 'w4', ticker: 'SPY', type: 'net_flow', group: 'B' },
-];
+const DEFAULT_WIDGETS: Widget[] = [];
 
 function formatUSD(value: number): string {
   const abs = Math.abs(value);
@@ -53,6 +48,10 @@ export function GammaFlow() {
     return localStorage.getItem('atlas_gamma_flow_current_ticker') || activeTicker || 'SPY';
   });
 
+  // Modal State for adding ticker widgets
+  const [isAddTickerModalOpen, setIsAddTickerModalOpen] = useState<boolean>(false);
+  const [tickerSearchInput, setTickerSearchInput] = useState<string>('');
+
   // Focus View specific GEX heatmap strike count and metric setting
   const [focusStrikeCount, setFocusStrikeCount] = useState<number>(() => {
     const saved = localStorage.getItem('atlas_gamma_flow_focus_strike_count');
@@ -66,7 +65,7 @@ export function GammaFlow() {
     localStorage.setItem('atlas_gamma_flow_focus_metric', focusMetric);
   }, [focusMetric]);
 
-  // Widget state for Dashboard Grid
+  // Widget state for Dashboard Grid (Starts empty by default)
   const [widgets, setWidgets] = useState<Widget[]>(() => {
     const saved = localStorage.getItem('atlas_gamma_flow_widgets');
     if (saved) {
@@ -622,18 +621,14 @@ export function GammaFlow() {
             {/* Dashboard Specific Top Controls */}
             {viewMode === 'dashboard' && (
               <div className={styles.topControlGroup}>
-                <span className={styles.topControlLabel}>Add Ticker Widget:</span>
-                <select
-                  className={styles.cardSelector}
-                  value=""
-                  onChange={(e) => handleAddWidgetSelect(e.target.value)}
+                <button
+                  type="button"
+                  className={styles.addTickerBtn}
+                  onClick={() => setIsAddTickerModalOpen(true)}
                   disabled={widgets.length >= MAX_WIDGETS}
                 >
-                  <option value="" disabled>Select Ticker ({widgets.length}/{MAX_WIDGETS})</option>
-                  {AVAILABLE_TICKERS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                  + Add Ticker Widget ({widgets.length}/{MAX_WIDGETS})
+                </button>
               </div>
             )}
 
@@ -666,6 +661,8 @@ export function GammaFlow() {
                     <option value={6}>6 strikes</option>
                     <option value={12}>12 strikes</option>
                     <option value={20}>20 strikes</option>
+                    <option value={30}>30 strikes</option>
+                    <option value={40}>40 strikes</option>
                     <option value={0}>All strikes</option>
                   </select>
                 </div>
@@ -751,15 +748,27 @@ export function GammaFlow() {
                 </div>
               </section>
             </div>
+          ) : widgets.length === 0 ? (
+            <div className={styles.emptyStateCard}>
+              <div className={styles.emptyIcon}>📊</div>
+              <h3 className={styles.emptyTitle}>No Ticker Widgets Added</h3>
+              <p className={styles.emptyDesc}>
+                Click the button below to select a ticker symbol (SPY, QQQ, IWM, etc.) and add real-time GEX Heatmap and Net Flow widgets.
+              </p>
+              <button
+                type="button"
+                className={styles.emptyAddBtn}
+                onClick={() => setIsAddTickerModalOpen(true)}
+              >
+                + Add Ticker Widget
+              </button>
+            </div>
           ) : (
-            /* Grid Dashboard View Content */
             <div className={styles.dashboardGrid}>
               {widgets.map((widget, index) => {
                 const data = dashboardData[widget.ticker];
                 const netPrem = data?.netFlow?.net_premium ?? 0;
                 const isPositive = netPrem >= 0;
-
-                 // No local grid filtering needed since canvas components handle currentTimestamp directly
 
                 return (
                   <div
@@ -775,15 +784,30 @@ export function GammaFlow() {
                     {/* Card Header with Interactive Dropdown Controls */}
                     <div className={styles.cardHeader}>
                       <div className={styles.cardLeftControls}>
-                        {/* Drag Handle */}
                         <span
                           className={styles.cardGrip}
                           onClick={(e) => e.stopPropagation()}
                         >
                           ☰
                         </span>
-                        
-                        {/* Ticker Dropdown Selector */}
+
+                        <button
+                          type="button"
+                          className={`${styles.cardGroupSelector} ${widget.group === 'A' ? styles.groupA : widget.group === 'B' ? styles.groupB : widget.group === 'C' ? styles.groupC : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const nextGroup: LinkGroup =
+                              widget.group === 'none' ? 'A' :
+                              widget.group === 'A' ? 'B' :
+                              widget.group === 'B' ? 'C' : 'none';
+                            handleWidgetGroupChange(widget.id, nextGroup);
+                          }}
+                          title="Group Channel: Click to cycle color link group"
+                        >
+                          <span className={styles.groupDot} style={{ background: widget.group === 'A' ? '#38bdf8' : widget.group === 'B' ? '#c084fc' : widget.group === 'C' ? '#4ade80' : 'rgba(255,255,255,0.3)' }} />
+                          {widget.group === 'none' ? 'No Link' : `Group ${widget.group}`}
+                        </button>
+
                         <select
                           className={styles.cardSelector}
                           value={widget.ticker}
@@ -797,8 +821,9 @@ export function GammaFlow() {
                             <option key={t} value={t}>{t}</option>
                           ))}
                         </select>
+                      </div>
 
-                        {/* Chart Type Dropdown Selector */}
+                      <div className={styles.cardRightControls}>
                         <select
                           className={styles.cardSelector}
                           value={widget.type}
@@ -813,7 +838,6 @@ export function GammaFlow() {
                           <option value="bar_chart">Bar Chart</option>
                         </select>
 
-                        {/* strikes and metric setting dropdowns (only visible on heatmap types) */}
                         {widget.type === 'heatmap' && (
                           <>
                             <select
@@ -829,6 +853,8 @@ export function GammaFlow() {
                               <option value={6}>6 Strk</option>
                               <option value={12}>12 Strk</option>
                               <option value={20}>20 Strk</option>
+                              <option value={30}>30 Strk</option>
+                              <option value={40}>40 Strk</option>
                               <option value={0}>All Strk</option>
                             </select>
                             <select
@@ -846,64 +872,34 @@ export function GammaFlow() {
                             </select>
                           </>
                         )}
-                        {/* Link Group Channel Color Cycle Toggle Button */}
-                        <button
-                          type="button"
-                          className={getGroupSelectClass(widget.group)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleWidgetGroupChange(widget.id, cycleGroup(widget.group));
-                          }}
-                          title={`Link Channel: ${widget.group === 'none' ? 'Unlinked' : 'Group ' + widget.group} (Click to cycle)`}
-                        >
-                          <span className={styles.groupDot} style={{ background: getGroupDotColor(widget.group) }} />
-                          <span>{widget.group === 'none' ? 'Unlinked' : `Group ${widget.group}`}</span>
-                        </button>
-                      </div>
 
-                      <div className={styles.cardRightControls}>
-                        {/* Spot Price Badge always at top right */}
-                        <span className={styles.cardSpot}>
-                          {data ? `$${data.spot.toFixed(2)}` : 'Loading...'}
-                        </span>
-                        
-                        {/* Open Focus View Expand Button */}
-                        <button
-                          type="button"
-                          className={styles.cardFocusBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCardClick(widget.ticker);
-                          }}
-                          title="Open detailed focus view for this ticker"
-                          disabled={!data}
-                        >
-                          ⤢
-                        </button>
-
-                        {/* Delete Widget X Button */}
-                        {widgets.length > 1 && (
-                          <button
-                            type="button"
-                            className={styles.cardDeleteBtn}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteWidget(widget.id);
-                            }}
-                            title="Remove Widget"
-                          >
-                            ✕
-                          </button>
+                        {data?.spot && (
+                          <span className={styles.cardSpot}>${data.spot.toFixed(2)}</span>
                         )}
+
+                        <button
+                          type="button"
+                          className={styles.cardDeleteBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteWidget(widget.id);
+                          }}
+                          title="Delete Widget"
+                        >
+                          ×
+                        </button>
                       </div>
                     </div>
-                    
-                    {/* Conditional Chart Rendering based on Widget Type */}
-                    <div className={styles.cardChartBody}>
+
+                    <div
+                      className={styles.cardBody}
+                      onClick={() => handleCardClick(widget.ticker)}
+                      title="Click card to open in Focus Detail View"
+                    >
                       {!data ? (
                         <div className={styles.cardLoading}>
                           <div className={styles.cardSpinner} />
-                          <span>Fetching {widget.ticker} data...</span>
+                          <span>Loading {widget.ticker}...</span>
                         </div>
                       ) : widget.type === 'heatmap' ? (
                         <GammaHeatmap history={data.gammaHistory || []} currentTimestamp={currentTimestamp} strikeCount={widget.strikeCount} metric={widget.metric ?? 'gex'} />
@@ -930,6 +926,61 @@ export function GammaFlow() {
           )}
         </main>
       </div>
+
+      {/* Blurred Background Ticker Selection Modal Dialog */}
+      {isAddTickerModalOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={() => setIsAddTickerModalOpen(false)}
+        >
+          <div
+            className={styles.modalPane}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Select Ticker Widget</h3>
+              <button
+                type="button"
+                className={styles.modalCloseBtn}
+                onClick={() => setIsAddTickerModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.modalSearchBox}>
+              <input
+                type="text"
+                className={styles.modalSearchInput}
+                placeholder="Search symbol (e.g. SPY, QQQ, NVDA)..."
+                value={tickerSearchInput}
+                onChange={(e) => setTickerSearchInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className={styles.tickerGridList}>
+              {AVAILABLE_TICKERS
+                .filter((t) => t.toLowerCase().includes(tickerSearchInput.toLowerCase()))
+                .map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={styles.tickerOptionCard}
+                    onClick={() => {
+                      handleAddWidgetSelect(t);
+                      setIsAddTickerModalOpen(false);
+                      setTickerSearchInput('');
+                    }}
+                  >
+                    <span className={styles.tickerSymbol}>{t}</span>
+                    <span className={styles.tickerAddLabel}>+ Add</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

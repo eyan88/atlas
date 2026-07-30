@@ -3,7 +3,7 @@ import { EVOLUTION_WINDOW_LABELS } from '../../../types';
 import type { EvolutionWindow } from '../../../types';
 import styles from './EvolutionControls.module.css';
 
-const WINDOWS: EvolutionWindow[] = ['prev_snapshot', '5m', '15m', '1h', 'open', 'prev_day'];
+const WINDOWS: EvolutionWindow[] = ['1m', '15m', '1h', 'open', 'prev_day'];
 
 export function EvolutionControls() {
   const evolutionWindow = useAppStore((s) => s.evolutionWindow);

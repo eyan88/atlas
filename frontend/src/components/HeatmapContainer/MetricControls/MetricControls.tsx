@@ -10,19 +10,21 @@ export function MetricControls() {
   const setMetric      = useAppStore((s) => s.setMetric);
 
   return (
-    <div className={styles.controls} role="toolbar" aria-label="Metric selector">
-      {METRICS.map((m) => (
-        <button
-          key={m}
-          id={`metric-btn-${m}`}
-          className={`${styles.btn} ${selectedMetric === m ? styles.btnActive : ''}`}
-          onClick={() => setMetric(m)}
-          aria-pressed={selectedMetric === m}
-          title={METRIC_LABELS[m]}
-        >
-          {METRIC_LABELS[m]}
-        </button>
-      ))}
+    <div className={styles.controls} title="Select Heatmap Exposure Metric">
+      <span className={styles.label}>Metric:</span>
+      <select
+        id="metric-select-dropdown"
+        className={styles.select}
+        value={selectedMetric}
+        onChange={(e) => setMetric(e.target.value as Metric)}
+        aria-label="Select Exposure Metric"
+      >
+        {METRICS.map((m) => (
+          <option key={m} value={m}>
+            {METRIC_LABELS[m]}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
