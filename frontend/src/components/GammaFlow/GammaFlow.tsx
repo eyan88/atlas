@@ -254,6 +254,11 @@ export function GammaFlow() {
   // Extract unique sorted list of tickers to cache requests
   const uniqueTickersKey = Array.from(new Set(widgets.map((w) => w.ticker))).sort().join(',');
 
+  // Reset cached dashboard data when historical session date changes
+  useEffect(() => {
+    setDashboardData({});
+  }, [selectedDate]);
+
   // Fetch Dashboard Grid Data (Batch requests for active tickers)
   useEffect(() => {
     if (viewMode !== 'dashboard') return;
@@ -265,62 +270,61 @@ export function GammaFlow() {
     const fetchDashboardHistory = async () => {
       try {
         const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
-        const missingTickers = uniqueTickers.filter((t) => !dashboardData[t]);
-
-        if (missingTickers.length === 0) {
+        if (uniqueTickers.length === 0) {
           setLoading(false);
           return;
         }
 
+        const missingTickers = uniqueTickers.filter((t) => !dashboardData[t]);
         const results: typeof dashboardData = { ...dashboardData };
         let mockActive = false;
-        let mainTimestamps: number[] = [];
 
-        await Promise.all(
-          missingTickers.map(async (ticker) => {
-            try {
-              const [currentData, netFlowHist, gammaHist] = await Promise.all([
-                gammaFlowApi.getCurrentGamma(ticker),
-                gammaFlowApi.getHistoricalNetFlow(ticker, { date: selectedDate }),
-                gammaFlowApi.getHistoricalGamma(ticker, { date: selectedDate }),
-              ]);
+        if (missingTickers.length > 0) {
+          await Promise.all(
+            missingTickers.map(async (ticker) => {
+              try {
+                const [currentData, netFlowHist, gammaHist] = await Promise.all([
+                  gammaFlowApi.getCurrentGamma(ticker),
+                  gammaFlowApi.getHistoricalNetFlow(ticker, { date: selectedDate }),
+                  gammaFlowApi.getHistoricalGamma(ticker, { date: selectedDate }),
+                ]);
 
-              const normalizedNetFlow = netFlowHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
-              const normalizedGamma = gammaHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
-              results[ticker] = {
-                spot: currentData.price,
-                strikes: currentData.strikes,
-                netFlow: currentData.net_flow,
-                netFlowHistory: normalizedNetFlow,
-                gammaHistory: normalizedGamma,
-              };
-              if (currentData.isMock) mockActive = true;
-
-              if (ticker === uniqueTickers[0]) {
-                mainTimestamps = Array.from(new Set(normalizedGamma.map((h) => h.timestamp))).sort((a, b) => a - b);
+                const normalizedNetFlow = netFlowHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+                const normalizedGamma = gammaHist.history.map((h) => ({ ...h, timestamp: toSeconds(h.timestamp) }));
+                results[ticker] = {
+                  spot: currentData.price,
+                  strikes: currentData.strikes,
+                  netFlow: currentData.net_flow,
+                  netFlowHistory: normalizedNetFlow,
+                  gammaHistory: normalizedGamma,
+                };
+                if (currentData.isMock) mockActive = true;
+              } catch (err) {
+                console.error(`Failed to fetch dashboard data for ${ticker}:`, err);
               }
-            } catch (err) {
-              console.error(`Failed to fetch dashboard data for ${ticker}:`, err);
+            })
+          );
+
+          if (!active) return;
+          setDashboardData(results);
+          setIsMockDataActive(mockActive);
+          setError(null);
+        }
+
+        // Always guarantee timeline timestamps and currentTimestamp are populated in store
+        const primaryTicker = uniqueTickers[0];
+        const primaryData = results[primaryTicker] || dashboardData[primaryTicker];
+        if (primaryData && primaryData.gammaHistory && primaryData.gammaHistory.length > 0) {
+          const mainTimestamps = Array.from(new Set(primaryData.gammaHistory.map((h) => h.timestamp))).sort((a, b) => a - b);
+          if (mainTimestamps.length > 0) {
+            const storeState = useAppStore.getState();
+            const existingSnaps = storeState.snapshotsHistory[primaryTicker] || {};
+            setTimelineData(primaryTicker, mainTimestamps, existingSnaps);
+            const latestTs = mainTimestamps[mainTimestamps.length - 1];
+
+            if (storeState.currentTimestamp === null || !mainTimestamps.includes(storeState.currentTimestamp)) {
+              storeState.setTimestamp(latestTs);
             }
-          })
-        );
-
-        if (!active) return;
-        setDashboardData(results);
-        setIsMockDataActive(mockActive);
-        setError(null);
-
-        if (mainTimestamps.length > 0) {
-          const storeState = useAppStore.getState();
-          const existingSnaps = storeState.snapshotsHistory[uniqueTickers[0]] || {};
-          setTimelineData(uniqueTickers[0], mainTimestamps, existingSnaps);
-          const latestTs = mainTimestamps[mainTimestamps.length - 1];
-          const isTodaySelected = selectedDate === todayStr;
-
-          if (storeState.currentTimestamp === null && !isTodaySelected) {
-            storeState.setTimestamp(latestTs);
-          } else if (storeState.currentTimestamp !== null && !mainTimestamps.includes(storeState.currentTimestamp)) {
-            storeState.setTimestamp(latestTs);
           }
         }
       } catch (err: any) {
