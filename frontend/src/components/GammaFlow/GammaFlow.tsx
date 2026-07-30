@@ -400,6 +400,8 @@ export function GammaFlow() {
       } catch (err) {
         console.error('Failed to poll dashboard ticks:', err);
       }
+    };
+
     fetchDashboardHistory();
 
     if (isToday) {
