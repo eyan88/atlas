@@ -12,8 +12,6 @@ export function Header() {
   const openTickers   = useAppStore((s) => s.openTickers);
   const selectedDate   = useAppStore((s) => s.selectedDate);
   const setSelectedDate = useAppStore((s) => s.setSelectedDate);
-  const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const colorTheme    = useAppStore((s) => s.colorTheme);
   const setColorTheme = useAppStore((s) => s.setColorTheme);
   const [tickerInput, setTickerInput] = useState('');

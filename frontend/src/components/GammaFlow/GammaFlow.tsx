@@ -546,33 +546,11 @@ export function GammaFlow() {
 
   const isNetPremiumPositive = netFlow ? netFlow.net_premium >= 0 : false;
 
-  const cycleGroup = (current: LinkGroup): LinkGroup => {
-    if (current === 'none') return 'A';
-    if (current === 'A') return 'B';
-    if (current === 'B') return 'C';
-    return 'none';
-  };
-
   const getCardGroupBorderClass = (group: LinkGroup) => {
     if (group === 'A') return styles.cardGroupA;
     if (group === 'B') return styles.cardGroupB;
     if (group === 'C') return styles.cardGroupC;
     return '';
-  };
-
-  const getGroupDotColor = (group: LinkGroup) => {
-    if (group === 'A') return '#38bdf8';
-    if (group === 'B') return '#c084fc';
-    if (group === 'C') return '#4ade80';
-    return 'rgba(255, 255, 255, 0.3)';
-  };
-
-  // Helper to resolve CSS classes for group select color badges
-  const getGroupSelectClass = (group: LinkGroup) => {
-    if (group === 'A') return `${styles.cardGroupSelector} ${styles.groupA}`;
-    if (group === 'B') return `${styles.cardGroupSelector} ${styles.groupB}`;
-    if (group === 'C') return `${styles.cardGroupSelector} ${styles.groupC}`;
-    return `${styles.cardGroupSelector} ${styles.groupNone}`;
   };
 
   return (
