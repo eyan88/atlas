@@ -261,16 +261,23 @@ export function GammaFlow() {
     let active = true;
     let timerId: any = null;
 
-    // 1. Initial 1-time historical load for all unique dashboard tickers
+    // 1. Initial 1-time historical load for missing dashboard tickers
     const fetchDashboardHistory = async () => {
       try {
         const uniqueTickers = Array.from(new Set(widgets.map((w) => w.ticker)));
+        const missingTickers = uniqueTickers.filter((t) => !dashboardData[t]);
+
+        if (missingTickers.length === 0) {
+          setLoading(false);
+          return;
+        }
+
         const results: typeof dashboardData = { ...dashboardData };
         let mockActive = false;
         let mainTimestamps: number[] = [];
 
         await Promise.all(
-          uniqueTickers.map(async (ticker) => {
+          missingTickers.map(async (ticker) => {
             try {
               const [currentData, netFlowHist, gammaHist] = await Promise.all([
                 gammaFlowApi.getCurrentGamma(ticker),
@@ -323,6 +330,12 @@ export function GammaFlow() {
         if (active) setLoading(false);
       }
     };
+
+    // Only show full page spinner on initial empty dashboard load
+    if (Object.keys(dashboardData).length === 0 && widgets.length > 0) {
+      setLoading(true);
+    }
+    fetchDashboardHistory();
 
     // 2. Poll lightweight getCurrentGamma for live dashboard ticks
     const fetchLiveDashboardTick = async () => {
