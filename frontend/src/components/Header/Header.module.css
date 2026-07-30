@@ -336,3 +336,55 @@
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
+
+/* 📱 Header Mobile Responsiveness */
+@media (max-width: 768px) {
+  .header {
+    height: auto;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    justify-content: space-between;
+  }
+
+  .brandTagline {
+    display: none;
+  }
+
+  .tabs {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .controls {
+    gap: 8px;
+  }
+
+  .searchShortcut {
+    display: none;
+  }
+
+  .searchTrigger {
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .statusText {
+    display: none;
+  }
+
+  .dateInput {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+}

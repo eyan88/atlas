@@ -61,6 +61,16 @@ html, body, #root {
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  html, body, #root {
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 body {
   font-family: var(--font-ui);
   font-size: 13px;

@@ -622,3 +622,76 @@
   border-top-color: #38bdf8;
   animation: spin 1s linear infinite;
 }
+
+/* 📱 GammaFlow Mobile Responsiveness */
+@media (max-width: 768px) {
+  .workspace {
+    padding: 10px;
+    gap: 12px;
+    overflow-y: visible;
+    height: auto;
+  }
+
+  .topBar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 12px;
+    gap: 12px;
+  }
+
+  .topControlGroup {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .topStatsPanel {
+    border-left: none;
+    padding-left: 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding-bottom: 20px;
+  }
+
+  .dashboardCard {
+    height: 480px;
+    padding: 10px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .cardRightControls {
+    margin-left: 0;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .chartsGrid {
+    flex-direction: column;
+    height: auto;
+    gap: 16px;
+  }
+
+  .chartWrapper {
+    height: 380px;
+    padding: 12px;
+    width: 100%;
+  }
+
+  .chartHeader {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

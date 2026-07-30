@@ -129,3 +129,35 @@
   }
 }
 
+/* 📱 Mobile Timeline Controls Responsiveness */
+@media (max-width: 768px) {
+  .footer {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    padding: 10px 12px;
+    gap: 8px;
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    background: rgba(13, 17, 23, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+  }
+
+  .sliderWrapper {
+    width: 100%;
+    order: 1;
+  }
+
+  .playControls {
+    width: 100%;
+    justify-content: space-between;
+    order: 2;
+  }
+
+  .liveBtn {
+    justify-self: center;
+  }
+}
+
