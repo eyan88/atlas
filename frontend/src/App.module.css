@@ -174,38 +174,54 @@
   .app {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
     height: auto;
     min-height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .workspace {
     flex: 1 0 auto;
+    width: 100%;
+    max-width: 100vw;
     height: auto;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
+    box-sizing: border-box;
   }
 
   .mainArea {
     flex: 1 0 auto;
+    width: 100%;
+    max-width: 100vw;
     height: auto;
     min-height: 0;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
+    box-sizing: border-box;
   }
 
   .globalControlsBar {
     flex-direction: column;
     align-items: stretch;
+    width: 100%;
+    max-width: 100vw;
     padding: 6px 8px;
     gap: 8px;
+    box-sizing: border-box;
   }
 
   .browserTabs {
     width: 100%;
+    max-width: 100vw;
     padding: 4px 4px 0 4px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     white-space: nowrap;
+    box-sizing: border-box;
   }
 
   .browserTab {
@@ -216,19 +232,29 @@
 
   .controlsGroup {
     width: 100%;
+    max-width: 100vw;
     justify-content: space-between;
     padding: 4px 8px;
     flex-wrap: wrap;
+    box-sizing: border-box;
   }
 
   .paneStrip {
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
     overflow-x: hidden;
     overflow-y: visible;
     height: auto;
+    box-sizing: border-box;
   }
 
   .compassStrip {
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    overflow-y: visible;
+    box-sizing: border-box;
   }
 }

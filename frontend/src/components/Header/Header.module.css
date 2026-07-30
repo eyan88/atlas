@@ -337,54 +337,181 @@
   50%       { opacity: 0.4; }
 }
 
+/* Mobile Hamburger Navigation Button (Hidden on Desktop) */
+.mobileNavToggle {
+  display: none;
+  font-size: 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
 /* 📱 Header Mobile Responsiveness */
 @media (max-width: 768px) {
   .header {
-    height: auto;
-    padding: 8px 12px;
-    flex-wrap: wrap;
-    gap: 8px 12px;
+    height: 48px;
+    padding: 0 12px;
     justify-content: space-between;
+  }
+
+  .mobileNavToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .brandTagline {
     display: none;
   }
 
-  .tabs {
-    order: 3;
-    width: 100%;
-    justify-content: center;
-    margin-left: 0;
-    margin-top: 4px;
+  /* Hide header controls on mobile screen width; accessible via ☰ Hamburger Menu Drawer */
+  .header > .tabs,
+  .header > .strikeControl,
+  .header > .status,
+  .header > .searchTrigger {
+    display: none !important;
   }
+}
 
-  .tab {
-    flex: 1;
-    text-align: center;
-    padding: 6px 8px;
-    font-size: 10px;
-  }
+/* 🔍 Glassmorphic Mobile Navigation Drawer */
+.mobileNavBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(5, 7, 12, 0.8);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-start;
+  animation: fadeIn 0.15s ease-out;
+}
 
-  .controls {
-    gap: 8px;
-  }
+.mobileNavDrawer {
+  width: 85%;
+  max-width: 320px;
+  height: 100%;
+  background: rgba(13, 17, 23, 0.98);
+  border-right: 1px solid var(--border);
+  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  animation: slideRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
-  .searchShortcut {
-    display: none;
-  }
+@keyframes slideRight {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
 
-  .searchTrigger {
-    padding: 0 8px;
-    font-size: 10px;
-  }
+.mobileNavHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+}
 
-  .statusText {
-    display: none;
-  }
+.mobileNavClose {
+  font-size: 24px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
 
-  .dateInput {
-    padding: 4px 6px;
-    font-size: 11px;
-  }
+.mobileNavBody {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.mobileSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobileSectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.mobileTabGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobileTabBtn {
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mobileTabActive {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
+  border-color: rgba(88, 166, 255, 0.3);
+}
+
+.mobileSearchBtn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mobileControlRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.mobileControlName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mobileSelect {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  outline: none;
 }

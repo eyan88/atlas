@@ -18,6 +18,7 @@ export function Header() {
   const setColorTheme = useAppStore((s) => s.setColorTheme);
   const [tickerInput, setTickerInput] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   useEffect(() => {
@@ -74,14 +75,23 @@ export function Header() {
 
   return (
     <header className={styles.header}>
-      {/* Brand */}
+      {/* Brand & Mobile Hamburger Menu Toggle */}
       <div className={styles.brand}>
+        <button
+          type="button"
+          className={styles.mobileNavToggle}
+          onClick={() => setIsMobileNavOpen(true)}
+          title="Open Menu"
+          aria-label="Toggle Navigation Menu"
+        >
+          ☰
+        </button>
         <span className={styles.brandLogo}>◈</span>
         <span className={styles.brandName}>ATLAS</span>
         <span className={styles.brandTagline}>Dealer Positioning</span>
       </div>
 
-      {/* Tabs */}
+      {/* Desktop Tabs */}
       <div className={styles.tabs}>
         <button
           className={`${styles.tab} ${activeTab === 'heatmap' ? styles.tabActive : ''}`}
@@ -163,6 +173,106 @@ export function Header() {
         />
         <span className={styles.statusLabel}>{wsConnected ? 'LIVE' : 'OFFLINE'}</span>
       </div>
+
+      {/* Glassmorphic Mobile Navigation Drawer */}
+      {isMobileNavOpen && (
+        <div className={styles.mobileNavBackdrop} onClick={() => setIsMobileNavOpen(false)}>
+          <div className={styles.mobileNavDrawer} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.mobileNavHeader}>
+              <div className={styles.brand}>
+                <span className={styles.brandLogo}>◈</span>
+                <span className={styles.brandName}>ATLAS MENU</span>
+              </div>
+              <button
+                type="button"
+                className={styles.mobileNavClose}
+                onClick={() => setIsMobileNavOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.mobileNavBody}>
+              <div className={styles.mobileSection}>
+                <span className={styles.mobileSectionLabel}>Navigation Views</span>
+                <div className={styles.mobileTabGroup}>
+                  <button
+                    className={`${styles.mobileTabBtn} ${activeTab === 'heatmap' ? styles.mobileTabActive : ''}`}
+                    onClick={() => { setActiveTab('heatmap'); setIsMobileNavOpen(false); }}
+                  >
+                    Heatmaps
+                  </button>
+                  <button
+                    className={`${styles.mobileTabBtn} ${activeTab === 'compass' ? styles.mobileTabActive : ''}`}
+                    onClick={() => { setActiveTab('compass'); setIsMobileNavOpen(false); }}
+                  >
+                    Compass
+                  </button>
+                  <button
+                    className={`${styles.mobileTabBtn} ${activeTab === 'gamma-flow' ? styles.mobileTabActive : ''}`}
+                    onClick={() => { setActiveTab('gamma-flow'); setIsMobileNavOpen(false); }}
+                  >
+                    Gamma Flow
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.mobileSection}>
+                <span className={styles.mobileSectionLabel}>Ticker Search</span>
+                <button
+                  className={styles.mobileSearchBtn}
+                  onClick={() => { setIsMobileNavOpen(false); setIsSearchOpen(true); }}
+                >
+                  🔍 Search Tickers [TAB]
+                </button>
+              </div>
+
+              <div className={styles.mobileSection}>
+                <span className={styles.mobileSectionLabel}>Session Settings</span>
+                <div className={styles.mobileControlRow}>
+                  <span className={styles.mobileControlName}>Session Date:</span>
+                  <input
+                    type="date"
+                    className={styles.mobileSelect}
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                  />
+                </div>
+                <div className={styles.mobileControlRow}>
+                  <span className={styles.mobileControlName}>Strike Rows:</span>
+                  <select
+                    className={styles.mobileSelect}
+                    value={strikeCount}
+                    onChange={(e) => setStrikeCount(Number(e.target.value))}
+                  >
+                    {[10, 20, 30, 40, 50, 60].map((n) => (
+                      <option key={n} value={n}>{n} Strikes</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.mobileControlRow}>
+                  <span className={styles.mobileControlName}>Color Theme:</span>
+                  <select
+                    className={styles.mobileSelect}
+                    value={colorTheme}
+                    onChange={(e) => setColorTheme(e.target.value as 'atlas' | 'classic')}
+                  >
+                    <option value="atlas">Atlas Dark</option>
+                    <option value="classic">Classic</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.mobileSection}>
+                <div className={styles.status}>
+                  <span className={`${styles.statusDot} ${wsConnected ? styles.statusLive : styles.statusOff}`} />
+                  <span className={styles.statusLabel}>SERVER STATUS: {wsConnected ? 'LIVE' : 'OFFLINE'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isSearchOpen && (
         <div className={styles.searchOverlay} role="presentation" onMouseDown={() => setIsSearchOpen(false)}>
