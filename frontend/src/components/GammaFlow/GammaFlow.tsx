@@ -857,6 +857,19 @@ export function GammaFlow() {
 
                         <button
                           type="button"
+                          className={styles.cardFocusBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCardClick(widget.ticker);
+                          }}
+                          title="Expand ticker to Detail Focus view"
+                          aria-label="Expand view"
+                        >
+                          ⤢
+                        </button>
+
+                        <button
+                          type="button"
                           className={styles.cardDeleteBtn}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -869,11 +882,7 @@ export function GammaFlow() {
                       </div>
                     </div>
 
-                    <div
-                      className={styles.cardBody}
-                      onClick={() => handleCardClick(widget.ticker)}
-                      title="Click card to open in Focus Detail View"
-                    >
+                    <div className={styles.cardBody}>
                       {!data ? (
                         <div className={styles.cardLoading}>
                           <div className={styles.cardSpinner} />
