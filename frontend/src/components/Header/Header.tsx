@@ -98,12 +98,6 @@ export function Header() {
           Heatmaps
         </button>
         <button
-          className={`${styles.tab} ${activeTab === 'compass' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('compass')}
-        >
-          Compass
-        </button>
-        <button
           className={`${styles.tab} ${activeTab === 'gamma-flow' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('gamma-flow')}
         >
@@ -199,12 +193,6 @@ export function Header() {
                     onClick={() => { setActiveTab('heatmap'); setIsMobileNavOpen(false); }}
                   >
                     Heatmaps
-                  </button>
-                  <button
-                    className={`${styles.mobileTabBtn} ${activeTab === 'compass' ? styles.mobileTabActive : ''}`}
-                    onClick={() => { setActiveTab('compass'); setIsMobileNavOpen(false); }}
-                  >
-                    Compass
                   </button>
                   <button
                     className={`${styles.mobileTabBtn} ${activeTab === 'gamma-flow' ? styles.mobileTabActive : ''}`}
