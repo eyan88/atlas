@@ -113,6 +113,60 @@ class BlackScholesCalculator:
         return result_df
 
 
+class LeeReadyClassifier:
+    """
+    Vectorized implementation of the Lee-Ready (1991) Trade Aggressor Classification Algorithm.
+    Determines whether option trades are Buyer-Initiated (+1) or Seller-Initiated (-1) for GEX alignment.
+    """
+    @staticmethod
+    def classify_trades(trades_df: pd.DataFrame) -> pd.Series:
+        """
+        Classifies trade aggressor direction using the Lee-Ready Quote & Tick algorithm.
+        
+        Args:
+            trades_df: DataFrame containing trade & quote data. Must have columns:
+                'price', 'bid', 'ask' (and optional 'prev_price')
+                
+        Returns:
+            pd.Series with values +1.0 (Buyer-Initiated / Ask-Side) or -1.0 (Seller-Initiated / Bid-Side).
+        """
+        if trades_df.empty:
+            return pd.Series(dtype=float)
+
+        price = trades_df['price']
+        bid = trades_df['bid']
+        ask = trades_df['ask']
+        
+        # Calculate Bid-Ask Midpoint
+        midpoint = (bid + ask) / 2.0
+        
+        # 1. Quote Test
+        sign = pd.Series(0.0, index=trades_df.index)
+        sign[price > midpoint] = 1.0   # Buyer-Initiated (Ask-Side Aggression)
+        sign[price < midpoint] = -1.0  # Seller-Initiated (Bid-Side Aggression)
+        
+        # 2. Tick Test (Fallback when price == midpoint or quotes missing)
+        midpoint_mask = (price == midpoint) | (bid == 0.0) | (ask == 0.0) | (bid.isna()) | (ask.isna())
+        if midpoint_mask.any():
+            if 'prev_price' in trades_df.columns:
+                prev_p = trades_df['prev_price']
+            else:
+                prev_p = price.shift(1).fillna(price)
+                
+            tick_diff = price - prev_p
+            tick_sign = pd.Series(0.0, index=trades_df.index)
+            tick_sign[tick_diff > 0] = 1.0
+            tick_sign[tick_diff < 0] = -1.0
+            
+            # Forward-fill zero ticks (when price == prev_price)
+            tick_sign = tick_sign.replace(0.0, np.nan).ffill().fillna(1.0)
+            
+            # Apply Tick Test for midpoint trades
+            sign[midpoint_mask] = tick_sign[midpoint_mask]
+            
+        return sign
+
+
 class DealerExposureEngine:
     """
     Vectorized computation engine for aggregate options dealer positioning.
@@ -160,6 +214,32 @@ class DealerExposureEngine:
         result_df['net_vanna'] = sign * oi * vanna * vex_factor
         result_df['net_charm'] = sign * oi * charm * cex_factor
 
+        return result_df
+
+    def calculate_intraday_volume_gex(self, chain_df: pd.DataFrame, spot: float) -> pd.DataFrame:
+        """
+        Calculates dynamic intraday Volume GEX using Lee-Ready trade aggressor classification.
+        Matches commercial platform standards (Unusual Whales / SpotGamma).
+        """
+        if chain_df.empty:
+            return chain_df.copy()
+
+        result_df = chain_df.copy()
+        multiplier = 100.0
+        gex_factor = multiplier * (spot ** 2) * 0.01
+
+        vol = chain_df['volume'].fillna(0)
+        gamma = chain_df['gamma'].fillna(0.0)
+
+        # Apply Lee-Ready algorithm if trade price & quote data exist
+        if {'bid', 'ask', 'price'}.issubset(chain_df.columns):
+            aggressor_sign = LeeReadyClassifier.classify_trades(chain_df)
+        else:
+            is_call = (chain_df['option_type'] == 'C').astype(float)
+            is_put = (chain_df['option_type'] == 'P').astype(float)
+            aggressor_sign = is_call - is_put
+
+        result_df['volume_gex'] = aggressor_sign * vol * gamma * gex_factor
         return result_df
 
     def find_gamma_flip_strike(self, grouped_metrics_df: pd.DataFrame, spot: Optional[float] = None) -> float:
