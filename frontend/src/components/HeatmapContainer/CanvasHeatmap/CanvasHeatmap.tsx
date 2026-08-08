@@ -339,9 +339,9 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       allAbsVals.sort((a, b) => a - b);
       let sigThreshold = 0;
       if (allAbsVals.length > 0) {
-        // Top 20% magnitude (80th percentile)
-        const p80Idx = Math.floor(allAbsVals.length * 0.80);
-        sigThreshold = allAbsVals[p80Idx];
+        // Top 15% magnitude (85th percentile)
+        const p85Idx = Math.floor(allAbsVals.length * 0.85);
+        sigThreshold = allAbsVals[p85Idx];
       }
 
       const checkIsCellSignificant = (r: number, c: number): boolean => {
