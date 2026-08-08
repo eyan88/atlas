@@ -24,6 +24,9 @@ interface AppState {
   // Selected metric displayed in the heatmap
   selectedMetric: Metric;
 
+  // Highlight significant gamma nodes & dim noise cells
+  highlightSignificantNodes: boolean;
+
   // Color theme settings: 'atlas' (vibrant theme) or 'classic' (red/green)
   colorTheme: 'atlas' | 'classic';
 
@@ -98,6 +101,7 @@ interface AppState {
   setSelectedDate: (date: string) => void;
   setIsLoadingHistory: (loading: boolean) => void;
   toggleSidebar: () => void;
+  toggleHighlightSignificantNodes: () => void;
   setColorTheme: (theme: 'atlas' | 'classic') => void;
   setHoveredCell: (cell: CellDetail | null) => void;
 }
@@ -109,6 +113,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeTicker: '',
   openTickers: [],
   selectedMetric: 'net_gex',
+  highlightSignificantNodes: false,
   colorTheme: (localStorage.getItem('atlas_color_theme') as 'atlas' | 'classic') || 'atlas',
   strikeCount: 40,
   evolutionWindow: '1m',
@@ -131,6 +136,7 @@ export const useAppStore = create<AppState>((set) => ({
   // ─── Actions ────────────────────────────────────────────────────────────────
   
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  toggleHighlightSignificantNodes: () => set((state) => ({ highlightSignificantNodes: !state.highlightSignificantNodes })),
   setActiveTab: (tab) => set({ activeTab: tab }),
   setColorTheme: (theme) => {
     localStorage.setItem('atlas_color_theme', theme);

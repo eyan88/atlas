@@ -182,6 +182,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
   const evolutionWindow = useAppStore((s) => s.evolutionWindow);
   const snapshotsHistory = useAppStore((s) => s.snapshotsHistory);
   const colorTheme  = useAppStore((s) => s.colorTheme);
+  const highlightSignificantNodes = useAppStore((s) => s.highlightSignificantNodes);
 
   const CELL_W = isCompassMode ? 160 : 106;
   const CELL_H = isCompassMode ? 26 : 42;
@@ -321,9 +322,12 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       let maxAbsRowIdx = -1;
       let maxAbsColIdx = -1;
 
+      const allAbsVals: number[] = [];
+
       for (let r = 0; r < rows.length; r++) {
         for (let c = 0; c < cols.length; c++) {
           const absVal = Math.abs(snap.data[r][c]);
+          if (absVal > 0) allAbsVals.push(absVal);
           if (absVal > maxAbsValue) {
             maxAbsValue = absVal;
             maxAbsRowIdx = r;
@@ -331,6 +335,22 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           }
         }
       }
+
+      allAbsVals.sort((a, b) => a - b);
+      let sigThreshold = 0;
+      if (allAbsVals.length > 0) {
+        // Top 20% magnitude (80th percentile)
+        const p80Idx = Math.floor(allAbsVals.length * 0.80);
+        sigThreshold = allAbsVals[p80Idx];
+      }
+
+      const checkIsCellSignificant = (r: number, c: number): boolean => {
+        const isCellCallWall = colCallWallRows[c] === r;
+        const isCellPutWall = colPutWallRows[c] === r;
+        const isAbsMax = r === maxAbsRowIdx && c === maxAbsColIdx;
+        const val = Math.abs(snap.data[r][c]);
+        return isCellCallWall || isCellPutWall || isAbsMax || (sigThreshold > 0 && val >= sigThreshold);
+      };
 
       // Calculate percentage changes for display labels
       const pctChanges = rows.map((strike, r) => {
@@ -384,34 +404,60 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         for (let c = 0; c < cols.length; c++) {
           const x = axisLeft + c * CELL_W;
           const normVal = norm[r][c];
+          const raw = snap.data[r][c];
           
           // Map absolute exposure to color (warm gold for positive, violet for negative)
           const [r_, g_, b_, a] = valueToColor(normVal, colorTheme);
 
-          // Cell background (colored by absolute dealer exposure value)
-          ctx.fillStyle = `rgba(${r_},${g_},${b_},${a})`;
-          ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
-
           const isCellCallWall = colCallWallRows[c] === r;
           const isCellPutWall = colPutWallRows[c] === r;
+          const isSignificant = checkIsCellSignificant(r, c);
 
-          // Highlight row/cell borders based on priority: Spot > Flip > Expiry Call Wall > Expiry Put Wall
-          if (isSpot) {
-            ctx.strokeStyle = 'rgba(249,250,251,0.45)'; // White (Spot row)
+          if (highlightSignificantNodes && !isSignificant) {
+            // Dim non-significant cells
+            ctx.fillStyle = `rgba(${r_},${g_},${b_},${a * 0.08})`;
+            ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.lineWidth = 1;
             ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
-          } else if (isFlip) {
-            ctx.strokeStyle = 'rgba(251,191,36,0.55)'; // Amber/Gold (Flip row)
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
-          } else if (isCellCallWall) {
-            ctx.strokeStyle = '#34d399'; // Mint Green (Call Wall cell)
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
-          } else if (isCellPutWall) {
-            ctx.strokeStyle = '#f87171'; // Coral Red (Put Wall cell)
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
+          } else {
+            // Significant cell OR normal view mode
+            ctx.fillStyle = `rgba(${r_},${g_},${b_},${highlightSignificantNodes ? Math.max(a, 0.65) : a})`;
+            ctx.fillRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+
+            if (highlightSignificantNodes && isSignificant) {
+              // Highlight significant node with glowing border and badge
+              ctx.strokeStyle = raw >= 0 ? '#38bdf8' : '#f43f5e';
+              ctx.lineWidth = 2.5;
+              ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+
+              // Draw badge icon
+              ctx.fillStyle = raw >= 0 ? '#38bdf8' : '#f43f5e';
+              ctx.font = '10px sans-serif';
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'top';
+              ctx.fillText('⚡', x + 3, y + 3);
+            } else {
+              // Highlight row/cell borders based on priority: Spot > Flip > Expiry Call Wall > Expiry Put Wall
+              if (isSpot) {
+                ctx.strokeStyle = 'rgba(249,250,251,0.45)'; // White (Spot row)
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+              } else if (isFlip) {
+                ctx.strokeStyle = 'rgba(251,191,36,0.55)'; // Amber/Gold (Flip row)
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 1, y + 1, CELL_W - 2, CELL_H - 2);
+              } else if (isCellCallWall) {
+                ctx.strokeStyle = '#34d399'; // Mint Green (Call Wall cell)
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
+              } else if (isCellPutWall) {
+                ctx.strokeStyle = '#f87171'; // Coral Red (Put Wall cell)
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1.5, y + 1.5, CELL_W - 3, CELL_H - 3);
+              }
+            }
           }
 
           // If this cell is the absolute maximum exposure node in the entire matrix, draw a gold star waypoint ★
@@ -424,7 +470,6 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           }
 
           // Line 1: Absolute Value
-          const raw = snap.data[r][c];
           const absV = Math.abs(raw);
           let label = '';
           if      (absV >= 1e9) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e9).toFixed(1)}B`;
@@ -432,11 +477,13 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
           else if (absV >= 1e3) label = `${raw >= 0 ? '+' : '-'}${(absV / 1e3).toFixed(0)}K`;
           else                  label = `${raw >= 0 ? '+' : '-'}${absV.toFixed(1)}`;
 
+          const isDimmedText = highlightSignificantNodes && !isSignificant;
+
           // Fill main text
           
           if (isCompassMode) {
             // Side by side
-            ctx.fillStyle = textColorForCell(r_, g_, b_);
+            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : textColorForCell(r_, g_, b_);
             ctx.font = "11px 'Inter', sans-serif";
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
@@ -455,16 +502,16 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
             
             ctx.beginPath();
             ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+            ctx.fillStyle = isDimmedText ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.38)';
             ctx.fill();
             
-            ctx.fillStyle = pctColorForCell(isPos);
+            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : pctColorForCell(isPos);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(pctLabel, pillX + pillW / 2, y + CELL_H / 2 + 1);
           } else {
             // Top and bottom
-            ctx.fillStyle = textColorForCell(r_, g_, b_);
+            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : textColorForCell(r_, g_, b_);
             ctx.font = "11px 'Inter', sans-serif";
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
@@ -483,10 +530,10 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
             
             ctx.beginPath();
             ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+            ctx.fillStyle = isDimmedText ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.38)';
             ctx.fill();
 
-            ctx.fillStyle = pctColorForCell(isPos);
+            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : pctColorForCell(isPos);
             ctx.textAlign = 'center';
             ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
           }
@@ -494,6 +541,8 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
 
 
         // Strike label (drawn after cell backgrounds)
+        const rowHasSig = cols.some((_, c) => checkIsCellSignificant(r, c));
+
         if (isSpot) {
           ctx.fillStyle = '#f9fafb'; // White
         } else if (isFlip) {
@@ -503,7 +552,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         } else if (isPut) {
           ctx.fillStyle = '#f87171'; // Coral Red
         } else {
-          ctx.fillStyle = '#6b7280'; // Gray
+          ctx.fillStyle = highlightSignificantNodes && !rowHasSig ? 'rgba(107, 114, 128, 0.25)' : '#6b7280'; // Dim or Gray
         }
         ctx.font = FONT;
         ctx.textBaseline = 'middle';
@@ -517,7 +566,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         }
       }
     },
-    [evolutionWindow, refSnap, isCompassMode, CELL_W, CELL_H],
+    [evolutionWindow, refSnap, isCompassMode, colorTheme, highlightSignificantNodes, CELL_W, CELL_H],
   );
 
 
