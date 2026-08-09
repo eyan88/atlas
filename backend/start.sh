@@ -7,8 +7,12 @@ if [ "${DATA_PROVIDER,,}" = "thetadata" ]; then
     echo "========================================================"
     
     if [ -n "$THETADATA_USERNAME" ] && [ -n "$THETADATA_PASSWORD" ]; then
-        java -jar /app/ThetaTerminal.jar --username="$THETADATA_USERNAME" --password="$THETADATA_PASSWORD" &
-        echo "ThetaTerminal launched in background on 127.0.0.1:25510."
+        if [ -f "/app/ThetaTerminalv3.jar" ]; then
+            java -jar /app/ThetaTerminalv3.jar --username="$THETADATA_USERNAME" --password="$THETADATA_PASSWORD" &
+        else
+            java -jar /app/ThetaTerminal.jar --username="$THETADATA_USERNAME" --password="$THETADATA_PASSWORD" &
+        fi
+        echo "ThetaTerminal v3 launched in background on 127.0.0.1:25510."
         echo "Waiting 5 seconds for ThetaTerminal to initialize..."
         sleep 5
     else

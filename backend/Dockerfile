@@ -26,8 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Download official Headless ThetaTerminal Java JAR
-RUN curl -o /app/ThetaTerminal.jar https://thetadata-firmware.s3.amazonaws.com/ThetaTerminal.jar
+# Download official Headless ThetaTerminal v3 Java JAR
+RUN curl -o /app/ThetaTerminalv3.jar https://thetadata-firmware.s3.amazonaws.com/ThetaTerminalv3.jar || \
+    curl -o /app/ThetaTerminalv3.jar https://thetadata-firmware.s3.amazonaws.com/ThetaTerminal.jar
 
 # Copy user-installed packages from builder stage
 COPY --from=builder /root/.local /root/.local
