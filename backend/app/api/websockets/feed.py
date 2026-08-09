@@ -11,22 +11,24 @@ from app.models.metric import DealerMetricSnapshot
 from app.models.underlying import UnderlyingPriceSnapshot
 from app.api.endpoints.heatmap import get_heatmap
 
-router = APIRouter()
+from app.db.session import SessionLocal
 
 @router.websocket("/{ticker}")
-async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int = 40, db: Session = Depends(get_db)):
+async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int = 40):
     await websocket.accept()
     ticker = ticker.upper()
     
     # 1. Fetch and send the initial full snapshot (INIT)
+    db = None
     try:
+        db = SessionLocal()
         init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db, redis_conn=None)
         await websocket.send_json({
             "type": "INIT",
             "payload": init_data
         })
     except HTTPException as e:
-        if e.status_code == 404:
+        if e.status_code == 404 and db:
             from app.core.config import settings
             from app.db.backfill_eod import run_backfill
             from datetime import date, timedelta
@@ -66,6 +68,9 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int
             })
         except Exception:
             pass
+    finally:
+        if db:
+            db.close()
 
     # 2. Establish connection to Redis Pub/Sub
     import redis.asyncio as aioredis
