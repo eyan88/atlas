@@ -29,10 +29,10 @@ app = FastAPI(
 # Enable Gzip compression for network egress optimization (responses > 500 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Set all CORS enabled origins
+# Set all CORS enabled origins safely with regex support for cloud origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
