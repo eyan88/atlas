@@ -151,7 +151,7 @@ export function CompassChart() {
     return () => {
       active = false;
     };
-  }, [activeChartTicker, selectedDate, gexSource, tickerHistory]);
+  }, [activeChartTicker, selectedDate, gexSource]);
 
   // Find currently active candle matching the timeline slider playhead (closest 2.5-minute match)
   const activeCandle = currentTimestamp

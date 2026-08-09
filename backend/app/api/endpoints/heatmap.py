@@ -471,9 +471,57 @@ def get_stock_candles(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
-    # Convert date to UTC boundaries
-    start_ts = int(datetime.combine(dt, py_time.min).replace(tzinfo=timezone.utc).timestamp())
-    end_ts = int(datetime.combine(dt, py_time.max).replace(tzinfo=timezone.utc).timestamp())
+    start_dt = datetime.combine(dt, py_time.min)
+    end_dt = datetime.combine(dt, py_time.max)
+
+    # 1. Primary Source: Fetch underlying price snapshots from database
+    db_prices = db.query(UnderlyingPriceSnapshot).filter(
+        UnderlyingPriceSnapshot.ticker == ticker.upper(),
+        UnderlyingPriceSnapshot.timestamp >= start_dt,
+        UnderlyingPriceSnapshot.timestamp <= end_dt
+    ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
+
+    if db_prices:
+        candles = []
+        for p in db_prices:
+            ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
+            candles.append({
+                "time": ts,
+                "open": float(p.price),
+                "high": float(p.price),
+                "low": float(p.price),
+                "close": float(p.price)
+            })
+        return candles
+
+    # 2. Secondary Source: Fetch from ThetaData stock_history_1m if configured
+    if settings.DATA_PROVIDER == "thetadata":
+        try:
+            from thetadata import ThetaClient
+            username = os.getenv("THETADATA_USERNAME") or os.getenv("THETADATA_EMAIL")
+            password = os.getenv("THETADATA_PASSWORD")
+            if username and password:
+                client = ThetaClient(email=username, password=password, dataframe_type="pandas")
+                df_stock = client.stock_history_1m(symbol=ticker.upper(), start_date=dt.date(), end_date=dt.date())
+                if not df_stock.empty:
+                    candles = []
+                    for _, row in df_stock.iterrows():
+                        ts = int(pd.to_datetime(row["ms_of_day"], unit="ms").timestamp()) if "ms_of_day" in row else int(time.time())
+                        candles.append({
+                            "time": ts,
+                            "open": float(row.get("open", row.get("close", 0))),
+                            "high": float(row.get("high", row.get("close", 0))),
+                            "low": float(row.get("low", row.get("close", 0))),
+                            "close": float(row.get("close", 0))
+                        })
+                    if candles:
+                        return candles
+        except Exception as e:
+            print(f"Notice: ThetaData stock_history_1m fetch notice for {ticker}: {e}")
+
+    # 3. Fallback Source: Query Yahoo Finance API
+    start_ts = int(start_dt.replace(tzinfo=timezone.utc).timestamp())
+    end_ts = int(end_dt.replace(tzinfo=timezone.utc).timestamp())
 
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?period1={start_ts}&period2={end_ts}&interval=5m"
     headers = {
@@ -512,25 +560,6 @@ def get_stock_candles(
                     "high": float(highs[i]),
                     "low": float(lows[i]),
                     "close": float(closes[i])
-                })
-        if not candles:
-            # Fallback to database underlying price snapshots if Yahoo Finance is empty/offline
-            start_dt = datetime.combine(dt, py_time.min)
-            end_dt = datetime.combine(dt, py_time.max)
-            db_prices = db.query(UnderlyingPriceSnapshot).filter(
-                UnderlyingPriceSnapshot.ticker == ticker.upper(),
-                UnderlyingPriceSnapshot.timestamp >= start_dt,
-                UnderlyingPriceSnapshot.timestamp <= end_dt
-            ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
-            
-            for p in db_prices:
-                ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
-                candles.append({
-                    "time": ts,
-                    "open": float(p.price),
-                    "high": float(p.price),
-                    "low": float(p.price),
-                    "close": float(p.price)
                 })
         return candles
     except Exception as e:

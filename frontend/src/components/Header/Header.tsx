@@ -101,7 +101,7 @@ export function Header() {
           className={`${styles.tab} ${activeTab === 'compass' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('compass')}
         >
-          Compass View 🧭
+          Compass
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'gamma-flow' ? styles.tabActive : ''}`}
@@ -204,7 +204,7 @@ export function Header() {
                     className={`${styles.mobileTabBtn} ${activeTab === 'compass' ? styles.mobileTabActive : ''}`}
                     onClick={() => { setActiveTab('compass'); setIsMobileNavOpen(false); }}
                   >
-                    Compass View 🧭
+                    Compass
                   </button>
                   <button
                     className={`${styles.mobileTabBtn} ${activeTab === 'gamma-flow' ? styles.mobileTabActive : ''}`}
