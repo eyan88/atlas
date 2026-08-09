@@ -11,6 +11,7 @@ from app.models.metric import DealerMetricSnapshot
 from app.models.underlying import UnderlyingPriceSnapshot
 from app.api.endpoints.heatmap import get_heatmap
 
+router = APIRouter()
 from app.db.session import SessionLocal
 
 @router.websocket("/{ticker}")
