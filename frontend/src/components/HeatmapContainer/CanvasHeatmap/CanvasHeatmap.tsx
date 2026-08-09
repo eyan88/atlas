@@ -356,7 +356,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       };
 
       // Calculate percentage changes for display labels
-      const pctChanges = rows.map((strike, r) => {
+      const pctChanges = rows.map((_strike, r) => {
         return cols.map((_exp, c) => {
           const curVal = snap.data[r][c];
           let refVal = curVal;
