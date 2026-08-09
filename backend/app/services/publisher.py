@@ -103,9 +103,10 @@ async def realtime_live_publisher():
                     diffs = []
                     strike_agg = {}
                     for (strike, exp), c in cells.items():
+                        exp_str = str(exp).split('T')[0].split(' ')[0]
                         diffs.append({
                             "k": float(strike),
-                            "e": exp.isoformat() if hasattr(exp, 'isoformat') else str(exp),
+                            "e": exp_str,
                             "g": float(c["g"]),
                             "d": float(c["d"]),
                             "va": float(c["va"]),
@@ -139,7 +140,13 @@ async def realtime_live_publisher():
                         "put_wall": put_wall,
                         "diffs": diffs
                     }
-                    
+
+                    # If off-hours polling returns zeroed-out quotes, skip publishing to preserve active heatmap
+                    has_gex_data = any(d["g"] != 0.0 or d["d"] != 0.0 or d["v"] > 0 for d in diffs)
+                    if not has_gex_data:
+                        print(f"Off-hours polling for {ticker}: market exchanges closed. Preserving active heatmap.")
+                        continue
+
                     await r.publish(f"atlas:realtime:{ticker}", json.dumps(payload))
 
                     # Persist live 60-second snapshot to DB for historical evolution & timeline tracking

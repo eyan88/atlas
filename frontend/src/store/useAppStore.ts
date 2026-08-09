@@ -8,6 +8,11 @@ export function toSeconds(ts: number): number {
   return ts > 1e11 ? Math.floor(ts / 1000) : ts;
 }
 
+export function strToDateStr(d: string): string {
+  if (!d) return '';
+  return String(d).split('T')[0];
+}
+
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
 export type AppTab = 'heatmap' | 'compass' | 'gamma-flow';
@@ -311,12 +316,13 @@ export const useAppStore = create<AppState>((set) => ({
         nextData = current.data.map((row) => [...row]);
       }
 
-      const rowMap = new Map(rows.map((r, i) => [r, i]));
-      const colMap = new Map(columns.map((c, i) => [c, i]));
+      const rowMap = new Map(rows.map((r, i) => [Number(r), i]));
+      const colMap = new Map(columns.map((c, i) => [strToDateStr(c), i]));
 
+      let hasValidDiffs = false;
       payload.diffs.forEach((diff) => {
-        const rIdx = rowMap.get(diff.k);
-        const cIdx = colMap.get(diff.e);
+        const rIdx = rowMap.get(Number(diff.k));
+        const cIdx = colMap.get(strToDateStr(diff.e));
         if (rIdx !== undefined && cIdx !== undefined) {
           let val = diff.g; 
           if (state.selectedMetric === 'net_dex') val = diff.d ?? diff.oi; 
@@ -326,9 +332,15 @@ export const useAppStore = create<AppState>((set) => ({
           else if (state.selectedMetric === 'put_oi') val = diff.poi ?? diff.oi;
           else if (state.selectedMetric === 'volume') val = diff.v;
 
+          if (val !== 0) hasValidDiffs = true;
           nextData[rIdx][cIdx] = val;
         }
       });
+
+      // If the incoming diff payload was completely zeroed out (e.g. off-hours polling), keep current heatmap intact
+      if (!hasValidDiffs && current && current.data && current.data.some(row => row.some(v => v !== 0))) {
+        nextData = current.data;
+      }
 
       const nextSnapshot = {
         ticker: payload.ticker,
