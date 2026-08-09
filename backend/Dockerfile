@@ -19,9 +19,9 @@ FROM python:3.12-slim as runner
 
 WORKDIR /app
 
-# Install system runtime dependencies (Open Java JRE for ThetaTerminal, curl, libpq5)
+# Install system runtime dependencies (Default Java JRE for ThetaTerminal, curl, libpq5)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-17-jre-headless \
+    default-jre-headless \
     curl \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
