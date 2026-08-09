@@ -233,6 +233,22 @@ def get_replay_timeline(
             except Exception as e:
                 print(f"On-the-fly backfill failed for {ticker} date {date}: {e}")
 
+    # Fallback to the latest available trading session date on or before query_date (e.g., Friday for a Sunday lookup)
+    if not timestamps:
+        prev_ts = db.query(func.max(DealerMetricSnapshot.timestamp)).filter(
+            DealerMetricSnapshot.ticker == ticker,
+            DealerMetricSnapshot.timestamp <= end_dt
+        ).scalar()
+        if prev_ts:
+            fallback_date = prev_ts.date()
+            f_start = datetime.combine(fallback_date, datetime.min.time())
+            f_end = datetime.combine(fallback_date, datetime.max.time())
+            timestamps = db.query(DealerMetricSnapshot.timestamp).filter(
+                DealerMetricSnapshot.ticker == ticker,
+                DealerMetricSnapshot.timestamp >= f_start,
+                DealerMetricSnapshot.timestamp <= f_end
+            ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
+
     # Convert timestamps to unix epoch seconds, forcing UTC timezone for naive values
     unix_timestamps = []
     for ts in timestamps:
@@ -289,6 +305,22 @@ def get_heatmap_history(
         DealerMetricSnapshot.timestamp >= start_dt,
         DealerMetricSnapshot.timestamp <= end_dt
     ).order_by(DealerMetricSnapshot.timestamp.asc()).all()
+
+    if not records:
+        # Fallback to the latest available trading date on or before query_date (e.g. Friday for weekend/Sunday lookup)
+        prev_ts = db.query(func.max(DealerMetricSnapshot.timestamp)).filter(
+            DealerMetricSnapshot.ticker == ticker,
+            DealerMetricSnapshot.timestamp <= end_dt
+        ).scalar()
+        if prev_ts:
+            fallback_date = prev_ts.date()
+            start_dt = datetime.combine(fallback_date, datetime.min.time())
+            end_dt = datetime.combine(fallback_date, datetime.max.time())
+            records = db.query(DealerMetricSnapshot).filter(
+                DealerMetricSnapshot.ticker == ticker,
+                DealerMetricSnapshot.timestamp >= start_dt,
+                DealerMetricSnapshot.timestamp <= end_dt
+            ).order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
     if not records:
         return {"ticker": ticker, "date": date, "history": {}}
