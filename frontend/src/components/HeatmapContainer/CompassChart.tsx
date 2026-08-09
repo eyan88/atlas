@@ -352,64 +352,64 @@ export function CompassChart() {
 
       ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-      // Helper to sum options size at strike
-      const getGexSumForStrike = (snap: any, strike: number) => {
-        if (!snap || !snap.rows || !snap.data) return 0;
-        const idx = snap.rows.indexOf(strike);
-        if (idx === -1) return 0;
-        return snap.data[idx].reduce((sum: number, val: number) => sum + Math.abs(val), 0);
+      // Helper to calculate strike-level net GEX map for a snapshot
+      const getSignificantGammaNodes = (snap: any) => {
+        if (!snap || !snap.rows || !snap.data) return [];
+        const strikeSums: { strike: number; gex: number; absGex: number }[] = [];
+        let maxAbsGex = 0;
+
+        snap.rows.forEach((strike: number, rowIdx: number) => {
+          const rowVals = snap.data[rowIdx];
+          const netGex = rowVals ? rowVals.reduce((sum: number, val: number) => sum + val, 0) : 0;
+          const absGex = Math.abs(netGex);
+          if (absGex > maxAbsGex) maxAbsGex = absGex;
+          strikeSums.push({ strike, gex: netGex, absGex });
+        });
+
+        if (maxAbsGex === 0) return [];
+
+        // Significance threshold: keep nodes with at least 15% of maximum GEX peak magnitude
+        const threshold = maxAbsGex * 0.15;
+        return strikeSums
+          .filter((n) => n.absGex >= threshold)
+          .map((n) => ({
+            ...n,
+            relativeMagnitude: n.absGex / maxAbsGex,
+          }));
       };
 
-      // Loop through and draw bubbles for each candle
+      // Loop through and draw dynamic gamma node bubbles for each candle
       candles.forEach((c) => {
         const x = chart.timeScale().timeToCoordinate(c.time as any);
         if (x === null || x < 0 || x > canvas.clientWidth) return;
 
-        // Find active snapshot for this candle to calculate relative GEX sum magnitude
-        const snapKey = Object.keys(tickerHistory)
-          .map(Number)
-          .find((ts) => Math.abs(ts - c.time) < 150);
-        const snap = snapKey ? tickerHistory[snapKey] : null;
+        // Find active snapshot for this candle
+        const snapKey = historyKeys.find((ts) => Math.abs(ts - c.time) < 150);
+        const snap = snapKey ? tickerHistory[snapKey] : latestHistorySnap;
+        const sigNodes = getSignificantGammaNodes(snap);
 
-        // 1. Draw Call Wall bubble (sleek, capped at max 8px radius)
-        if (c.call_wall != null) {
-          const y = series.priceToCoordinate(c.call_wall);
+        sigNodes.forEach((node) => {
+          const y = series.priceToCoordinate(node.strike);
           if (y !== null && y >= 0 && y <= canvas.clientHeight) {
-            const gexSum = getGexSumForStrike(snap, c.call_wall);
-            const radius = 3 + Math.min(5, (gexSum / 1e9) * 1.5);
+            const isPos = node.gex >= 0;
+            // Circle radius scales dynamically with relative magnitude (2.5px to 10px)
+            const radius = 2.5 + Math.min(7.5, node.relativeMagnitude * 7.5);
 
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = 'rgba(52, 211, 153, 0.22)';
-            ctx.strokeStyle = 'rgba(52, 211, 153, 0.75)';
+            ctx.fillStyle = isPos
+              ? 'rgba(52, 211, 153, 0.22)'
+              : (colorTheme === 'classic' ? 'rgba(239, 68, 68, 0.22)' : 'rgba(192, 132, 252, 0.22)');
+            ctx.strokeStyle = isPos
+              ? 'rgba(52, 211, 153, 0.75)'
+              : (colorTheme === 'classic' ? 'rgba(239, 68, 68, 0.75)' : 'rgba(192, 132, 252, 0.75)');
             ctx.lineWidth = 1;
             ctx.fill();
             ctx.stroke();
           }
-        }
+        });
 
-        // 2. Draw Put Wall bubble (sleek, capped at max 8px radius)
-        if (c.put_wall != null) {
-          const y = series.priceToCoordinate(c.put_wall);
-          if (y !== null && y >= 0 && y <= canvas.clientHeight) {
-            const gexSum = getGexSumForStrike(snap, c.put_wall);
-            const radius = 3 + Math.min(5, (gexSum / 1e9) * 1.5);
-
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = colorTheme === 'classic'
-              ? 'rgba(248, 113, 113, 0.22)'
-              : 'rgba(192, 132, 252, 0.22)';
-            ctx.strokeStyle = colorTheme === 'classic'
-              ? 'rgba(248, 113, 113, 0.75)'
-              : 'rgba(192, 132, 252, 0.75)';
-            ctx.lineWidth = 1;
-            ctx.fill();
-            ctx.stroke();
-          }
-        }
-
-        // 3. Draw Gamma Flip bubble (sleek constant 2px dot)
+        // Draw Gamma Flip dot (yellow accent)
         if (c.gamma_flip != null) {
           const y = series.priceToCoordinate(c.gamma_flip);
           if (y !== null && y >= 0 && y <= canvas.clientHeight) {
