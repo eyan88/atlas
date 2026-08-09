@@ -517,3 +517,21 @@ def get_stock_candles(
     except Exception as e:
         print(f"Error fetching Yahoo Finance candles for {ticker} on {date}: {e}")
         return []
+
+@router.get("/admin/reset-db")
+@router.post("/admin/reset-db")
+def admin_reset_db(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Admin endpoint to wipe database snapshots and trigger fresh ThetaData backfills.
+    """
+    try:
+        deleted_metrics = db.query(DealerMetricSnapshot).delete()
+        deleted_prices = db.query(UnderlyingPriceSnapshot).delete()
+        db.commit()
+        return {
+            "status": "success",
+            "message": f"Wiped {deleted_metrics} metric records and {deleted_prices} price records. Fresh backfills will trigger automatically."
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database reset error: {str(e)}")
