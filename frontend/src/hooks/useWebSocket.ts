@@ -115,7 +115,7 @@ export function useWebSocket() {
           
           // Only reconnect if the store is still in LIVE mode
           const currentState = useAppStore.getState();
-          const stillLive = currentState.currentTimestamp === null && currentState.selectedDate === todayStr;
+          const stillLive = currentState.currentTimestamp === null;
           if (stillLive) {
             reconnectTimer = setTimeout(connect, 3000);
           }
@@ -137,5 +137,5 @@ export function useWebSocket() {
         wsRef.current = null;
       }
     };
-  }, [activeTicker, isLive, todayStr]); // reconnect when active ticker, live state, or today date updates
+  }, [activeTicker, isLive]); // reconnect when active ticker or live state updates
 }
