@@ -103,3 +103,7 @@ lerna-debug.log*
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Database files
+*.db
+backend/atlas.db

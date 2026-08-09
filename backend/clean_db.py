@@ -12,16 +12,16 @@ from app.models.underlying import UnderlyingPriceSnapshot
 def clean_database():
     db = SessionLocal()
     try:
-        print("Cleaning mock simulation data from database...")
-        # Keep only the real backfilled closing snapshot at 4:00 PM ET (16:00:00)
-        target_timestamp = datetime(2026, 7, 2, 16, 0, 0)
+        print("Cleaning all old mock simulation data from database...")
+        # Delete all mock seed data prior to August 2026
+        cutoff_date = datetime(2026, 8, 1)
         
         deleted_prices = db.query(UnderlyingPriceSnapshot).filter(
-            UnderlyingPriceSnapshot.timestamp != target_timestamp
+            UnderlyingPriceSnapshot.timestamp < cutoff_date
         ).delete()
         
         deleted_metrics = db.query(DealerMetricSnapshot).filter(
-            DealerMetricSnapshot.timestamp != target_timestamp
+            DealerMetricSnapshot.timestamp < cutoff_date
         ).delete()
         
         db.commit()
