@@ -7,10 +7,14 @@ if [ "${DATA_PROVIDER,,}" = "thetadata" ]; then
     echo "========================================================"
     
     if [ -n "$THETADATA_USERNAME" ] && [ -n "$THETADATA_PASSWORD" ]; then
+        # Generate 2-line creds.txt file required by ThetaTerminal v3
+        printf "%s\n%s\n" "$THETADATA_USERNAME" "$THETADATA_PASSWORD" > /app/creds.txt
+        echo "Generated /app/creds.txt dynamically from environment variables."
+        
         if [ -f "/app/ThetaTerminalv3.jar" ]; then
-            java -jar /app/ThetaTerminalv3.jar --username="$THETADATA_USERNAME" --password="$THETADATA_PASSWORD" &
+            java -jar /app/ThetaTerminalv3.jar --creds-file /app/creds.txt &
         else
-            java -jar /app/ThetaTerminal.jar --username="$THETADATA_USERNAME" --password="$THETADATA_PASSWORD" &
+            java -jar /app/ThetaTerminal.jar --creds-file /app/creds.txt &
         fi
         echo "ThetaTerminal v3 launched in background on 127.0.0.1:25510."
         echo "Waiting 5 seconds for ThetaTerminal to initialize..."
