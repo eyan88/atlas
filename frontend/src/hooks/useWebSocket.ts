@@ -32,9 +32,7 @@ export function useWebSocket() {
   const setWsConnected = useAppStore((s) => s.setWsConnected);
 
   const currentTimestamp = useAppStore((s) => s.currentTimestamp);
-  const selectedDate = useAppStore((s) => s.selectedDate);
-  const todayStr = new Date().toISOString().split('T')[0];
-  const isLive = currentTimestamp === null && selectedDate === todayStr;
+  const isLive = currentTimestamp === null;
 
   const wsRef       = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -45,10 +43,13 @@ export function useWebSocket() {
     if (!isLive || !activeTicker) {
       if (wsRef.current) {
         wsRef.current.onclose = null; // Unbind handler to prevent reconnect
-        wsRef.current.close();
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.close();
+        }
         wsRef.current = null;
       }
       setWsConnected(false);
+      return;
     } else {
       const connect = () => {
         const state = useAppStore.getState();
