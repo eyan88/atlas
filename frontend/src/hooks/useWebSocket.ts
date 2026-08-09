@@ -42,9 +42,14 @@ export function useWebSocket() {
 
     if (!isLive || !activeTicker) {
       if (wsRef.current) {
-        wsRef.current.onclose = null; // Unbind handler to prevent reconnect
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.close();
+        const socket = wsRef.current;
+        socket.onclose = null;
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        } else if (socket.readyState === WebSocket.CONNECTING) {
+          socket.onopen = () => {
+            try { socket.close(); } catch { /* ignore */ }
+          };
         }
         wsRef.current = null;
       }
@@ -132,8 +137,15 @@ export function useWebSocket() {
         heartbeatRef.current = null;
       }
       if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close();
+        const socket = wsRef.current;
+        socket.onclose = null;
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        } else if (socket.readyState === WebSocket.CONNECTING) {
+          socket.onopen = () => {
+            try { socket.close(); } catch { /* ignore */ }
+          };
+        }
         wsRef.current = null;
       }
     };
