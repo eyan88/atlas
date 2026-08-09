@@ -513,10 +513,51 @@ def get_stock_candles(
                     "low": float(lows[i]),
                     "close": float(closes[i])
                 })
+        if not candles:
+            # Fallback to database underlying price snapshots if Yahoo Finance is empty/offline
+            start_dt = datetime.combine(dt, py_time.min)
+            end_dt = datetime.combine(dt, py_time.max)
+            db_prices = db.query(UnderlyingPriceSnapshot).filter(
+                UnderlyingPriceSnapshot.ticker == ticker.upper(),
+                UnderlyingPriceSnapshot.timestamp >= start_dt,
+                UnderlyingPriceSnapshot.timestamp <= end_dt
+            ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
+            
+            for p in db_prices:
+                ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
+                candles.append({
+                    "time": ts,
+                    "open": float(p.price),
+                    "high": float(p.price),
+                    "low": float(p.price),
+                    "close": float(p.price)
+                })
         return candles
     except Exception as e:
-        print(f"Error fetching Yahoo Finance candles for {ticker} on {date}: {e}")
-        return []
+        print(f"Error fetching candles for {ticker} on {date}: {e}")
+        # Fallback to database underlying price snapshots
+        try:
+            start_dt = datetime.combine(dt, py_time.min)
+            end_dt = datetime.combine(dt, py_time.max)
+            db_prices = db.query(UnderlyingPriceSnapshot).filter(
+                UnderlyingPriceSnapshot.ticker == ticker.upper(),
+                UnderlyingPriceSnapshot.timestamp >= start_dt,
+                UnderlyingPriceSnapshot.timestamp <= end_dt
+            ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
+            
+            candles = []
+            for p in db_prices:
+                ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
+                candles.append({
+                    "time": ts,
+                    "open": float(p.price),
+                    "high": float(p.price),
+                    "low": float(p.price),
+                    "close": float(p.price)
+                })
+            return candles
+        except Exception:
+            return []
 
 @router.get("/admin/reset-db")
 @router.post("/admin/reset-db")

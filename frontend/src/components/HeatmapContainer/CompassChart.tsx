@@ -158,11 +158,14 @@ export function CompassChart() {
     ? candles.find((c) => Math.abs(c.time - currentTimestamp) < 150) || candles[candles.length - 1]
     : candles[candles.length - 1];
 
-  // Selected level values for display (matching the active candle/playhead)
-  const spotPriceVal = activeCandle?.close;
-  const callWallVal = activeCandle?.call_wall;
-  const putWallVal = activeCandle?.put_wall;
-  const flipVal = activeCandle?.gamma_flip;
+  const liveSnap = useAppStore((s) => s.heatmapsByTicker[activeChartTicker] ?? s.heatmap);
+  const liveSpot = useAppStore((s) => s.spotPrice);
+
+  // Selected level values for display (matching live stream or active playhead candle)
+  const spotPriceVal = currentTimestamp === null ? (liveSnap?.spot_price ?? liveSpot ?? activeCandle?.close) : activeCandle?.close;
+  const callWallVal = currentTimestamp === null ? (liveSnap?.call_wall ?? activeCandle?.call_wall) : activeCandle?.call_wall;
+  const putWallVal = currentTimestamp === null ? (liveSnap?.put_wall ?? activeCandle?.put_wall) : activeCandle?.put_wall;
+  const flipVal = currentTimestamp === null ? (liveSnap?.gamma_flip ?? activeCandle?.gamma_flip) : activeCandle?.gamma_flip;
 
   // Render OHLC values for hovered candle or active candle
   const displayCandle = hoveredCandle || activeCandle || null;
