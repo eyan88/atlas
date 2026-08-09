@@ -141,6 +141,47 @@ async def realtime_live_publisher():
                     }
                     
                     await r.publish(f"atlas:realtime:{ticker}", json.dumps(payload))
+
+                    # Persist live 60-second snapshot to DB for historical evolution & timeline tracking
+                    try:
+                        from app.db.session import SessionLocal
+                        from app.models.metric import DealerMetricSnapshot
+                        from app.models.underlying import UnderlyingPriceSnapshot
+                        from datetime import date as py_date
+                        
+                        db = SessionLocal()
+                        now_dt = datetime.now(timezone.utc)
+                        
+                        db.add(UnderlyingPriceSnapshot(
+                            ticker=ticker,
+                            price=spot_price,
+                            timestamp=now_dt
+                        ))
+                        
+                        db_records = []
+                        for (strike, exp), c in cells.items():
+                            exp_date = exp if isinstance(exp, (py_date, datetime)) else py_date.fromisoformat(str(exp))
+                            db_records.append(DealerMetricSnapshot(
+                                ticker=ticker,
+                                timestamp=now_dt,
+                                strike=strike,
+                                expiration=exp_date,
+                                net_gex=c["g"],
+                                net_dex=c["d"],
+                                net_vanna=c["va"],
+                                net_charm=c["ch"],
+                                call_oi=c["coi"],
+                                put_oi=c["poi"],
+                                call_volume=c["v"],
+                                put_volume=0
+                            ))
+                        
+                        if db_records:
+                            db.add_all(db_records)
+                            db.commit()
+                        db.close()
+                    except Exception as db_err:
+                        print(f"Database persistence warning in publisher for {ticker}: {db_err}")
                 except Exception as e:
                     print(f"{provider_name.upper()} live publisher loop error for {ticker}: {e}")
                     
