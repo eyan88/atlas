@@ -109,6 +109,9 @@ export function CompassChart() {
         if (!active) return;
 
         // Map GEX levels onto each candle
+        const historyKeys = Object.keys(tickerHistory).map(Number).sort((a, b) => a - b);
+        const latestHistorySnap = historyKeys.length > 0 ? tickerHistory[historyKeys[historyKeys.length - 1]] : null;
+
         const formattedCandles = priceCandles.map((c) => {
           // If using prior levels, assign previous day EOD walls. Otherwise look up corresponding active day snapshot
           let callWall = walls.call_wall;
@@ -116,10 +119,8 @@ export function CompassChart() {
           let flip = walls.gamma_flip;
 
           if (gexSource === 'active') {
-            const snapKey = Object.keys(tickerHistory)
-              .map(Number)
-              .find((ts) => Math.abs(ts - c.time) < 150);
-            const snap = snapKey ? tickerHistory[snapKey] : null;
+            const snapKey = historyKeys.find((ts) => Math.abs(ts - c.time) < 150);
+            const snap = snapKey ? tickerHistory[snapKey] : latestHistorySnap;
             callWall = snap?.call_wall ?? null;
             putWall = snap?.put_wall ?? null;
             flip = snap?.gamma_flip ?? null;
@@ -160,12 +161,24 @@ export function CompassChart() {
 
   const liveSnap = useAppStore((s) => s.heatmapsByTicker[activeChartTicker] ?? s.heatmap);
   const liveSpot = useAppStore((s) => s.spotPrice);
+  const currentSnap = currentTimestamp ? tickerHistory[currentTimestamp] : null;
 
-  // Selected level values for display (matching live stream or active playhead candle)
-  const spotPriceVal = currentTimestamp === null ? (liveSnap?.spot_price ?? liveSpot ?? activeCandle?.close) : activeCandle?.close;
-  const callWallVal = currentTimestamp === null ? (liveSnap?.call_wall ?? activeCandle?.call_wall) : activeCandle?.call_wall;
-  const putWallVal = currentTimestamp === null ? (liveSnap?.put_wall ?? activeCandle?.put_wall) : activeCandle?.put_wall;
-  const flipVal = currentTimestamp === null ? (liveSnap?.gamma_flip ?? activeCandle?.gamma_flip) : activeCandle?.gamma_flip;
+  // Selected level values for display (matching live stream or active playhead candle at exact timestamp)
+  const spotPriceVal = currentTimestamp === null 
+    ? (liveSnap?.spot_price ?? liveSpot ?? activeCandle?.close) 
+    : (currentSnap?.spot_price ?? activeCandle?.spot_price ?? activeCandle?.close);
+
+  const callWallVal = currentTimestamp === null 
+    ? (liveSnap?.call_wall ?? activeCandle?.call_wall) 
+    : (currentSnap?.call_wall ?? activeCandle?.call_wall);
+
+  const putWallVal = currentTimestamp === null 
+    ? (liveSnap?.put_wall ?? activeCandle?.put_wall) 
+    : (currentSnap?.put_wall ?? activeCandle?.put_wall);
+
+  const flipVal = currentTimestamp === null 
+    ? (liveSnap?.gamma_flip ?? activeCandle?.gamma_flip) 
+    : (currentSnap?.gamma_flip ?? activeCandle?.gamma_flip);
 
   // Render OHLC values for hovered candle or active candle
   const displayCandle = hoveredCandle || activeCandle || null;
@@ -184,6 +197,17 @@ export function CompassChart() {
         fontSize: 10,
         fontFamily: 'Inter, system-ui, sans-serif',
       },
+      localization: {
+        timeFormatter: (ts: number) => {
+          const d = new Date(ts * 1000);
+          return d.toLocaleTimeString('en-US', {
+            timeZone: 'America/New_York',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+        },
+      },
       grid: {
         vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
         horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
@@ -192,6 +216,15 @@ export function CompassChart() {
         borderColor: 'rgba(255, 255, 255, 0.08)',
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: (ts: number) => {
+          const d = new Date(ts * 1000);
+          return d.toLocaleTimeString('en-US', {
+            timeZone: 'America/New_York',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+        },
       },
       crosshair: {
         vertLine: {
