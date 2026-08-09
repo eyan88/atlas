@@ -378,14 +378,26 @@ export function CompassChart() {
           }));
       };
 
-      // Loop through and draw dynamic gamma node bubbles for each candle
+      // Helper to find the historical snapshot recorded at or before candle time
+      const getSnapForCandleTime = (candleTime: number) => {
+        let targetKey: number | null = null;
+        for (let i = 0; i < historyKeys.length; i++) {
+          if (historyKeys[i] <= candleTime + 150) {
+            targetKey = historyKeys[i];
+          } else {
+            break;
+          }
+        }
+        return targetKey ? tickerHistory[targetKey] : (historyKeys.length > 0 ? tickerHistory[historyKeys[0]] : null);
+      };
+
+      // Loop through and draw gamma node bubbles for each candle based on its exact historical snapshot
       candles.forEach((c) => {
         const x = chart.timeScale().timeToCoordinate(c.time as any);
         if (x === null || x < 0 || x > canvas.clientWidth) return;
 
-        // Find active snapshot for this candle
-        const snapKey = historyKeys.find((ts) => Math.abs(ts - c.time) < 150);
-        const snap = snapKey ? tickerHistory[snapKey] : latestHistorySnap;
+        // Retrieve historical snapshot recorded at or before this candle's timestamp
+        const snap = getSnapForCandleTime(c.time);
         const sigNodes = getSignificantGammaNodes(snap);
 
         sigNodes.forEach((node) => {
