@@ -19,10 +19,15 @@ FROM python:3.12-slim as runner
 
 WORKDIR /app
 
-# Install system runtime dependencies
+# Install system runtime dependencies (Open Java JRE for ThetaTerminal, curl, libpq5)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    curl \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
+
+# Download official Headless ThetaTerminal Java JAR
+RUN curl -o /app/ThetaTerminal.jar https://thetadata-firmware.s3.amazonaws.com/ThetaTerminal.jar
 
 # Copy user-installed packages from builder stage
 COPY --from=builder /root/.local /root/.local
@@ -33,6 +38,9 @@ ENV PATH=/root/.local/bin:$PATH \
 # Copy source code files
 COPY . .
 
-# Expose port and run FastAPI using Uvicorn
+# Make start.sh executable
+RUN chmod +x /app/start.sh
+
+# Expose port and run container startup script
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/start.sh"]
