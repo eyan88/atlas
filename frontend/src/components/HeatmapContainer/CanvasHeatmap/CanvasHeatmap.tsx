@@ -212,14 +212,6 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       const sameDayStamps = historyTimestamps.filter(ts => new Date(ts * 1000).toISOString().split('T')[0] === currentDateStr);
       const openTs = sameDayStamps.length > 0 ? sameDayStamps[0] : historyTimestamps[0];
       refSnap = tickerHistory[openTs] ?? null;
-    } else if (evolutionWindow === 'prev_day') {
-      const currentDateStr = new Date(currentTs * 1000).toISOString().split('T')[0];
-      const prevDayStamps = historyTimestamps.filter(ts => new Date(ts * 1000).toISOString().split('T')[0] < currentDateStr);
-      if (prevDayStamps.length > 0) {
-        refSnap = tickerHistory[prevDayStamps[prevDayStamps.length - 1]] ?? null;
-      } else {
-        refSnap = tickerHistory[historyTimestamps[0]] ?? null;
-      }
     }
   }
 

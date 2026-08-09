@@ -117,14 +117,12 @@ export type EvolutionWindow =
   | '1m'
   | '15m'
   | '1h'
-  | 'open'
-  | 'prev_day';
+  | 'open';
 
 export const EVOLUTION_WINDOW_LABELS: Record<EvolutionWindow, string> = {
   '1m': '1 Minute',
   '15m': '15 Minutes',
   '1h': '1 Hour',
   open: 'Since Open',
-  prev_day: 'Prev Day',
 };
 
