@@ -474,14 +474,14 @@ def get_stock_candles(
     start_dt = datetime.combine(dt, py_time.min)
     end_dt = datetime.combine(dt, py_time.max)
 
-    # 1. Primary Source: Fetch underlying price snapshots from database
+    # 1. Primary Source: Fetch underlying price snapshots from database if we have live intraday data (>= 5 points)
     db_prices = db.query(UnderlyingPriceSnapshot).filter(
         UnderlyingPriceSnapshot.ticker == ticker.upper(),
         UnderlyingPriceSnapshot.timestamp >= start_dt,
         UnderlyingPriceSnapshot.timestamp <= end_dt
     ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
 
-    if db_prices:
+    if len(db_prices) >= 5:
         candles = []
         for p in db_prices:
             ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
@@ -494,7 +494,50 @@ def get_stock_candles(
             })
         return candles
 
-    # 2. Secondary Source: Fetch from ThetaData stock_history_1m if configured
+    # 2. Secondary Source: Fetch full intraday candles from Yahoo Finance API (5-minute OHLC bars)
+    start_ts = int(datetime.combine(dt, py_time.min).replace(tzinfo=timezone.utc).timestamp())
+    end_ts = int(datetime.combine(dt, py_time.max).replace(tzinfo=timezone.utc).timestamp())
+
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?period1={start_ts}&period2={end_ts}&interval=5m"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            result = data.get("chart", {}).get("result", [])
+            if result:
+                chart_data = result[0]
+                timestamps = chart_data.get("timestamp", [])
+                indicators = chart_data.get("indicators", {}).get("quote", [{}])[0]
+                
+                opens = indicators.get("open", [])
+                highs = indicators.get("high", [])
+                lows = indicators.get("low", [])
+                closes = indicators.get("close", [])
+                
+                candles = []
+                for i in range(len(timestamps)):
+                    if (i < len(opens) and opens[i] is not None and
+                        i < len(highs) and highs[i] is not None and
+                        i < len(lows) and lows[i] is not None and
+                        i < len(closes) and closes[i] is not None):
+                        
+                        candles.append({
+                            "time": int(timestamps[i]),
+                            "open": float(opens[i]),
+                            "high": float(highs[i]),
+                            "low": float(lows[i]),
+                            "close": float(closes[i])
+                        })
+                if candles:
+                    return candles
+    except Exception as e:
+        print(f"Notice: Yahoo Finance candles fetch notice for {ticker}: {e}")
+
+    # 3. Tertiary Source: Fetch from ThetaData stock_history_1m if configured
     if settings.DATA_PROVIDER == "thetadata":
         try:
             from thetadata import ThetaClient
@@ -519,49 +562,20 @@ def get_stock_candles(
         except Exception as e:
             print(f"Notice: ThetaData stock_history_1m fetch notice for {ticker}: {e}")
 
-    # 3. Fallback Source: Query Yahoo Finance API
-    start_ts = int(start_dt.replace(tzinfo=timezone.utc).timestamp())
-    end_ts = int(end_dt.replace(tzinfo=timezone.utc).timestamp())
-
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?period1={start_ts}&period2={end_ts}&interval=5m"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code != 200:
-            return []
-            
-        data = res.json()
-        result = data.get("chart", {}).get("result", [])
-        if not result:
-            return []
-            
-        chart_data = result[0]
-        timestamps = chart_data.get("timestamp", [])
-        indicators = chart_data.get("indicators", {}).get("quote", [{}])[0]
-        
-        opens = indicators.get("open", [])
-        highs = indicators.get("high", [])
-        lows = indicators.get("low", [])
-        closes = indicators.get("close", [])
-        
+    # 4. Fallback: Return whatever database snapshots exist
+    if db_prices:
         candles = []
-        for i in range(len(timestamps)):
-            if (i < len(opens) and opens[i] is not None and
-                i < len(highs) and highs[i] is not None and
-                i < len(lows) and lows[i] is not None and
-                i < len(closes) and closes[i] is not None):
-                
-                candles.append({
-                    "time": int(timestamps[i]),
-                    "open": float(opens[i]),
-                    "high": float(highs[i]),
-                    "low": float(lows[i]),
-                    "close": float(closes[i])
-                })
+        for p in db_prices:
+            ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
+            candles.append({
+                "time": ts,
+                "open": float(p.price),
+                "high": float(p.price),
+                "low": float(p.price),
+                "close": float(p.price)
+            })
         return candles
+    return []
     except Exception as e:
         print(f"Error fetching candles for {ticker} on {date}: {e}")
         # Fallback to database underlying price snapshots

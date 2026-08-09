@@ -269,8 +269,17 @@ export function CompassChart() {
     const series = candlestickSeriesRef.current;
     if (!series || candles.length === 0) return;
 
-    // Load series data
-    series.setData(candles);
+    // Deduplicate and sort candles strictly ascending for Lightweight Charts
+    const uniqueMap = new Map<number, CandleData>();
+    candles.forEach((c) => {
+      if (c && c.time && c.open !== undefined && c.high !== undefined && c.low !== undefined && c.close !== undefined) {
+        uniqueMap.set(c.time, c);
+      }
+    });
+    const sortedCandles = Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
+    if (sortedCandles.length > 0) {
+      series.setData(sortedCandles);
+    }
 
     // Draw a dynamic marker bubble directly on the playhead candle
     const markers: any[] = [];
