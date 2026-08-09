@@ -20,7 +20,7 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int
     
     # 1. Fetch and send the initial full snapshot (INIT)
     try:
-        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db)
+        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db, redis_conn=None)
         await websocket.send_json({
             "type": "INIT",
             "payload": init_data
@@ -47,7 +47,7 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int
                 
                 if success:
                     try:
-                        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db)
+                        init_data = get_heatmap(ticker=ticker, metric="net_gex", timestamp=None, strikeCount=strikeCount, db=db, redis_conn=None)
                         await websocket.send_json({"type": "INIT", "payload": init_data})
                     except Exception as inner_e:
                         await websocket.send_json({"type": "ERROR", "message": f"Failed after bootstrap: {str(inner_e)}"})
@@ -58,10 +58,14 @@ async def websocket_endpoint(websocket: WebSocket, ticker: str, strikeCount: int
         else:
             await websocket.send_json({"type": "ERROR", "message": f"Failed to load initial snapshot: {str(e)}"})
     except Exception as e:
-        await websocket.send_json({
-            "type": "ERROR",
-            "message": f"Failed to load initial snapshot: {str(e)}"
-        })
+        print(f"WebSocket INIT exception for {ticker}: {e}")
+        try:
+            await websocket.send_json({
+                "type": "ERROR",
+                "message": f"Failed to load initial snapshot: {str(e)}"
+            })
+        except Exception:
+            pass
 
     # 2. Establish connection to Redis Pub/Sub
     import redis.asyncio as aioredis
