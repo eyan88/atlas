@@ -548,8 +548,10 @@ def get_stock_candles(
                 df_stock = client.stock_history_1m(symbol=ticker.upper(), start_date=dt.date(), end_date=dt.date())
                 if not df_stock.empty:
                     candles = []
+                    base_ts = int(datetime.combine(dt.date(), py_time.min).replace(tzinfo=timezone.utc).timestamp())
                     for _, row in df_stock.iterrows():
-                        ts = int(pd.to_datetime(row["ms_of_day"], unit="ms").timestamp()) if "ms_of_day" in row else int(time.time())
+                        ms = int(row["ms_of_day"]) if "ms_of_day" in row else 0
+                        ts = base_ts + (ms // 1000)
                         candles.append({
                             "time": ts,
                             "open": float(row.get("open", row.get("close", 0))),
@@ -576,31 +578,6 @@ def get_stock_candles(
             })
         return candles
     return []
-    except Exception as e:
-        print(f"Error fetching candles for {ticker} on {date}: {e}")
-        # Fallback to database underlying price snapshots
-        try:
-            start_dt = datetime.combine(dt, py_time.min)
-            end_dt = datetime.combine(dt, py_time.max)
-            db_prices = db.query(UnderlyingPriceSnapshot).filter(
-                UnderlyingPriceSnapshot.ticker == ticker.upper(),
-                UnderlyingPriceSnapshot.timestamp >= start_dt,
-                UnderlyingPriceSnapshot.timestamp <= end_dt
-            ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
-            
-            candles = []
-            for p in db_prices:
-                ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
-                candles.append({
-                    "time": ts,
-                    "open": float(p.price),
-                    "high": float(p.price),
-                    "low": float(p.price),
-                    "close": float(p.price)
-                })
-            return candles
-        except Exception:
-            return []
 
 @router.get("/admin/reset-db")
 @router.post("/admin/reset-db")
