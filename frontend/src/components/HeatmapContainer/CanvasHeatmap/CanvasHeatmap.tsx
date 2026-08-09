@@ -208,7 +208,18 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
       const refTs = historyTimestamps.reduce((prev, curr) => Math.abs(curr - targetTs) < Math.abs(prev - targetTs) ? curr : prev, historyTimestamps[0]);
       refSnap = tickerHistory[refTs] ?? null;
     } else if (evolutionWindow === 'open') {
-      refSnap = tickerHistory[historyTimestamps[0]] ?? null;
+      const currentDateStr = new Date(currentTs * 1000).toISOString().split('T')[0];
+      const sameDayStamps = historyTimestamps.filter(ts => new Date(ts * 1000).toISOString().split('T')[0] === currentDateStr);
+      const openTs = sameDayStamps.length > 0 ? sameDayStamps[0] : historyTimestamps[0];
+      refSnap = tickerHistory[openTs] ?? null;
+    } else if (evolutionWindow === 'prev_day') {
+      const currentDateStr = new Date(currentTs * 1000).toISOString().split('T')[0];
+      const prevDayStamps = historyTimestamps.filter(ts => new Date(ts * 1000).toISOString().split('T')[0] < currentDateStr);
+      if (prevDayStamps.length > 0) {
+        refSnap = tickerHistory[prevDayStamps[prevDayStamps.length - 1]] ?? null;
+      } else {
+        refSnap = tickerHistory[historyTimestamps[0]] ?? null;
+      }
     }
   }
 
@@ -357,14 +368,11 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         return cols.map((_exp, c) => {
           const curVal = snap.data[r][c];
           let refVal = curVal;
-          if (evolutionWindow === 'prev_day') {
-            // Synthetic previous day close value: 15% difference based on strike position
-            refVal = curVal * (1 - 0.15 * Math.sin(strike));
-          } else if (refSnap && refSnap.data && refSnap.data[r]) {
-            refVal = refSnap.data[r][c] ?? curVal;
+          if (refSnap && refSnap.data && refSnap.data[r] && refSnap.data[r][c] !== undefined) {
+            refVal = refSnap.data[r][c];
           }
           
-          if (refVal === 0) return 0;
+          if (refVal === 0 || refVal === curVal) return 0;
           return ((curVal - refVal) / Math.abs(refVal)) * 100;
         });
       });
