@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore, getEasternDateStr } from '../../store/useAppStore';
 import styles from './TimelineControls.module.css';
 
 const SPEEDS = [1, 5, 10, 60] as const;
@@ -127,7 +126,7 @@ export function TimelineControls() {
         id="toggle-live-btn"
         className={`${styles.liveBtn} ${timestamp === null ? styles.liveActive : ''}`}
         onClick={() => {
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayStr = getEasternDateStr();
           useAppStore.setState({ selectedDate: todayStr });
           setTimestamp(null);
         }}

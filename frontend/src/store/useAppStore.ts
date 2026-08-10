@@ -13,6 +13,10 @@ export function strToDateStr(d: string): string {
   return String(d).split('T')[0];
 }
 
+export function getEasternDateStr(d: Date = new Date()): string {
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
 export type AppTab = 'heatmap' | 'compass' | 'gamma-flow';
@@ -124,7 +128,7 @@ export const useAppStore = create<AppState>((set) => ({
   evolutionWindow: '1m',
   snapshotsHistory: {},
   timelineTimestamps: [],
-  selectedDate: new Date().toISOString().split('T')[0],
+  selectedDate: getEasternDateStr(),
   currentTimestamp: null,
   isPlaying: false,
   replaySpeed: 1,

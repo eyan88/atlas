@@ -481,7 +481,7 @@ def get_stock_candles(
         UnderlyingPriceSnapshot.timestamp <= end_dt
     ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
 
-    if len(db_prices) >= 5:
+    if len(db_prices) >= 1:
         candles = []
         for p in db_prices:
             ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())

@@ -6,7 +6,7 @@ import { TimelineControls } from './components/TimelineControls/TimelineControls
 import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
 import { GammaFlow } from './components/GammaFlow/GammaFlow';
 import { CompassChart } from './components/HeatmapContainer/CompassChart';
-import { useAppStore, toSeconds } from './store/useAppStore';
+import { useAppStore, toSeconds, getEasternDateStr } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
 
@@ -53,7 +53,7 @@ export function App() {
             // Only clear the heatmap if this is a historical date.
             // If it's live mode (today), the WebSocket INIT will provide the baseline
             // heatmap (e.g., from yesterday's close) and we should retain it.
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getEasternDateStr();
             const isLive = selectedDate === todayStr;
             
             if (!isLive) {
