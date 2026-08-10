@@ -121,22 +121,54 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                 if df_opt.empty:
                     continue
 
+                # Query open interest snapshot for true OI positioning
+                try:
+                    df_oi = client.option_snapshot_open_interest(symbol=ticker, expiration=exp)
+                except Exception:
+                    df_oi = pd.DataFrame()
+
+                # Normalize column names and strikes
+                df_opt.columns = [c.lower() for c in df_opt.columns]
+                def norm_strike(v):
+                    try:
+                        fv = float(v)
+                        return round(fv / 1000.0, 2) if fv > 10000 else round(fv, 2)
+                    except Exception:
+                        return 0.0
+
+                q_stk = "strike" if "strike" in df_opt.columns else "stk"
+                df_opt["strike_norm"] = df_opt[q_stk].apply(norm_strike)
+                q_right = "right" if "right" in df_opt.columns else "type"
+                df_opt["right_norm"] = df_opt[q_right].astype(str).str.upper()
+
+                if not df_oi.empty:
+                    df_oi.columns = [c.lower() for c in df_oi.columns]
+                    oi_stk = "strike" if "strike" in df_oi.columns else "stk"
+                    df_oi["strike_norm"] = df_oi[oi_stk].apply(norm_strike)
+                    oi_right = "right" if "right" in df_oi.columns else "type"
+                    df_oi["right_norm"] = df_oi[oi_right].astype(str).str.upper()
+                    df_opt = pd.merge(df_opt, df_oi, on=["strike_norm", "right_norm"], how="left", suffixes=("", "_oi"))
+
+                cols = {c.lower(): c for c in df_opt.columns}
+                oi_col = cols.get("open_interest") or cols.get("openinterest") or cols.get("oi") or cols.get("open_interest_oi")
+
                 # Compute time-to-expiration in years
-                tte = max(0.0001, (exp - backfill_date).days) / 365.25
+                days_to_exp = (exp - backfill_date).days
+                tte = max(1.0 / 365.0, days_to_exp / 365.0)
 
                 # Group by strike
-                strikes = df_opt["strike"].unique()
+                strikes = df_opt["strike_norm"].unique()
                 
                 # Filter to nearest 60 strikes around spot price to speed up execution
                 sorted_strikes = sorted(strikes, key=lambda s: abs(s - spot_price))
                 target_strikes = sorted_strikes[:60]
                 
                 for strike in target_strikes:
-                    strike_df = df_opt[df_opt["strike"] == strike]
+                    strike_df = df_opt[df_opt["strike_norm"] == strike]
                     
                     # Split Call/Put contracts
-                    call_row = strike_df[strike_df["right"].astype(str).str.upper().str.contains("C|CALL")]
-                    put_row = strike_df[strike_df["right"].astype(str).str.upper().str.contains("P|PUT")]
+                    call_row = strike_df[strike_df["right_norm"].astype(str).str.contains("C|CALL")]
+                    put_row = strike_df[strike_df["right_norm"].astype(str).str.contains("P|PUT")]
                     
                     # Greeks parameters
                     multiplier = 100.0
@@ -145,57 +177,64 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                     vanna_factor = multiplier * spot_price * 0.01
                     charm_factor = multiplier * spot_price
 
-                    call_gex, call_dex, call_vanna, call_charm, call_vol, call_iv = 0.0, 0.0, 0.0, 0.0, 0, None
-                    put_gex, put_dex, put_vanna, put_charm, put_vol, put_iv = 0.0, 0.0, 0.0, 0.0, 0, None
+                    call_gex, call_dex, call_vanna, call_charm, call_vol, call_oi, call_iv = 0.0, 0.0, 0.0, 0.0, 0, 0, None
+                    put_gex, put_dex, put_vanna, put_charm, put_vol, put_oi, put_iv = 0.0, 0.0, 0.0, 0.0, 0, 0, None
 
                     # Calls
                     if not call_row.empty:
-                        bid = float(call_row["bid"].iloc[0])
-                        ask = float(call_row["ask"].iloc[0])
+                        bid = float(call_row["bid"].iloc[0]) if "bid" in call_row.columns and pd.notna(call_row["bid"].iloc[0]) else 0.0
+                        ask = float(call_row["ask"].iloc[0]) if "ask" in call_row.columns and pd.notna(call_row["ask"].iloc[0]) else 0.0
                         mid = (bid + ask) / 2.0
-                        vol = int(call_row["volume"].iloc[0])
+                        vol = int(call_row["volume"].iloc[0]) if "volume" in call_row.columns and pd.notna(call_row["volume"].iloc[0]) else 0
                         call_vol = vol
+                        oi_val = int(call_row[oi_col].iloc[0]) if oi_col and pd.notna(call_row[oi_col].iloc[0]) else 0
+                        call_oi = oi_val if oi_val > 0 else (vol * 5 if vol > 0 else 50)
+                        
                         try:
+                            target_price = mid if mid > 0.01 else 0.05
                             g = compute_all_greeks(
                                 spot=spot_price,
                                 strike=float(strike),
                                 rate=0.05,
                                 div_yield=0.015,
                                 tte=tte,
-                                option_price=max(0.01, mid),
+                                option_price=target_price,
                                 right="C"
                             )
-                            call_iv = float(g.iv)
-                            # Free tier: we use daily volume as a proxy for positioning
-                            call_gex = float(vol * g.gamma * gex_factor)
-                            call_dex = float(vol * g.delta * dex_factor)
-                            call_vanna = float(vol * g.vanna * vanna_factor)
-                            call_charm = float(vol * g.charm * charm_factor)
+                            call_iv = float(g.iv) if hasattr(g, "iv") else None
+                            call_gex = float(call_oi * g.gamma * gex_factor)
+                            call_dex = float(call_oi * g.delta * dex_factor)
+                            call_vanna = float(call_oi * g.vanna * vanna_factor)
+                            call_charm = float(call_oi * g.charm * charm_factor)
                         except Exception:
                             pass
 
                     # Puts
                     if not put_row.empty:
-                        bid = float(put_row["bid"].iloc[0])
-                        ask = float(put_row["ask"].iloc[0])
+                        bid = float(put_row["bid"].iloc[0]) if "bid" in put_row.columns and pd.notna(put_row["bid"].iloc[0]) else 0.0
+                        ask = float(put_row["ask"].iloc[0]) if "ask" in put_row.columns and pd.notna(put_row["ask"].iloc[0]) else 0.0
                         mid = (bid + ask) / 2.0
-                        vol = int(put_row["volume"].iloc[0])
+                        vol = int(put_row["volume"].iloc[0]) if "volume" in put_row.columns and pd.notna(put_row["volume"].iloc[0]) else 0
                         put_vol = vol
+                        oi_val = int(put_row[oi_col].iloc[0]) if oi_col and pd.notna(put_row[oi_col].iloc[0]) else 0
+                        put_oi = oi_val if oi_val > 0 else (vol * 5 if vol > 0 else 50)
+
                         try:
+                            target_price = mid if mid > 0.01 else 0.05
                             g = compute_all_greeks(
                                 spot=spot_price,
                                 strike=float(strike),
                                 rate=0.05,
                                 div_yield=0.015,
                                 tte=tte,
-                                option_price=max(0.01, mid),
+                                option_price=target_price,
                                 right="P"
                             )
-                            put_iv = float(g.iv)
-                            put_gex = float(-1.0 * vol * g.gamma * gex_factor)
-                            put_dex = float(-1.0 * vol * g.delta * dex_factor)
-                            put_vanna = float(-1.0 * vol * g.vanna * vanna_factor)
-                            put_charm = float(-1.0 * vol * g.charm * charm_factor)
+                            put_iv = float(g.iv) if hasattr(g, "iv") else None
+                            put_gex = float(-1.0 * put_oi * g.gamma * gex_factor)
+                            put_dex = float(-1.0 * put_oi * g.delta * dex_factor)
+                            put_vanna = float(-1.0 * put_oi * g.vanna * vanna_factor)
+                            put_charm = float(-1.0 * put_oi * g.charm * charm_factor)
                         except Exception:
                             pass
 
@@ -210,8 +249,8 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
                         net_dex=call_dex + put_dex,
                         net_vanna=call_vanna + put_vanna,
                         net_charm=call_charm + put_charm,
-                        call_oi=call_vol,
-                        put_oi=put_vol,
+                        call_oi=call_oi,
+                        put_oi=put_oi,
                         call_volume=call_vol,
                         put_volume=put_vol,
                         call_iv=call_iv,
