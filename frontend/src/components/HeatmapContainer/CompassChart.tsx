@@ -378,6 +378,8 @@ export function CompassChart() {
           }));
       };
 
+      const historyKeys = Object.keys(tickerHistory).map(Number).sort((a, b) => a - b);
+
       // Helper to find the historical snapshot recorded at or before candle time
       const getSnapForCandleTime = (candleTime: number) => {
         let targetKey: number | null = null;
