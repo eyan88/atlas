@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useAppStore, getEasternDateStr } from '../../store/useAppStore';
 import styles from './TimelineControls.module.css';
 
