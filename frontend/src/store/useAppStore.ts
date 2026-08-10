@@ -302,26 +302,35 @@ export const useAppStore = create<AppState>((set) => ({
         current = state.heatmap;
       }
 
-      let rows: number[];
-      let columns: string[];
-      let nextData: number[][];
+      // Collect all rows and columns dynamically from both current heatmap and incoming payload diffs
+      const rSet = new Set<number>(current ? current.rows.map(Number) : []);
+      const cSet = new Set<string>(current ? current.columns.map(strToDateStr) : []);
+      payload.diffs.forEach(d => {
+        rSet.add(Number(d.k));
+        cSet.add(strToDateStr(d.e));
+      });
 
-      if (!current) {
-        // Bootstrap a new snapshot from scratch using the diff payload
-        const rSet = new Set<number>();
-        const cSet = new Set<string>();
-        payload.diffs.forEach(d => { rSet.add(d.k); cSet.add(d.e); });
-        rows = Array.from(rSet).sort((a, b) => b - a); // descending
-        columns = Array.from(cSet).sort();
-        nextData = Array(rows.length).fill(0).map(() => Array(columns.length).fill(0));
-      } else {
-        rows = current.rows;
-        columns = current.columns;
-        nextData = current.data.map((row) => [...row]);
-      }
+      const rows = Array.from(rSet).sort((a, b) => b - a); // descending
+      const columns = Array.from(cSet).sort();
 
       const rowMap = new Map(rows.map((r, i) => [Number(r), i]));
       const colMap = new Map(columns.map((c, i) => [strToDateStr(c), i]));
+
+      let nextData: number[][] = Array(rows.length).fill(0).map(() => Array(columns.length).fill(0));
+
+      // Carry forward existing heatmap cell data into expanded matrix
+      if (current) {
+        current.rows.forEach((r, oldR) => {
+          const newR = rowMap.get(Number(r));
+          if (newR === undefined) return;
+          current.columns.forEach((c, oldC) => {
+            const newC = colMap.get(strToDateStr(c));
+            if (newC !== undefined && current.data[oldR] && current.data[oldR][oldC] !== undefined) {
+              nextData[newR][newC] = current.data[oldR][oldC];
+            }
+          });
+        });
+      }
 
       let hasValidDiffs = false;
       payload.diffs.forEach((diff) => {

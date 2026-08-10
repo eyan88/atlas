@@ -87,20 +87,21 @@ async def realtime_live_publisher():
                             cells[key] = {"g":0.0, "d":0.0, "va":0.0, "ch":0.0, "coi":0, "poi":0, "oi":0, "v":0}
                         
                         c = cells[key]
-                        c["oi"] += q.open_interest
+                        oi_val = q.open_interest if q.open_interest > 0 else (q.volume if q.volume > 0 else 10)
+                        c["oi"] += oi_val
                         c["v"] += q.volume
                         if q.option_type == "C":
-                            if q.gamma: c["g"] += q.gamma * gex_factor
-                            if q.delta: c["d"] += q.delta * dex_factor
-                            if q.vanna: c["va"] += q.vanna * vanna_factor
-                            if q.charm: c["ch"] += q.charm * charm_factor
-                            c["coi"] += q.open_interest
+                            if q.gamma: c["g"] += q.gamma * oi_val * gex_factor
+                            if q.delta: c["d"] += q.delta * oi_val * dex_factor
+                            if q.vanna: c["va"] += q.vanna * oi_val * vanna_factor
+                            if q.charm: c["ch"] += q.charm * oi_val * charm_factor
+                            c["coi"] += oi_val
                         else:
-                            if q.gamma: c["g"] += q.gamma * gex_factor * -1.0
-                            if q.delta: c["d"] += q.delta * dex_factor * -1.0
-                            if q.vanna: c["va"] += q.vanna * vanna_factor * -1.0
-                            if q.charm: c["ch"] += q.charm * charm_factor * -1.0
-                            c["poi"] += q.open_interest
+                            if q.gamma: c["g"] += -1.0 * q.gamma * oi_val * gex_factor
+                            if q.delta: c["d"] += -1.0 * q.delta * oi_val * dex_factor
+                            if q.vanna: c["va"] += -1.0 * q.vanna * oi_val * vanna_factor
+                            if q.charm: c["ch"] += -1.0 * q.charm * oi_val * charm_factor
+                            c["poi"] += oi_val
                     
                     diffs = []
                     strike_agg = {}
