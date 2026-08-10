@@ -198,9 +198,10 @@ export function CompassChart() {
         fontFamily: 'Inter, system-ui, sans-serif',
       },
       localization: {
-        timeFormatter: (ts: number) => {
-          const d = new Date(ts * 1000);
-          return d.toLocaleTimeString('en-US', {
+        timeFormatter: (time: any) => {
+          const unixSec = typeof time === 'number' ? time : time?.timestamp;
+          if (!unixSec || isNaN(unixSec)) return '';
+          return new Date(unixSec * 1000).toLocaleTimeString('en-US', {
             timeZone: 'America/New_York',
             hour: '2-digit',
             minute: '2-digit',
@@ -216,9 +217,10 @@ export function CompassChart() {
         borderColor: 'rgba(255, 255, 255, 0.08)',
         timeVisible: true,
         secondsVisible: false,
-        tickMarkFormatter: (ts: number) => {
-          const d = new Date(ts * 1000);
-          return d.toLocaleTimeString('en-US', {
+        tickMarkFormatter: (time: any) => {
+          const unixSec = typeof time === 'number' ? time : time?.timestamp;
+          if (!unixSec || isNaN(unixSec)) return '';
+          return new Date(unixSec * 1000).toLocaleTimeString('en-US', {
             timeZone: 'America/New_York',
             hour: '2-digit',
             minute: '2-digit',
