@@ -33,31 +33,33 @@ async def realtime_live_publisher():
         return
 
     engine = DealerExposureEngine()
-    r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    tickers = ["SPY", "QQQ", "IWM"]
-    
-    print(f"Starting background {provider_name.upper()} live publisher task (polling every 60s)...")
+    r = None
     try:
+        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         await r.ping()
         print("Connected to Redis for live Pub/Sub publishing.")
     except Exception as e:
-        print(f"Redis unreachable. {e}")
-        await r.close()
-        return
+        print(f"Notice: Redis Pub/Sub unreachable ({e}). Live publisher operating in direct database persistence mode.")
+        r = None
+
+    default_tickers = ["QQQ", "SPY", "IWM"]
 
     try:
         while True:
             # Poll every 60 seconds
             await asyncio.sleep(60.0)
-            # Dynamically discover which tickers have active websocket listeners
-            active_channels = await r.pubsub_channels("atlas:realtime:*")
             
-            if not active_channels:
-                continue # No one is watching anything, skip polling
-                
-            tickers = [ch.split(":")[-1] for ch in active_channels]
+            target_tickers = list(default_tickers)
+            if r:
+                try:
+                    active_channels = await r.pubsub_channels("atlas:realtime:*")
+                    if active_channels:
+                        extra_tickers = [ch.split(":")[-1] for ch in active_channels]
+                        target_tickers = list(set(target_tickers + extra_tickers))
+                except Exception:
+                    pass
             
-            for ticker in tickers:
+            for ticker in target_tickers:
                 try:
                     await asyncio.sleep(1.0) # stagger requests
                     
@@ -147,7 +149,11 @@ async def realtime_live_publisher():
                         print(f"Off-hours polling for {ticker}: market exchanges closed. Preserving active heatmap.")
                         continue
 
-                    await r.publish(f"atlas:realtime:{ticker}", json.dumps(payload))
+                    if r:
+                        try:
+                            await r.publish(f"atlas:realtime:{ticker}", json.dumps(payload))
+                        except Exception as pub_err:
+                            print(f"Redis publish notice for {ticker}: {pub_err}")
 
                     # Persist live 60-second snapshot to DB for historical evolution & timeline tracking
                     try:
