@@ -269,7 +269,18 @@ class ThetaDataProvider(BaseDataProvider):
                     df_oi = pd.DataFrame()
 
                 # Lowercase columns to handle naming variations and perform merge
+                # Lowercase columns and normalize strike values (handle thousandths vs dollars)
                 df_quote.columns = [c.lower() for c in df_quote.columns]
+                
+                def norm_strike(v):
+                    try:
+                        fv = float(v)
+                        return round(fv / 1000.0, 2) if fv > 10000 else round(fv, 2)
+                    except Exception:
+                        return 0.0
+
+                q_strike_col = "strike" if "strike" in df_quote.columns else "stk"
+                df_quote["strike_norm"] = df_quote[q_strike_col].apply(norm_strike)
                 
                 # Determine type column name
                 q_right_col = "right" if "right" in df_quote.columns else ("option_type" if "option_type" in df_quote.columns else "type")
@@ -280,31 +291,34 @@ class ThetaDataProvider(BaseDataProvider):
 
                 if not df_oi.empty:
                     df_oi.columns = [c.lower() for c in df_oi.columns]
+                    oi_strike_col = "strike" if "strike" in df_oi.columns else "stk"
+                    df_oi["strike_norm"] = df_oi[oi_strike_col].apply(norm_strike)
+                    
                     oi_right_col = "right" if "right" in df_oi.columns else ("option_type" if "option_type" in df_oi.columns else "type")
                     if oi_right_col in df_oi.columns:
                         df_oi["right_norm"] = df_oi[oi_right_col].astype(str).str.upper()
                     else:
                         df_oi["right_norm"] = "C"
 
-                    df = pd.merge(df_quote, df_oi, on=["strike", "right_norm"], how="left", suffixes=("", "_oi"))
+                    df = pd.merge(df_quote, df_oi, on=["strike_norm", "right_norm"], how="left", suffixes=("", "_oi"))
                 else:
                     df = df_quote
                     df["open_interest"] = 0
 
                 cols = {c.lower(): c for c in df.columns}
                 
-                strike_col = cols.get("strike")
-                oi_col = cols.get("open_interest") or cols.get("openinterest") or cols.get("oi")
+                oi_col = cols.get("open_interest") or cols.get("openinterest") or cols.get("oi") or cols.get("open_interest_oi")
                 volume_col = cols.get("volume") or cols.get("vol")
                 bid_col = cols.get("bid")
                 ask_col = cols.get("ask")
 
-                # Compute time-to-expiration in years
-                tte = max(0.0001, (exp - today).days) / 365.0
+                # Compute time-to-expiration in years (minimum 1 trading day = 1/365)
+                days_to_exp = (exp - today).days
+                tte = max(1.0 / 365.0, days_to_exp / 365.0)
 
                 for _, row in df.iterrows():
-                    strike = row[strike_col] if strike_col else None
-                    if strike is None:
+                    strike = row["strike_norm"]
+                    if not strike or strike <= 0:
                         continue
 
                     option_type = "C" if "C" in str(row["right_norm"]) or "CALL" in str(row["right_norm"]).upper() else "P"
@@ -315,15 +329,17 @@ class ThetaDataProvider(BaseDataProvider):
                     ask = float(row[ask_col]) if ask_col and pd.notna(row[ask_col]) else 0.0
                     mid_price = (bid + ask) / 2.0
 
-                    # Calculate Greeks locally using Method C (Pure-Python Black-Scholes solver)
+                    # Calculate Greeks locally using Black-Scholes solver
                     try:
+                        # Use market price if available; fallback to baseline Black-Scholes if deep OTM
+                        target_price = mid_price if mid_price > 0.01 else 0.05
                         g = compute_all_greeks(
                             spot=spot_price,
                             strike=float(strike),
                             rate=0.05,
                             div_yield=0.015,
                             tte=tte,
-                            option_price=max(0.01, mid_price),
+                            option_price=target_price,
                             right=option_type
                         )
                         iv = float(g.iv) if hasattr(g, "iv") else None
@@ -332,8 +348,6 @@ class ThetaDataProvider(BaseDataProvider):
                         vanna = float(g.vanna) if hasattr(g, "vanna") else None
                         charm = float(g.charm) if hasattr(g, "charm") else None
                     except Exception as e:
-                        # Fallback to None if calculations fail for a single strike
-                        print(f"Warning: Local Greeks calculation failed for strike {strike} right {option_type}: {e}")
                         iv, delta, gamma, vanna, charm = None, None, None, None, None
 
                     # Generate standardized OCC contract symbol
