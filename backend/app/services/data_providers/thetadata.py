@@ -110,10 +110,43 @@ class ThetaDataProvider(BaseDataProvider):
 
     def get_underlying_quote(self, ticker: str) -> DomainUnderlyingQuote:
         """
-        Fetches the latest spot price of the underlying ticker.
-        Attempts direct snapshot methods first, then falls back to 1-minute historical bars.
+        Fetches the latest real-time spot price of the underlying ticker.
+        Attempts real-time market API first, then falls back to ThetaData snapshots and bars.
         """
-        # 1. Try get_last_trade if supported in this version
+        ticker = ticker.upper()
+
+        # 1. Primary Source: Yahoo Finance Real-Time Quote (instant live market price)
+        try:
+            import requests
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            res = requests.get(url, headers=headers, timeout=3)
+            if res.status_code == 200:
+                data = res.json()
+                result = data.get("chart", {}).get("result", [])
+                if result:
+                    meta = result[0].get("meta", {})
+                    regular_price = meta.get("regularMarketPrice")
+                    if regular_price and float(regular_price) > 0:
+                        return DomainUnderlyingQuote(
+                            ticker=ticker,
+                            price=float(regular_price),
+                            timestamp_utc=int(time.time()),
+                        )
+                    indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
+                    closes = [c for c in indicators.get("close", []) if c is not None]
+                    if closes:
+                        return DomainUnderlyingQuote(
+                            ticker=ticker,
+                            price=float(closes[-1]),
+                            timestamp_utc=int(time.time()),
+                        )
+        except Exception as e:
+            print(f"Notice: Yahoo real-time price fetch notice for {ticker}: {e}")
+
+        # 2. Try get_last_trade if supported in this version
         if hasattr(self.client, "get_last_trade"):
             try:
                 trade = self.client.get_last_trade(ticker)
