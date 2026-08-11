@@ -375,15 +375,6 @@ export function CompassChart() {
           });
         }
       });
-      if (latestHistorySnap && latestHistorySnap.rows && latestHistorySnap.data) {
-        latestHistorySnap.rows.forEach((_: number, rowIdx: number) => {
-          const rowVals = latestHistorySnap.data[rowIdx];
-          if (rowVals) {
-            const netGex = Math.abs(rowVals.reduce((sum: number, val: number) => sum + val, 0));
-            if (netGex > sessionMaxGex) sessionMaxGex = netGex;
-          }
-        });
-      }
 
       // Helper to calculate strike-level net GEX map for a snapshot relative to session peak GEX
       const getSignificantGammaNodes = (snap: any) => {
