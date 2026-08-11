@@ -362,31 +362,56 @@ export function CompassChart() {
 
       ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-      // Helper to calculate strike-level net GEX map for a snapshot
+      // 1. Calculate overall session maximum peak GEX magnitude across all intraday snapshots
+      let sessionMaxGex = 0;
+      Object.values(tickerHistory).forEach((snap: any) => {
+        if (snap && snap.rows && snap.data) {
+          snap.rows.forEach((_: number, rowIdx: number) => {
+            const rowVals = snap.data[rowIdx];
+            if (rowVals) {
+              const netGex = Math.abs(rowVals.reduce((sum: number, val: number) => sum + val, 0));
+              if (netGex > sessionMaxGex) sessionMaxGex = netGex;
+            }
+          });
+        }
+      });
+      if (latestHistorySnap && latestHistorySnap.rows && latestHistorySnap.data) {
+        latestHistorySnap.rows.forEach((_: number, rowIdx: number) => {
+          const rowVals = latestHistorySnap.data[rowIdx];
+          if (rowVals) {
+            const netGex = Math.abs(rowVals.reduce((sum: number, val: number) => sum + val, 0));
+            if (netGex > sessionMaxGex) sessionMaxGex = netGex;
+          }
+        });
+      }
+
+      // Helper to calculate strike-level net GEX map for a snapshot relative to session peak GEX
       const getSignificantGammaNodes = (snap: any) => {
         if (!snap || !snap.rows || !snap.data) return [];
         const strikeSums: { strike: number; gex: number; absGex: number }[] = [];
-        let maxAbsGex = 0;
+        let snapMaxGex = 0;
 
         snap.rows.forEach((strike: number, rowIdx: number) => {
           const rowVals = snap.data[rowIdx];
           const netGex = rowVals ? rowVals.reduce((sum: number, val: number) => sum + val, 0) : 0;
           const absGex = Math.abs(netGex);
-          if (absGex > maxAbsGex) maxAbsGex = absGex;
+          if (absGex > snapMaxGex) snapMaxGex = absGex;
           strikeSums.push({ strike, gex: netGex, absGex });
         });
 
-        if (maxAbsGex === 0) return [];
+        if (snapMaxGex === 0) return [];
 
-        // Broaden threshold to 5% of peak GEX to display up to 8-10 granular multi-tiered gamma levels
-        const threshold = maxAbsGex * 0.05;
+        // Reference peak is the session-wide maximum GEX so persistent high positions stay consistently large
+        const peakRef = sessionMaxGex > 0 ? sessionMaxGex : snapMaxGex;
+        const threshold = peakRef * 0.05;
+
         return strikeSums
           .filter((n) => n.absGex >= threshold)
           .sort((a, b) => b.absGex - a.absGex)
-          .slice(0, 10) // Limit to top 10 most prominent levels per snapshot
+          .slice(0, 10)
           .map((n) => ({
             ...n,
-            relativeMagnitude: n.absGex / maxAbsGex,
+            relativeMagnitude: n.absGex / peakRef,
           }));
       };
 
