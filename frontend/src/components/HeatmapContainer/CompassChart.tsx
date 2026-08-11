@@ -378,10 +378,12 @@ export function CompassChart() {
 
         if (maxAbsGex === 0) return [];
 
-        // Significance threshold: keep nodes with at least 15% of maximum GEX peak magnitude
-        const threshold = maxAbsGex * 0.15;
+        // Broaden threshold to 5% of peak GEX to display up to 8-10 granular multi-tiered gamma levels
+        const threshold = maxAbsGex * 0.05;
         return strikeSums
           .filter((n) => n.absGex >= threshold)
+          .sort((a, b) => b.absGex - a.absGex)
+          .slice(0, 10) // Limit to top 10 most prominent levels per snapshot
           .map((n) => ({
             ...n,
             relativeMagnitude: n.absGex / maxAbsGex,
@@ -416,8 +418,15 @@ export function CompassChart() {
           const y = series.priceToCoordinate(node.strike);
           if (y !== null && y >= 0 && y <= canvas.clientHeight) {
             const isPos = node.gex >= 0;
-            // Circle radius scales dynamically with relative magnitude (2.5px to 10px)
-            const radius = 2.5 + Math.min(7.5, node.relativeMagnitude * 7.5);
+            const mag = node.relativeMagnitude;
+
+            // Multi-tier bubble scaling across 5 visual size categories (2.0px to 11.5px)
+            let radius = 2.0;
+            if (mag >= 0.85) radius = 11.5;       // Tier 1: Peak Wall (100% - 85%)
+            else if (mag >= 0.65) radius = 9.0;  // Tier 2: Major Level (85% - 65%)
+            else if (mag >= 0.45) radius = 6.5;  // Tier 3: Intermediate Level (65% - 45%)
+            else if (mag >= 0.25) radius = 4.5;  // Tier 4: Secondary Level (45% - 25%)
+            else radius = 2.5;                    // Tier 5: Minor Level (25% - 5%)
 
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, 2 * Math.PI);
