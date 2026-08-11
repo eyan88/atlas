@@ -94,7 +94,7 @@ export function App() {
 
           if (snap) {
             setHeatmapForTicker(ticker, snap);
-            if (ticker === activeTicker || index === 0) {
+            if (ticker === activeTicker) {
               setHeatmap(snap);
               setTimestamp(latestTs);
             }

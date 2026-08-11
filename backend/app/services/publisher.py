@@ -46,8 +46,8 @@ async def realtime_live_publisher():
 
     try:
         while True:
-            # Poll every 60 seconds
-            await asyncio.sleep(60.0)
+            # Poll live market data every 15 seconds
+            await asyncio.sleep(15.0)
             
             target_tickers = list(default_tickers)
             if r:
