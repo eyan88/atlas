@@ -315,13 +315,20 @@ export function CompassChart() {
         const min = parseInt(parts[1], 10);
         const minuteOfDay = hour * 60 + min;
         if (minuteOfDay <= 960) {
-          uniqueMap.set(c.time, c);
+            uniqueMap.set(c.time, c);
         }
       }
     });
     const sortedCandles = Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
-    if (sortedCandles.length > 0) {
-      series.setData(sortedCandles);
+    
+    // In Replay mode (currentTimestamp != null), slice candles up to playhead timestamp to paint price action bar-by-bar
+    const isLive = currentTimestamp === null;
+    const visibleCandles = isLive
+      ? sortedCandles
+      : sortedCandles.filter((c) => c.time <= currentTimestamp);
+
+    if (visibleCandles.length > 0) {
+      series.setData(visibleCandles);
     }
 
     // Draw a dynamic marker bubble directly on the playhead candle
@@ -339,14 +346,15 @@ export function CompassChart() {
     if (seriesMarkersRef.current) {
       seriesMarkersRef.current.setMarkers(markers);
     }
-  }, [candles, activeCandle]);
+  }, [candles, activeCandle, currentTimestamp]);
 
   // 3. Draw options level bubbles dynamically sized on canvas overlay
   useEffect(() => {
+    const container = chartContainerRef.current;
     const canvas = overlayCanvasRef.current;
     const chart = chartRef.current;
     const series = candlestickSeriesRef.current;
-    if (!canvas || !chart || !series || candles.length === 0) return;
+    if (!container || !canvas || !chart || !series) return;
 
     let animFrameId: number;
 
@@ -421,8 +429,12 @@ export function CompassChart() {
         return targetKey ? tickerHistory[targetKey] : (historyKeys.length > 0 ? tickerHistory[historyKeys[0]] : null);
       };
 
+      // Filter candles for rendering canvas overlay up to current playhead timestamp in replay mode
+      const isLive = currentTimestamp === null;
+      const renderCandles = isLive ? candles : candles.filter((c) => c.time <= currentTimestamp);
+
       // Loop through and draw gamma node bubbles for each candle based on its exact historical snapshot
-      candles.forEach((c) => {
+      renderCandles.forEach((c) => {
         const x = chart.timeScale().timeToCoordinate(c.time as any);
         if (x === null || x < 0 || x > canvas.clientWidth) return;
 
