@@ -6,9 +6,29 @@ from datetime import datetime, timezone
 from app.core.config import settings
 
 
+def is_market_open() -> bool:
+    """
+    Returns True only during US Regular Trading Hours (Monday-Friday 9:30 AM - 4:00 PM ET).
+    Prevents API data consumption off-hours and on weekends.
+    """
+    import zoneinfo
+    from datetime import datetime
+
+    ny_tz = zoneinfo.ZoneInfo("America/New_York")
+    now_et = datetime.now(ny_tz)
+
+    # Weekends (Saturday=5, Sunday=6)
+    if now_et.weekday() >= 5:
+        return False
+
+    minute_of_day = now_et.hour * 60 + now_et.minute
+    # 9:30 AM is 570 mins, 4:00 PM is 960 mins
+    return 570 <= minute_of_day < 960
+
+
 async def realtime_live_publisher():
     """
-    Background loop that polls the configured data provider every 60 seconds
+    Background loop that polls the configured data provider during market hours
     for the options chain, calculates Greeks, and streams the diffs.
     """
     from app.services.analytics import DealerExposureEngine
@@ -46,7 +66,13 @@ async def realtime_live_publisher():
 
     try:
         while True:
-            # Poll live market data every 15 seconds
+            # Enforce Market Hours Guard (Monday-Friday 9:30 AM - 4:00 PM ET)
+            if not is_market_open():
+                print("Off-market hours (ET). Live publisher sleeping until next market session...")
+                await asyncio.sleep(60.0)
+                continue
+
+            # Poll live market data every 15 seconds during market hours
             await asyncio.sleep(15.0)
             
             target_tickers = list(default_tickers)
