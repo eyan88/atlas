@@ -455,8 +455,9 @@ def get_heatmap_history(
 @router.get("/stock/{ticker}/candles")
 def get_stock_candles(
     ticker: str,
-    date: str = Query(...), # YYYY-MM-DD
-def get_stock_candles(ticker: str, date: str, db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    date: str = Query(...),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
     import requests
     from datetime import datetime, time as py_time, timezone
     import zoneinfo
