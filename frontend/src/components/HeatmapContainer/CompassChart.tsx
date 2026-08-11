@@ -308,7 +308,15 @@ export function CompassChart() {
     const uniqueMap = new Map<number, CandleData>();
     candles.forEach((c) => {
       if (c && c.time && c.open !== undefined && c.high !== undefined && c.low !== undefined && c.close !== undefined) {
-        uniqueMap.set(c.time, c);
+        const d = new Date(c.time * 1000);
+        const nyTimeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false });
+        const parts = nyTimeStr.split(':');
+        const hour = parseInt(parts[0], 10);
+        const min = parseInt(parts[1], 10);
+        const minuteOfDay = hour * 60 + min;
+        if (minuteOfDay <= 960) {
+          uniqueMap.set(c.time, c);
+        }
       }
     });
     const sortedCandles = Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);

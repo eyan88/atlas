@@ -456,45 +456,20 @@ def get_heatmap_history(
 def get_stock_candles(
     ticker: str,
     date: str = Query(...), # YYYY-MM-DD
-    db: Session = Depends(get_db)
-):
-    """
-    Returns actual intraday 5-minute price candles for the ticker on the target date.
-    Fetches from Yahoo Finance and returns the OHLC data.
-    """
+def get_stock_candles(ticker: str, date: str, db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     import requests
     from datetime import datetime, time as py_time, timezone
-    
+    import zoneinfo
+
     ticker = ticker.upper()
     try:
         dt = datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
-    start_dt = datetime.combine(dt, py_time.min)
-    end_dt = datetime.combine(dt, py_time.max)
+    ny_tz = zoneinfo.ZoneInfo("America/New_York")
 
-    # 1. Primary Source: Fetch underlying price snapshots from database if we have live intraday data (>= 5 points)
-    db_prices = db.query(UnderlyingPriceSnapshot).filter(
-        UnderlyingPriceSnapshot.ticker == ticker.upper(),
-        UnderlyingPriceSnapshot.timestamp >= start_dt,
-        UnderlyingPriceSnapshot.timestamp <= end_dt
-    ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
-
-    if len(db_prices) >= 1:
-        candles = []
-        for p in db_prices:
-            ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
-            candles.append({
-                "time": ts,
-                "open": float(p.price),
-                "high": float(p.price),
-                "low": float(p.price),
-                "close": float(p.price)
-            })
-        return candles
-
-    # 2. Secondary Source: Fetch full intraday candles from Yahoo Finance API (5-minute OHLC bars)
+    # 1. Primary Source: Fetch full 5-minute OHLC candles from Yahoo Finance API
     start_ts = int(datetime.combine(dt, py_time.min).replace(tzinfo=timezone.utc).timestamp())
     end_ts = int(datetime.combine(dt, py_time.max).replace(tzinfo=timezone.utc).timestamp())
 
@@ -502,7 +477,7 @@ def get_stock_candles(
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
-    
+
     try:
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
@@ -512,71 +487,66 @@ def get_stock_candles(
                 chart_data = result[0]
                 timestamps = chart_data.get("timestamp", [])
                 indicators = chart_data.get("indicators", {}).get("quote", [{}])[0]
-                
+
                 opens = indicators.get("open", [])
                 highs = indicators.get("high", [])
                 lows = indicators.get("low", [])
                 closes = indicators.get("close", [])
-                
+
                 candles = []
                 for i in range(len(timestamps)):
                     if (i < len(opens) and opens[i] is not None and
                         i < len(highs) and highs[i] is not None and
                         i < len(lows) and lows[i] is not None and
                         i < len(closes) and closes[i] is not None):
-                        
-                        candles.append({
-                            "time": int(timestamps[i]),
-                            "open": float(opens[i]),
-                            "high": float(highs[i]),
-                            "low": float(lows[i]),
-                            "close": float(closes[i])
-                        })
+
+                        ts = int(timestamps[i])
+                        # Filter to regular market hours only (9:30 AM ET - 4:00 PM ET)
+                        d_et = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(ny_tz)
+                        minute_of_day = d_et.hour * 60 + d_et.minute
+                        if 570 <= minute_of_day <= 960:
+                            candles.append({
+                                "time": ts,
+                                "open": float(opens[i]),
+                                "high": float(highs[i]),
+                                "low": float(lows[i]),
+                                "close": float(closes[i])
+                            })
                 if candles:
                     return candles
     except Exception as e:
         print(f"Notice: Yahoo Finance candles fetch notice for {ticker}: {e}")
 
-    # 3. Tertiary Source: Fetch from ThetaData stock_history_1m if configured
-    if settings.DATA_PROVIDER == "thetadata":
-        try:
-            from thetadata import ThetaClient
-            username = os.getenv("THETADATA_USERNAME") or os.getenv("THETADATA_EMAIL")
-            password = os.getenv("THETADATA_PASSWORD")
-            if username and password:
-                client = ThetaClient(email=username, password=password, dataframe_type="pandas")
-                df_stock = client.stock_history_1m(symbol=ticker.upper(), start_date=dt.date(), end_date=dt.date())
-                if not df_stock.empty:
-                    candles = []
-                    base_ts = int(datetime.combine(dt.date(), py_time.min).replace(tzinfo=timezone.utc).timestamp())
-                    for _, row in df_stock.iterrows():
-                        ms = int(row["ms_of_day"]) if "ms_of_day" in row else 0
-                        ts = base_ts + (ms // 1000)
-                        candles.append({
-                            "time": ts,
-                            "open": float(row.get("open", row.get("close", 0))),
-                            "high": float(row.get("high", row.get("close", 0))),
-                            "low": float(row.get("low", row.get("close", 0))),
-                            "close": float(row.get("close", 0))
-                        })
-                    if candles:
-                        return candles
-        except Exception as e:
-            print(f"Notice: ThetaData stock_history_1m fetch notice for {ticker}: {e}")
+    # 2. Secondary Source: Aggregate database price snapshots into 5m OHLC candles
+    start_dt = datetime.combine(dt, py_time.min)
+    end_dt = datetime.combine(dt, py_time.max)
 
-    # 4. Fallback: Return whatever database snapshots exist
+    db_prices = db.query(UnderlyingPriceSnapshot).filter(
+        UnderlyingPriceSnapshot.ticker == ticker.upper(),
+        UnderlyingPriceSnapshot.timestamp >= start_dt,
+        UnderlyingPriceSnapshot.timestamp <= end_dt
+    ).order_by(UnderlyingPriceSnapshot.timestamp.asc()).all()
+
     if db_prices:
-        candles = []
+        bars_map = {}
         for p in db_prices:
             ts = int(p.timestamp.replace(tzinfo=timezone.utc).timestamp()) if p.timestamp.tzinfo is None else int(p.timestamp.timestamp())
-            candles.append({
-                "time": ts,
-                "open": float(p.price),
-                "high": float(p.price),
-                "low": float(p.price),
-                "close": float(p.price)
-            })
-        return candles
+            d_et = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(ny_tz)
+            minute_of_day = d_et.hour * 60 + d_et.minute
+            if 570 <= minute_of_day <= 960:
+                bar_time = (ts // 300) * 300
+                price = float(p.price)
+                if bar_time not in bars_map:
+                    bars_map[bar_time] = {"time": bar_time, "open": price, "high": price, "low": price, "close": price}
+                else:
+                    b = bars_map[bar_time]
+                    b["high"] = max(b["high"], price)
+                    b["low"] = min(b["low"], price)
+                    b["close"] = price
+
+        if bars_map:
+            return sorted(list(bars_map.values()), key=lambda b: b["time"])
+
     return []
 
 @router.get("/admin/reset-db")
