@@ -329,6 +329,9 @@ export const useAppStore = create<AppState>((set) => ({
         current = state.heatmap;
       }
 
+      const spotPrice = payload.spot_price ?? (current ? current.spot_price : null);
+      const strikeCount = state.strikeCount || 20;
+
       // Collect all rows and columns dynamically from both current heatmap and incoming payload diffs
       const rSet = new Set<number>(current ? current.rows.map(Number) : []);
       const cSet = new Set<string>(current ? current.columns.map(strToDateStr) : []);
@@ -337,7 +340,15 @@ export const useAppStore = create<AppState>((set) => ({
         cSet.add(strToDateStr(d.e));
       });
 
-      const rows = Array.from(rSet).sort((a, b) => b - a); // descending
+      let allStrikes = Array.from(rSet);
+      
+      // Trim strikes to strikeCount centered around spotPrice to prevent far OTM strikes from bloating grid
+      if (allStrikes.length > strikeCount && spotPrice !== null) {
+        const sortedByDist = [...allStrikes].sort((a, b) => Math.abs(a - spotPrice) - Math.abs(b - spotPrice));
+        allStrikes = sortedByDist.slice(0, strikeCount);
+      }
+
+      const rows = allStrikes.sort((a, b) => b - a); // descending
       const columns = Array.from(cSet).sort();
 
       const rowMap = new Map(rows.map((r, i) => [Number(r), i]));
