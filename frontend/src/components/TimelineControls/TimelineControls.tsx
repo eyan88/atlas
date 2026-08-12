@@ -104,6 +104,7 @@ export function TimelineControls() {
 
       {/* Timeline Slider */}
       <div className={styles.sliderWrapper}>
+        <span className={styles.sliderLabel}>9:30 AM</span>
         <input
           id="timeline-slider"
           type="range"
@@ -120,6 +121,7 @@ export function TimelineControls() {
           disabled={timelineTimestamps.length === 0}
           aria-label="Replay timeline"
         />
+        <span className={styles.sliderLabel}>4:00 PM</span>
       </div>
 
       {/* Live Toggle Button */}

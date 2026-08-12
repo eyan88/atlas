@@ -60,11 +60,24 @@
 }
 
 .sliderWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  flex: 1;
+}
+
+.sliderLabel {
+  font-size: 11px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 .slider {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 
 .liveBtn {
