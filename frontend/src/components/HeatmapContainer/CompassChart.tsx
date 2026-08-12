@@ -394,11 +394,12 @@ export function CompassChart() {
         const x = chart.timeScale().timeToCoordinate(c.time as any);
         if (x === null || x < 0 || x > canvas.clientWidth) return;
 
-        // Use gamma_levels embedded directly in the candle by the backend enrichment pass
+        // Use gamma_levels embedded directly in the candle by the backend enrichment pass.
+        // Backend already pre-filtered to >= 25% of each snapshot's own peak.
+        // Apply a final 20% session-peak guard to ensure only dominant institutional levels render.
         const levels = c.gamma_levels ?? [];
         const sigNodes = levels
-          .filter((n) => n.abs_gex >= threshold)
-          .slice(0, 12) // Up to 12 levels per candle
+          .filter((n) => n.abs_gex >= sessionPeakGex * 0.20)
           .map((n) => ({
             strike: n.strike,
             gex: n.net_gex,

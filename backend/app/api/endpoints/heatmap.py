@@ -615,14 +615,23 @@ def _enrich_candles_with_gamma(candles: list, ticker: str, dt, db) -> list:
         gf = engine.find_gamma_flip_strike(grouped, spot=None)
         ng = float(grouped["net_gex"].sum())
 
-        # Include ALL strikes sorted by abs_gex descending — frontend filters by threshold
+        # Only record strikes with significant institutional exposure.
+        # Threshold: >= 25% of THIS snapshot's own peak abs_gex.
+        # This ensures only dominant walls and major levels pass — minor noise is discarded.
+        # Cap at 6 levels: call wall, put wall, gamma flip zone, and 3 next-tier significant nodes.
+        snap_peak = float(grouped["abs_gex"].max() or 1.0)
+        sig_threshold = snap_peak * 0.25
         levels = []
         for _, row in grouped.sort_values("abs_gex", ascending=False).iterrows():
+            if float(row["abs_gex"]) < sig_threshold:
+                break  # Already sorted desc — stop as soon as we fall below threshold
             levels.append({
                 "strike": float(row["strike"]),
                 "net_gex": float(row["net_gex"]),
                 "abs_gex": float(row["abs_gex"]),
             })
+            if len(levels) >= 6:
+                break
 
         snap_map[int(ts_unix)] = {
             "call_wall": float(cw) if cw is not None and not _np.isnan(cw) else None,
