@@ -318,27 +318,31 @@ def get_heatmap_history(
     ticker = ticker.upper()
     metric = metric.lower()
     
+    try:
+        query_date = py_date.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    import zoneinfo as _zi
+    _ET = _zi.ZoneInfo("America/New_York")
+    eastern_today = datetime.now(_ET).date()
+    is_today = (query_date == eastern_today)
+
     # Cache key format: atlas:heatmap:history:v2:{ticker}:{date}:{metric}:{strikeCount}
     cache_key = f"atlas:heatmap:history:v2:{ticker}:{date}:{metric}:{strikeCount}"
     
     is_redis_active = redis_conn is not None and type(redis_conn).__name__ != "Depends"
     
-    if is_redis_active:
+    # Only serve cached history for historical dates. Today's live session accumulates 15s snapshots continuously.
+    if is_redis_active and not is_today:
         try:
             cached_data = redis_conn.get(cache_key)
             if cached_data:
                 return json.loads(cached_data)
         except Exception as e:
             print(f"Redis cache lookup error for history: {e}")
-            
-    try:
-        query_date = py_date.fromisoformat(date)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
     # 1. Fetch all snapshots and price quotes for this ticker on this date
-    import zoneinfo as _zi
-    _ET = _zi.ZoneInfo("America/New_York")
     start_dt = datetime.combine(query_date, datetime.min.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
     end_dt = datetime.combine(query_date, datetime.max.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
 
@@ -483,7 +487,8 @@ def get_heatmap_history(
         "history": history
     }
 
-    if is_redis_active:
+    # Only cache in Redis for completed historical sessions (not today's active session)
+    if is_redis_active and not is_today:
         try:
             redis_conn.set(cache_key, json.dumps(result), ex=86400)
         except Exception as e:
