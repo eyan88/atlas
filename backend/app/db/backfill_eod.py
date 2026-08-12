@@ -77,7 +77,7 @@ def run_backfill(ticker="SPY", backfill_date=date(2026, 7, 3), db=None):
         print(f"Found {len(expirations)} total active expirations.")
 
         # Define snapshot timestamp as 4:00 PM ET (20:00 UTC) on the target date
-        ts = datetime(backfill_date.year, backfill_date.month, backfill_date.day, 16, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(backfill_date.year, backfill_date.month, backfill_date.day, 20, 0, 0, tzinfo=timezone.utc)
 
         # 3. Clean up existing records for this day
         print("Pruning old database entries for this timestamp...")

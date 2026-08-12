@@ -15,6 +15,38 @@ from app.services.analytics import DealerExposureEngine
 router = APIRouter()
 engine = DealerExposureEngine()
 
+
+def to_utc_iso(dt: Any) -> str:
+    """
+    Formats a datetime object or pandas Timestamp into an ISO 8601 string with explicit UTC 'Z' suffix.
+    Ensures browsers interpret it as UTC rather than falling back to local time.
+    """
+    if dt is None:
+        return ""
+    if hasattr(dt, "to_pydatetime"):
+        dt = dt.to_pydatetime()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def to_unix_seconds(dt: Any) -> int:
+    """
+    Converts a datetime or pandas Timestamp into integer Unix epoch seconds, ensuring UTC timezone.
+    """
+    if dt is None:
+        return 0
+    if hasattr(dt, "to_pydatetime"):
+        dt = dt.to_pydatetime()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return int(dt.timestamp())
+
+
 @router.get("/heatmap/{ticker}")
 def get_heatmap(
     ticker: str,
@@ -67,7 +99,7 @@ def get_heatmap(
     ).all()
     
     if not records:
-        raise HTTPException(status_code=404, detail=f"No metrics snapshot found at {timestamp or target_ts.isoformat()}.")
+        raise HTTPException(status_code=404, detail=f"No metrics snapshot found at {timestamp or to_utc_iso(target_ts)}.")
 
     # Convert to pandas DataFrame for calculations
     df = pd.DataFrame([{
@@ -176,7 +208,7 @@ def get_heatmap(
 
     result = {
         "ticker": ticker,
-        "timestamp": target_ts.isoformat(),
+        "timestamp": to_utc_iso(target_ts),
         "spot_price": float(spot_price) if spot_price is not None else None,
         "gamma_flip": float(gamma_flip) if (gamma_flip is not None and not np.isnan(gamma_flip)) else None,
         "net_gamma": net_gamma,
@@ -215,10 +247,13 @@ def get_replay_timeline(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
-    # Fetch unique timestamps for this ticker on this date
-    start_dt = datetime.combine(query_date, datetime.min.time())
-    end_dt = datetime.combine(query_date, datetime.max.time())
-    
+    import zoneinfo as _zi
+    _ET = _zi.ZoneInfo("America/New_York")
+    # Bound queries to the full ET calendar day (midnight to midnight) converted to UTC
+    # This prevents naive-datetime mismatch where UTC midnight != ET midnight
+    start_dt = datetime.combine(query_date, datetime.min.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
+    end_dt   = datetime.combine(query_date, datetime.max.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
+
     timestamps = db.query(DealerMetricSnapshot.timestamp).filter(
         DealerMetricSnapshot.ticker == ticker,
         DealerMetricSnapshot.timestamp >= start_dt,
@@ -250,9 +285,9 @@ def get_replay_timeline(
             DealerMetricSnapshot.timestamp <= end_dt
         ).scalar()
         if prev_ts:
-            fallback_date = prev_ts.date()
-            f_start = datetime.combine(fallback_date, datetime.min.time())
-            f_end = datetime.combine(fallback_date, datetime.max.time())
+            fallback_date = prev_ts.date() if prev_ts.tzinfo is None else prev_ts.astimezone(_ET).date()
+            f_start = datetime.combine(fallback_date, datetime.min.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
+            f_end   = datetime.combine(fallback_date, datetime.max.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
             timestamps = db.query(DealerMetricSnapshot.timestamp).filter(
                 DealerMetricSnapshot.ticker == ticker,
                 DealerMetricSnapshot.timestamp >= f_start,
@@ -260,12 +295,7 @@ def get_replay_timeline(
             ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
     # Convert timestamps to unix epoch seconds, forcing UTC timezone for naive values
-    unix_timestamps = []
-    for ts in timestamps:
-        dt = ts[0]
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        unix_timestamps.append(int(dt.timestamp()))
+    unix_timestamps = [to_unix_seconds(ts[0]) for ts in timestamps]
 
     return {
         "ticker": ticker,
@@ -307,8 +337,10 @@ def get_heatmap_history(
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
     # 1. Fetch all snapshots and price quotes for this ticker on this date
-    start_dt = datetime.combine(query_date, datetime.min.time())
-    end_dt = datetime.combine(query_date, datetime.max.time())
+    import zoneinfo as _zi
+    _ET = _zi.ZoneInfo("America/New_York")
+    start_dt = datetime.combine(query_date, datetime.min.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
+    end_dt = datetime.combine(query_date, datetime.max.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
 
     records = db.query(DealerMetricSnapshot).filter(
         DealerMetricSnapshot.ticker == ticker,
@@ -323,9 +355,9 @@ def get_heatmap_history(
             DealerMetricSnapshot.timestamp <= end_dt
         ).scalar()
         if prev_ts:
-            fallback_date = prev_ts.date()
-            start_dt = datetime.combine(fallback_date, datetime.min.time())
-            end_dt = datetime.combine(fallback_date, datetime.max.time())
+            fallback_date = prev_ts.date() if prev_ts.tzinfo is None else prev_ts.astimezone(_ET).date()
+            start_dt = datetime.combine(fallback_date, datetime.min.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
+            end_dt   = datetime.combine(fallback_date, datetime.max.time()).replace(tzinfo=_ET).astimezone(timezone.utc).replace(tzinfo=None)
             records = db.query(DealerMetricSnapshot).filter(
                 DealerMetricSnapshot.ticker == ticker,
                 DealerMetricSnapshot.timestamp >= start_dt,
@@ -367,11 +399,7 @@ def get_heatmap_history(
     history = {}
 
     for ts, ts_df in grouped_time:
-        # Convert timestamp to unix seconds
-        dt = ts
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        ts_unix = int(dt.timestamp())
+        ts_unix = to_unix_seconds(ts)
 
         # Find spot price closest to ts
         spot_price = None
@@ -438,7 +466,7 @@ def get_heatmap_history(
 
         history[str(ts_unix)] = {
             "ticker": ticker,
-            "timestamp": dt.isoformat(),
+            "timestamp": to_utc_iso(ts),
             "spot_price": float(spot_price) if spot_price is not None else None,
             "gamma_flip": float(gamma_flip) if (gamma_flip is not None and not np.isnan(gamma_flip)) else None,
             "net_gamma": net_gamma,
