@@ -1,19 +1,35 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore, getEasternDateStr } from '../../store/useAppStore';
 import styles from './TimelineControls.module.css';
 
 const SPEEDS = [1, 5, 10, 60] as const;
 
+// Returns the current US Eastern Time formatted as HH:MM AM/PM
+function getLiveEtTime() {
+  return new Date().toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+  });
+}
+
 export function TimelineControls() {
-  const isPlaying   = useAppStore((s) => s.isPlaying);
-  const replaySpeed = useAppStore((s) => s.replaySpeed);
-  const timestamp   = useAppStore((s) => s.currentTimestamp);
-  const togglePlay  = useAppStore((s) => s.togglePlay);
-  const setSpeed    = useAppStore((s) => s.setReplaySpeed);
-  const setTimestamp = useAppStore((s) => s.setTimestamp);
+  const isPlaying          = useAppStore((s) => s.isPlaying);
+  const replaySpeed        = useAppStore((s) => s.replaySpeed);
+  const timestamp          = useAppStore((s) => s.currentTimestamp);
+  const togglePlay         = useAppStore((s) => s.togglePlay);
+  const setSpeed           = useAppStore((s) => s.setReplaySpeed);
+  const setTimestamp       = useAppStore((s) => s.setTimestamp);
   const timelineTimestamps = useAppStore((s) => s.timelineTimestamps);
 
-  // Replay timer loop effect
+  // Live ET clock — ticks every second, completely independent of the scrubber
+  const [liveEtTime, setLiveEtTime] = useState(getLiveEtTime);
+  useEffect(() => {
+    const clock = setInterval(() => setLiveEtTime(getLiveEtTime()), 1000);
+    return () => clearInterval(clock);
+  }, []);
+
+  // Replay timer loop
   useEffect(() => {
     if (!isPlaying || timelineTimestamps.length === 0) return;
 
@@ -28,12 +44,11 @@ export function TimelineControls() {
         const currentIdx = currentTs ? list.indexOf(currentTs) : list.length - 1;
         let nextIdx = currentIdx + 1;
         if (nextIdx >= list.length) {
-          nextIdx = 0; // Loop back to the start of the day
+          nextIdx = 0; // Loop back to start of session
         }
 
         const nextTs = list[nextIdx];
 
-        // Coordinate updates across all open panes
         const nextHeatmaps = { ...state.heatmapsByTicker };
         state.openTickers.forEach((t) => {
           const tHistory = state.snapshotsHistory[t];
@@ -60,13 +75,14 @@ export function TimelineControls() {
     return () => clearInterval(timer);
   }, [isPlaying, replaySpeed, timelineTimestamps]);
 
-  const timeLabel = timestamp
+  // Scrubber position label — shown above the slider, not on the GO LIVE button
+  const scrubberTimeLabel = timestamp
     ? new Date(timestamp * 1000).toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
         timeZone: 'America/New_York',
       })
-    : 'LIVE';
+    : null;
 
   const currentIdx = timestamp && timelineTimestamps.length > 0
     ? timelineTimestamps.indexOf(timestamp)
@@ -105,26 +121,32 @@ export function TimelineControls() {
       {/* Timeline Slider */}
       <div className={styles.sliderWrapper}>
         <span className={styles.sliderLabel}>9:30 AM</span>
-        <input
-          id="timeline-slider"
-          type="range"
-          className={styles.slider}
-          min={0}
-          max={timelineTimestamps.length > 0 ? timelineTimestamps.length - 1 : 100}
-          value={sliderVal}
-          onChange={(e) => {
-            const idx = Number(e.target.value);
-            if (timelineTimestamps[idx]) {
-              setTimestamp(timelineTimestamps[idx]);
-            }
-          }}
-          disabled={timelineTimestamps.length === 0}
-          aria-label="Replay timeline"
-        />
+        <div className={styles.sliderTrack}>
+          {/* Scrubber position tooltip — shows the replay timestamp, not the live clock */}
+          {scrubberTimeLabel && (
+            <span className={styles.scrubberTimeLabel}>{scrubberTimeLabel} ET</span>
+          )}
+          <input
+            id="timeline-slider"
+            type="range"
+            className={styles.slider}
+            min={0}
+            max={timelineTimestamps.length > 0 ? timelineTimestamps.length - 1 : 100}
+            value={sliderVal}
+            onChange={(e) => {
+              const idx = Number(e.target.value);
+              if (timelineTimestamps[idx]) {
+                setTimestamp(timelineTimestamps[idx]);
+              }
+            }}
+            disabled={timelineTimestamps.length === 0}
+            aria-label="Replay timeline"
+          />
+        </div>
         <span className={styles.sliderLabel}>4:00 PM</span>
       </div>
 
-      {/* Live Toggle Button */}
+      {/* Live Toggle Button — always shows current real ET clock, never scrubber position */}
       <button
         id="toggle-live-btn"
         className={`${styles.liveBtn} ${timestamp === null ? styles.liveActive : ''}`}
@@ -137,7 +159,7 @@ export function TimelineControls() {
       >
         <span className={`${styles.timeDot} ${timestamp === null ? styles.liveDot : ''}`} />
         <span className={styles.timeLabel}>
-          {timestamp === null ? 'LIVE FEED' : `GO LIVE (${timeLabel})`}
+          {timestamp === null ? `LIVE  ${liveEtTime} ET` : `GO LIVE  ${liveEtTime} ET`}
         </span>
       </button>
     </footer>

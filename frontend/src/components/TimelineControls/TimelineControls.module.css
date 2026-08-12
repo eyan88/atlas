@@ -78,6 +78,27 @@
 .slider {
   flex: 1;
   min-width: 0;
+  width: 100%;
+}
+
+.sliderTrack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Scrubber position time — shown above the slider rail, distinct from the GO LIVE clock */
+.scrubberTimeLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent, rgba(88, 166, 255, 0.85));
+  text-align: center;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .liveBtn {
