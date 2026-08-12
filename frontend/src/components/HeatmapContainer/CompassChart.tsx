@@ -382,9 +382,6 @@ export function CompassChart() {
       // Use session_peak_gex embedded per candle by backend for consistent session-wide normalization
       const sessionPeakGex = candles.reduce((peak, c) => Math.max(peak, c.session_peak_gex ?? 0), 0) || 1;
 
-      // Significance threshold: 5% of session peak — filters minor noise
-      const threshold = sessionPeakGex * 0.05;
-
       // Filter candles for rendering canvas overlay up to current playhead timestamp in replay mode
       const isLive = currentTimestamp === null;
       const renderCandles = isLive ? candles : candles.filter((c) => c.time <= currentTimestamp);
