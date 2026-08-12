@@ -103,6 +103,17 @@ def get_heatmap(
         if spot_record:
             spot_price = float(spot_record.price)
 
+    # Secondary Fallback: Fetch real market spot quote if database snapshot is missing or stale
+    if spot_price is None or spot_price > 700 and ticker in ["SPY", "IWM"]:
+        try:
+            from app.services.data_providers.thetadata import ThetaDataProvider
+            prov = ThetaDataProvider()
+            quote = prov.get_underlying_quote(ticker)
+            if quote and quote.price > 0:
+                spot_price = float(quote.price)
+        except Exception as q_err:
+            print(f"Notice: Spot price fallback for {ticker}: {q_err}")
+
     # 4. Group metrics by strike to compute key levels (Walls, Gamma Flip)
     # Call/Put Wall calculations are based on all strikes in the full chain snapshot
     grouped_full = df.groupby("strike", as_index=False).agg({
