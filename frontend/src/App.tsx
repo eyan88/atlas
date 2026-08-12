@@ -6,7 +6,7 @@ import { TimelineControls } from './components/TimelineControls/TimelineControls
 import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
 import { GammaFlow } from './components/GammaFlow/GammaFlow';
 import { CompassChart } from './components/HeatmapContainer/CompassChart';
-import { useAppStore, toSeconds, getEasternDateStr } from './store/useAppStore';
+import { useAppStore, toSeconds, getEasternDateStr, findClosestSnapshot } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
 
@@ -90,7 +90,7 @@ export function App() {
 
           // Default to the latest snapshot in the timeline
           const latestTs = timestamps[timestamps.length - 1];
-          const snap = normalizedHistory[latestTs];
+          const snap = findClosestSnapshot(normalizedHistory, latestTs);
 
           if (snap) {
             setHeatmapForTicker(ticker, snap);

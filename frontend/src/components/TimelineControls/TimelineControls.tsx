@@ -35,41 +35,20 @@ export function TimelineControls() {
 
     const intervalMs = 1000 / replaySpeed;
     const timer = setInterval(() => {
-      useAppStore.setState((state) => {
-        if (!state.isPlaying) return {};
-        const currentTs = state.currentTimestamp;
-        const list = state.timelineTimestamps;
-        if (list.length === 0) return {};
+      const storeState = useAppStore.getState();
+      if (!storeState.isPlaying) return;
+      const currentTs = storeState.currentTimestamp;
+      const list = storeState.timelineTimestamps;
+      if (list.length === 0) return;
 
-        const currentIdx = currentTs ? list.indexOf(currentTs) : list.length - 1;
-        let nextIdx = currentIdx + 1;
-        if (nextIdx >= list.length) {
-          nextIdx = 0; // Loop back to start of session
-        }
+      const currentIdx = currentTs ? list.indexOf(currentTs) : list.length - 1;
+      let nextIdx = currentIdx + 1;
+      if (nextIdx >= list.length) {
+        nextIdx = 0; // Loop back to start of session
+      }
 
-        const nextTs = list[nextIdx];
-
-        const nextHeatmaps = { ...state.heatmapsByTicker };
-        state.openTickers.forEach((t) => {
-          const tHistory = state.snapshotsHistory[t];
-          if (tHistory && tHistory[nextTs]) {
-            nextHeatmaps[t] = tHistory[nextTs];
-          }
-        });
-
-        const activeHist = state.snapshotsHistory[state.activeTicker];
-        const nextHeatmap = activeHist && activeHist[nextTs] ? activeHist[nextTs] : state.heatmap;
-
-        return {
-          currentTimestamp: nextTs,
-          heatmap: nextHeatmap,
-          heatmapsByTicker: nextHeatmaps,
-          spotPrice: nextHeatmap ? nextHeatmap.spot_price : state.spotPrice,
-          gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
-          callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
-          putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
-        };
-      });
+      const nextTs = list[nextIdx];
+      storeState.setTimestamp(nextTs);
     }, intervalMs);
 
     return () => clearInterval(timer);

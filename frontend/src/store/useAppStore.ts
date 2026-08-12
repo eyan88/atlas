@@ -17,6 +17,30 @@ export function getEasternDateStr(d: Date = new Date()): string {
   return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
+export function findClosestSnapshot(
+  history: Record<number, HeatmapSnapshot> | undefined,
+  targetTs: number | null
+): HeatmapSnapshot | null {
+  if (!history || targetTs === null) return null;
+  if (history[targetTs]) return history[targetTs];
+
+  const keys = Object.keys(history).map(Number).sort((a, b) => a - b);
+  if (keys.length === 0) return null;
+
+  let closest: number | null = null;
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i] <= targetTs + 30) {
+      closest = keys[i];
+    } else {
+      break;
+    }
+  }
+  if (closest === null && keys.length > 0) {
+    closest = keys[0];
+  }
+  return closest !== null ? history[closest] ?? null : null;
+}
+
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
 export type AppTab = 'heatmap' | 'compass' | 'gamma-flow';
@@ -245,25 +269,28 @@ export const useAppStore = create<AppState>((set) => ({
       const nextHeatmaps = { ...state.heatmapsByTicker };
       state.openTickers.forEach((t) => {
         const tHistory = state.snapshotsHistory[t];
-        if (ts && tHistory && tHistory[ts]) {
-          nextHeatmaps[t] = tHistory[ts];
+        const snap = findClosestSnapshot(tHistory, ts);
+        if (snap) {
+          nextHeatmaps[t] = snap;
         }
       });
 
       const activeHist = state.snapshotsHistory[state.activeTicker];
-      const nextHeatmap = ts && activeHist && activeHist[ts] ? activeHist[ts] : state.heatmap;
+      const nextHeatmap = ts === null
+        ? state.heatmap
+        : (findClosestSnapshot(activeHist, ts) ?? state.heatmap);
 
-       return {
-         currentTimestamp: ts,
-         heatmap: nextHeatmap,
-         heatmapsByTicker: nextHeatmaps,
-         spotPrice: nextHeatmap ? nextHeatmap.spot_price : state.spotPrice,
-         gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
-         callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
-         putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
-         isPlaying: ts === null ? false : state.isPlaying,
-       };
-     }),
+      return {
+        currentTimestamp: ts,
+        heatmap: nextHeatmap,
+        heatmapsByTicker: nextHeatmaps,
+        spotPrice: nextHeatmap ? nextHeatmap.spot_price : state.spotPrice,
+        gammaFlip: nextHeatmap ? nextHeatmap.gamma_flip : state.gammaFlip,
+        callWall: nextHeatmap ? nextHeatmap.call_wall : state.callWall,
+        putWall: nextHeatmap ? nextHeatmap.put_wall : state.putWall,
+        isPlaying: ts === null ? false : state.isPlaying,
+      };
+    }),
 
 
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
