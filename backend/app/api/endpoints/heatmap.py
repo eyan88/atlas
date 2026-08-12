@@ -568,18 +568,17 @@ def get_stock_candles(
 
 def _enrich_candles_with_gamma(candles: list, ticker: str, dt, db) -> list:
     """
-    For each 5-minute candle bar, find the closest DealerMetricSnapshot and attach
-    call_wall, put_wall, gamma_flip, and net_gamma so the Compass chart can render
-    gamma level overlays per candle timestamp.
+    For each 5-minute candle bar, find the closest DealerMetricSnapshot and attach:
+    - call_wall, put_wall, gamma_flip, net_gamma (summary levels)
+    - gamma_levels: full per-strike array [{strike, net_gex, abs_gex}] sorted by abs_gex desc
+      so the Compass chart can track how every significant gamma level grows/shrinks per candle.
     """
     from datetime import datetime as _dt, timezone as _tz
-    import zoneinfo as _zi
     import numpy as _np
 
     if not candles:
         return candles
 
-    ny_tz = _zi.ZoneInfo("America/New_York")
     start_dt = _dt.combine(dt, _dt.min.time())
     end_dt = _dt.combine(dt, _dt.max.time())
 
@@ -591,47 +590,58 @@ def _enrich_candles_with_gamma(candles: list, ticker: str, dt, db) -> list:
     ).order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
     if not records:
-        # No DB snapshots available — return candles without gamma enrichment
         return candles
 
     import pandas as _pd
     df = _pd.DataFrame([{
-        "timestamp": r.timestamp,
         "ts_unix": int(r.timestamp.replace(tzinfo=_tz.utc).timestamp()) if r.timestamp.tzinfo is None else int(r.timestamp.timestamp()),
         "strike": float(r.strike),
         "net_gex": float(r.net_gex),
         "net_dex": float(r.net_dex),
     } for r in records])
 
-    # Build a map of unix_ts -> {call_wall, put_wall, gamma_flip, net_gamma}
+    # Compute session-wide peak abs GEX across ALL timestamps and ALL strikes
+    # This anchors bubble size relative to the whole session — so dominant levels stay large all day
+    df["abs_gex"] = df["net_gex"].abs()
+    session_peak_gex = float(df.groupby(["ts_unix", "strike"])["abs_gex"].sum().max() or 1.0)
+
+    # Build a map of unix_ts -> full snapshot payload
     snap_map = {}
     for ts_unix, ts_df in df.groupby("ts_unix"):
         grouped = ts_df.groupby("strike", as_index=False).agg({"net_gex": "sum", "net_dex": "sum"})
+        grouped["abs_gex"] = grouped["net_gex"].abs()
+
         cw, pw = engine.find_walls(grouped)
         gf = engine.find_gamma_flip_strike(grouped, spot=None)
         ng = float(grouped["net_gex"].sum())
+
+        # Include ALL strikes sorted by abs_gex descending — frontend filters by threshold
+        levels = []
+        for _, row in grouped.sort_values("abs_gex", ascending=False).iterrows():
+            levels.append({
+                "strike": float(row["strike"]),
+                "net_gex": float(row["net_gex"]),
+                "abs_gex": float(row["abs_gex"]),
+            })
+
         snap_map[int(ts_unix)] = {
             "call_wall": float(cw) if cw is not None and not _np.isnan(cw) else None,
             "put_wall": float(pw) if pw is not None and not _np.isnan(pw) else None,
             "gamma_flip": float(gf) if gf is not None and not _np.isnan(gf) else None,
             "net_gamma": ng,
+            "gamma_levels": levels,
         }
 
     snap_keys = sorted(snap_map.keys())
 
-    # For each candle, find the closest snapshot at or before the candle time
+    # For each candle, binary-search for the closest snapshot at or before candle time
     import bisect as _bisect
     enriched = []
     for c in candles:
         candle_ts = int(c["time"])
-        # Find rightmost snap_key <= candle_ts
         idx = _bisect.bisect_right(snap_keys, candle_ts) - 1
-        if idx >= 0:
-            gamma = snap_map[snap_keys[idx]]
-        else:
-            # Candle is before any snapshot — use earliest
-            gamma = snap_map[snap_keys[0]] if snap_keys else {}
-        enriched.append({**c, **gamma})
+        gamma = snap_map[snap_keys[idx]] if idx >= 0 else (snap_map[snap_keys[0]] if snap_keys else {})
+        enriched.append({**c, **gamma, "session_peak_gex": session_peak_gex})
 
     return enriched
 

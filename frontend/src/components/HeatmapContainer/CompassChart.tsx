@@ -6,6 +6,12 @@ import styles from './CompassChart.module.css';
 
 const CHART_TICKERS = ['SPY', 'QQQ', 'IWM'];
 
+interface GammaLevel {
+  strike: number;
+  net_gex: number;
+  abs_gex: number;
+}
+
 interface CandleData {
   time: number;
   open: number;
@@ -16,6 +22,9 @@ interface CandleData {
   call_wall?: number | null;
   put_wall?: number | null;
   gamma_flip?: number | null;
+  net_gamma?: number | null;
+  gamma_levels?: GammaLevel[];
+  session_peak_gex?: number;
 }
 
 export function CompassChart() {
@@ -370,77 +379,32 @@ export function CompassChart() {
 
       ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-      // 1. Calculate overall session maximum peak GEX magnitude across all intraday snapshots
-      let sessionMaxGex = 0;
-      Object.values(tickerHistory).forEach((snap: any) => {
-        if (snap && snap.rows && snap.data) {
-          snap.rows.forEach((_: number, rowIdx: number) => {
-            const rowVals = snap.data[rowIdx];
-            if (rowVals) {
-              const netGex = Math.abs(rowVals.reduce((sum: number, val: number) => sum + val, 0));
-              if (netGex > sessionMaxGex) sessionMaxGex = netGex;
-            }
-          });
-        }
-      });
+      // Use session_peak_gex embedded per candle by backend for consistent session-wide normalization
+      const sessionPeakGex = candles.reduce((peak, c) => Math.max(peak, c.session_peak_gex ?? 0), 0) || 1;
 
-      // Helper to calculate strike-level net GEX map for a snapshot relative to session peak GEX
-      const getSignificantGammaNodes = (snap: any) => {
-        if (!snap || !snap.rows || !snap.data) return [];
-        const strikeSums: { strike: number; gex: number; absGex: number }[] = [];
-        let snapMaxGex = 0;
-
-        snap.rows.forEach((strike: number, rowIdx: number) => {
-          const rowVals = snap.data[rowIdx];
-          const netGex = rowVals ? rowVals.reduce((sum: number, val: number) => sum + val, 0) : 0;
-          const absGex = Math.abs(netGex);
-          if (absGex > snapMaxGex) snapMaxGex = absGex;
-          strikeSums.push({ strike, gex: netGex, absGex });
-        });
-
-        if (snapMaxGex === 0) return [];
-
-        // Reference peak is the session-wide maximum GEX so persistent high positions stay consistently large
-        const peakRef = sessionMaxGex > 0 ? sessionMaxGex : snapMaxGex;
-        const threshold = peakRef * 0.05;
-
-        return strikeSums
-          .filter((n) => n.absGex >= threshold)
-          .sort((a, b) => b.absGex - a.absGex)
-          .slice(0, 10)
-          .map((n) => ({
-            ...n,
-            relativeMagnitude: n.absGex / peakRef,
-          }));
-      };
-
-      const historyKeys = Object.keys(tickerHistory).map(Number).sort((a, b) => a - b);
-
-      // Helper to find the historical snapshot recorded at or before candle time
-      const getSnapForCandleTime = (candleTime: number) => {
-        let targetKey: number | null = null;
-        for (let i = 0; i < historyKeys.length; i++) {
-          if (historyKeys[i] <= candleTime + 150) {
-            targetKey = historyKeys[i];
-          } else {
-            break;
-          }
-        }
-        return targetKey ? tickerHistory[targetKey] : (historyKeys.length > 0 ? tickerHistory[historyKeys[0]] : null);
-      };
+      // Significance threshold: 5% of session peak — filters minor noise
+      const threshold = sessionPeakGex * 0.05;
 
       // Filter candles for rendering canvas overlay up to current playhead timestamp in replay mode
       const isLive = currentTimestamp === null;
       const renderCandles = isLive ? candles : candles.filter((c) => c.time <= currentTimestamp);
 
-      // Loop through and draw gamma node bubbles for each candle based on its exact historical snapshot
+      // Loop through and draw gamma node bubbles per candle using embedded gamma_levels
       renderCandles.forEach((c) => {
         const x = chart.timeScale().timeToCoordinate(c.time as any);
         if (x === null || x < 0 || x > canvas.clientWidth) return;
 
-        // Retrieve historical snapshot recorded at or before this candle's timestamp
-        const snap = getSnapForCandleTime(c.time);
-        const sigNodes = getSignificantGammaNodes(snap);
+        // Use gamma_levels embedded directly in the candle by the backend enrichment pass
+        const levels = c.gamma_levels ?? [];
+        const sigNodes = levels
+          .filter((n) => n.abs_gex >= threshold)
+          .slice(0, 12) // Up to 12 levels per candle
+          .map((n) => ({
+            strike: n.strike,
+            gex: n.net_gex,
+            absGex: n.abs_gex,
+            relativeMagnitude: n.abs_gex / sessionPeakGex,
+          }));
 
         sigNodes.forEach((node) => {
           const y = series.priceToCoordinate(node.strike);
@@ -448,13 +412,13 @@ export function CompassChart() {
             const isPos = node.gex >= 0;
             const mag = node.relativeMagnitude;
 
-            // Multi-tier bubble scaling across 5 visual size categories (2.0px to 11.5px)
-            let radius = 2.0;
-            if (mag >= 0.85) radius = 11.5;       // Tier 1: Peak Wall (100% - 85%)
-            else if (mag >= 0.65) radius = 9.0;  // Tier 2: Major Level (85% - 65%)
-            else if (mag >= 0.45) radius = 6.5;  // Tier 3: Intermediate Level (65% - 45%)
-            else if (mag >= 0.25) radius = 4.5;  // Tier 4: Secondary Level (45% - 25%)
-            else radius = 2.5;                    // Tier 5: Minor Level (25% - 5%)
+            // 5-tier bubble size scaling relative to session peak
+            let radius: number;
+            if (mag >= 0.85) radius = 11.5;
+            else if (mag >= 0.65) radius = 9.0;
+            else if (mag >= 0.45) radius = 6.5;
+            else if (mag >= 0.25) radius = 4.5;
+            else radius = 2.5;
 
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, 2 * Math.PI);
