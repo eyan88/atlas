@@ -62,18 +62,34 @@ async def realtime_live_publisher():
         print(f"Notice: Redis Pub/Sub unreachable ({e}). Live publisher operating in direct database persistence mode.")
         r = None
 
+    import zoneinfo as _zoneinfo
+    from datetime import datetime as _datetime
+
     default_tickers = ["QQQ", "SPY", "IWM"]
+    last_poll_time: float = 0.0
 
     try:
         while True:
+            now_et = _datetime.now(_zoneinfo.ZoneInfo("America/New_York"))
+            now_unix = now_et.timestamp()
+
             # Enforce Market Hours Guard (Monday-Friday 9:30 AM - 4:00 PM ET)
             if not is_market_open():
                 print("Off-market hours (ET). Live publisher sleeping until next market session...")
+                last_poll_time = 0.0  # Reset so we fire immediately at next open
                 await asyncio.sleep(60.0)
                 continue
 
-            # Poll live market data every 15 seconds during market hours
-            await asyncio.sleep(15.0)
+            # Calculate elapsed since last poll
+            elapsed = now_unix - last_poll_time
+
+            # On first entry after market open (or restart), snap immediately to 9:30 boundary
+            if elapsed < 15.0:
+                await asyncio.sleep(15.0 - elapsed)
+                continue
+
+            # Record poll time BEFORE the API call to prevent drift accumulation
+            last_poll_time = now_unix
             
             target_tickers = list(default_tickers)
             if r:
