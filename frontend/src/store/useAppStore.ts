@@ -395,9 +395,24 @@ export const useAppStore = create<AppState>((set) => ({
         data: nextData,
       };
 
+      const ms = payload.timestamp ? new Date(payload.timestamp).getTime() : NaN;
+      const secKey = !isNaN(ms) ? toSeconds(ms) : 0;
+
+      const tickerHist = state.snapshotsHistory[payload.ticker] ?? {};
+      const updatedTickerHist = secKey > 0
+        ? { ...tickerHist, [secKey]: nextSnapshot }
+        : tickerHist;
+
+      let updatedTimeline = state.timelineTimestamps;
+      if (secKey > 0 && payload.ticker === state.activeTicker && !updatedTimeline.includes(secKey)) {
+        updatedTimeline = [...updatedTimeline, secKey].sort((a, b) => a - b);
+      }
+
       return {
         heatmap: payload.ticker === state.activeTicker ? nextSnapshot : state.heatmap,
         heatmapsByTicker: { ...state.heatmapsByTicker, [payload.ticker]: nextSnapshot },
+        snapshotsHistory: { ...state.snapshotsHistory, [payload.ticker]: updatedTickerHist },
+        timelineTimestamps: updatedTimeline,
         spotPrice: payload.ticker === state.activeTicker ? nextSnapshot.spot_price : state.spotPrice,
         gammaFlip: payload.ticker === state.activeTicker ? nextSnapshot.gamma_flip : state.gammaFlip,
         callWall: payload.ticker === state.activeTicker ? nextSnapshot.call_wall : state.callWall,
