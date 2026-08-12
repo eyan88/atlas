@@ -108,6 +108,20 @@ class ThetaDataProvider(BaseDataProvider):
         except Exception as e:
             raise ThetaDataAPIError(f"Failed to connect to ThetaData: {e}") from e
 
+    def _reconnect_client(self):
+        """Re-initializes ThetaClient to obtain a fresh session ID if invalid session ID / UNAUTHENTICATED occurs."""
+        try:
+            from thetadata import ThetaClient
+            client_kwargs = {"dataframe_type": "pandas"}
+            if self.username:
+                client_kwargs["email"] = self.username
+            if self.password:
+                client_kwargs["password"] = self.password
+            self.client = ThetaClient(**client_kwargs)
+            print("Successfully re-authenticated ThetaData client session ID.")
+        except Exception as e:
+            print(f"Notice: Failed to re-authenticate ThetaData client: {e}")
+
     def get_underlying_quote(self, ticker: str) -> DomainUnderlyingQuote:
         """
         Fetches the latest real-time spot price of the underlying ticker.
@@ -266,7 +280,18 @@ class ThetaDataProvider(BaseDataProvider):
             df_exp['exp_date'] = pd.to_datetime(df_exp['expiration']).dt.date
             expirations = df_exp[df_exp['exp_date'] >= date.today()]['exp_date'].sort_values().tolist()
         except Exception as e:
-            raise ThetaDataAPIError(f"Failed to fetch expirations for {ticker}: {e}") from e
+            err_str = str(e)
+            if "UNAUTHENTICATED" in err_str or "Invalid session ID" in err_str:
+                print(f"Notice: ThetaData session invalidated ({e}). Re-authenticating client session...")
+                self._reconnect_client()
+                try:
+                    df_exp = self.client.option_list_expirations(symbol=ticker)
+                    df_exp['exp_date'] = pd.to_datetime(df_exp['expiration']).dt.date
+                    expirations = df_exp[df_exp['exp_date'] >= date.today()]['exp_date'].sort_values().tolist()
+                except Exception as retry_e:
+                    raise ThetaDataAPIError(f"Failed to fetch expirations for {ticker} after re-authenticating: {retry_e}") from retry_e
+            else:
+                raise ThetaDataAPIError(f"Failed to fetch expirations for {ticker}: {e}") from e
 
         if not expirations:
             return []
