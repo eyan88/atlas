@@ -1,17 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAppStore, getEasternDateStr } from '../../store/useAppStore';
 import styles from './TimelineControls.module.css';
 
 const SPEEDS = [1, 5, 10, 60] as const;
-
-// Returns the current US Eastern Time formatted as HH:MM AM/PM
-function getLiveEtTime() {
-  return new Date().toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'America/New_York',
-  });
-}
 
 export function TimelineControls() {
   const isPlaying          = useAppStore((s) => s.isPlaying);
@@ -21,13 +12,6 @@ export function TimelineControls() {
   const setSpeed           = useAppStore((s) => s.setReplaySpeed);
   const setTimestamp       = useAppStore((s) => s.setTimestamp);
   const timelineTimestamps = useAppStore((s) => s.timelineTimestamps);
-
-  // Live ET clock — ticks every second, completely independent of the scrubber
-  const [liveEtTime, setLiveEtTime] = useState(getLiveEtTime);
-  useEffect(() => {
-    const clock = setInterval(() => setLiveEtTime(getLiveEtTime()), 1000);
-    return () => clearInterval(clock);
-  }, []);
 
   // Replay timer loop
   useEffect(() => {
