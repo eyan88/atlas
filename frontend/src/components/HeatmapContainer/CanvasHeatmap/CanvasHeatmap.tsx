@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { HeatmapSnapshot } from '../../../types';
 import styles from './CanvasHeatmap.module.css';
@@ -524,7 +524,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!displaySnap) return;
+      if (!heatmap) return;
       const rect = e.currentTarget.getBoundingClientRect();
       const mx     = e.clientX - rect.left;
       const my     = e.clientY - rect.top;
@@ -534,16 +534,16 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
 
       if (
         cIdx >= 0 &&
-        cIdx < displaySnap.columns.length &&
+        cIdx < heatmap.columns.length &&
         rIdx >= 0 &&
-        rIdx < displaySnap.rows.length
+        rIdx < heatmap.rows.length
       ) {
-        const value = displaySnap.data[rIdx][cIdx];
+        const value = heatmap.data[rIdx][cIdx];
         
         // Find reference value for absolute/percent change
         let refValue = null;
-        if (displayRefSnap && displayRefSnap.data[rIdx] && displayRefSnap.data[rIdx][cIdx] !== undefined) {
-          refValue = displayRefSnap.data[rIdx][cIdx];
+        if (refSnap && refSnap.data[rIdx] && refSnap.data[rIdx][cIdx] !== undefined) {
+          refValue = refSnap.data[rIdx][cIdx];
         }
 
         const pctChange = (refValue !== null && refValue !== 0) ? ((value - refValue) / Math.abs(refValue)) * 100 : 0;
@@ -551,8 +551,8 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
         setHovered({
           ticker,
           metric: useAppStore.getState().selectedMetric,
-          strike: displaySnap.rows[rIdx],
-          expiration: displaySnap.columns[cIdx],
+          strike: heatmap.rows[rIdx],
+          expiration: heatmap.columns[cIdx],
           value,
           pctChange,
           rowIdx: rIdx,
@@ -564,7 +564,7 @@ export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
         setHovered(null);
       }
     },
-    [displaySnap, displayRefSnap, ticker, setHovered, CELL_W, CELL_H],
+    [heatmap, refSnap, ticker, setHovered, CELL_W, CELL_H],
   );
 
   const handleMouseLeave = useCallback(() => setHovered(null), [setHovered]);
