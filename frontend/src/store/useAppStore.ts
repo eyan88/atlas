@@ -43,7 +43,7 @@ export function findClosestSnapshot(
 
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
-export type AppTab = 'heatmap' | 'compass' | 'gamma-flow';
+export type AppTab = 'heatmap' | 'gamma-flow';
 
 interface AppState {
   activeTab: AppTab;

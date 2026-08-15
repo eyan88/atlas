@@ -172,10 +172,9 @@ const FONT_HDR  = "12px 'Inter', sans-serif";
 
 interface CanvasHeatmapProps {
   ticker: string;
-  isCompassMode?: boolean;
 }
 
-export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapProps) {
+export function CanvasHeatmap({ ticker }: CanvasHeatmapProps) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const heatmap     = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
   const setHovered  = useAppStore((s) => s.setHoveredCell);
@@ -184,9 +183,9 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
   const colorTheme  = useAppStore((s) => s.colorTheme);
   const highlightSignificantNodes = useAppStore((s) => s.highlightSignificantNodes);
 
-  const CELL_W = isCompassMode ? 160 : 106;
-  const CELL_H = isCompassMode ? 26 : 42;
-  const axisLeft = isCompassMode ? 0 : 76;
+  const CELL_W = 106;
+  const CELL_H = 42;
+  const axisLeft = 76;
 
   // Resolve reference snapshot for calculations based on selected evolution window
   const tickerHistory = snapshotsHistory[ticker] ?? {};
@@ -215,27 +214,7 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
     }
   }
 
-  // ─── Compass Mode Slicing ────────────────────────────────────────────────────
-  
-  const displaySnap = useMemo(() => {
-    if (!heatmap) return null;
-    if (!isCompassMode) return heatmap;
-    return {
-      ...heatmap,
-      columns: heatmap.columns.slice(0, 1),
-      data: heatmap.data.map(row => [row[0]]),
-    };
-  }, [heatmap, isCompassMode]);
 
-  const displayRefSnap = useMemo(() => {
-    if (!refSnap) return null;
-    if (!isCompassMode) return refSnap;
-    return {
-      ...refSnap,
-      columns: refSnap.columns.slice(0, 1),
-      data: refSnap.data.map(row => [row[0]]),
-    };
-  }, [refSnap, isCompassMode]);
 
   // ─── Draw ──────────────────────────────────────────────────────────────────
 
@@ -481,62 +460,32 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
 
           // Fill main text
           
-          if (isCompassMode) {
-            // Side by side
-            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : textColorForCell(r_, g_, b_);
-            ctx.font = "11px 'Inter', sans-serif";
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(label, x + CELL_W / 2 - 2, y + CELL_H / 2);
-            
-            const pct = pctChanges[r][c];
-            const isPos = pct >= 0;
-            const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
-            ctx.font = "9px 'Inter', sans-serif";
-            
-            const pctTextW = ctx.measureText(pctLabel).width;
-            const pillW = pctTextW + 8;
-            const pillH = 13;
-            const pillX = x + CELL_W / 2 + 6;
-            const pillY = y + CELL_H / 2 - pillH / 2;
-            
-            ctx.beginPath();
-            ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-            ctx.fillStyle = isDimmedText ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.38)';
-            ctx.fill();
-            
-            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : pctColorForCell(isPos);
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(pctLabel, pillX + pillW / 2, y + CELL_H / 2 + 1);
-          } else {
-            // Top and bottom
-            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : textColorForCell(r_, g_, b_);
-            ctx.font = "11px 'Inter', sans-serif";
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText(label, x + CELL_W / 2, y + 8);
+          // Top and bottom
+          ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : textColorForCell(r_, g_, b_);
+          ctx.font = "11px 'Inter', sans-serif";
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(label, x + CELL_W / 2, y + 8);
 
-            const pct = pctChanges[r][c];
-            const isPos = pct >= 0;
-            const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
-            ctx.font = "9px 'Inter', sans-serif";
-            
-            const pctTextW = ctx.measureText(pctLabel).width;
-            const pillW = pctTextW + 8;
-            const pillH = 13;
-            const pillX = x + CELL_W / 2 - pillW / 2;
-            const pillY = y + 23;
-            
-            ctx.beginPath();
-            ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-            ctx.fillStyle = isDimmedText ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.38)';
-            ctx.fill();
+          const pct = pctChanges[r][c];
+          const isPos = pct >= 0;
+          const pctLabel = `${isPos ? '▲ +' : '▼ '}${pct.toFixed(0)}%`;
+          ctx.font = "9px 'Inter', sans-serif";
+          
+          const pctTextW = ctx.measureText(pctLabel).width;
+          const pillW = pctTextW + 8;
+          const pillH = 13;
+          const pillX = x + CELL_W / 2 - pillW / 2;
+          const pillY = y + 23;
+          
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+          ctx.fillStyle = isDimmedText ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.38)';
+          ctx.fill();
 
-            ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : pctColorForCell(isPos);
-            ctx.textAlign = 'center';
-            ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
-          }
+          ctx.fillStyle = isDimmedText ? 'rgba(148, 163, 184, 0.25)' : pctColorForCell(isPos);
+          ctx.textAlign = 'center';
+          ctx.fillText(pctLabel, x + CELL_W / 2, y + 25);
         }
 
 
@@ -557,24 +506,19 @@ export function CanvasHeatmap({ ticker, isCompassMode = false }: CanvasHeatmapPr
         ctx.font = FONT;
         ctx.textBaseline = 'middle';
         const strikeLabel = Number.isInteger(strike) ? strike.toFixed(0) : strike.toFixed(2).replace(/\.?0+$/, '');
-        if (isCompassMode) {
-          ctx.textAlign = 'left';
-          ctx.fillText(strikeLabel, axisLeft + 4, y + CELL_H / 2);
-        } else {
-          ctx.textAlign = 'right';
-          ctx.fillText(strikeLabel, axisLeft - 6, y + CELL_H / 2);
-        }
+        ctx.textAlign = 'right';
+        ctx.fillText(strikeLabel, axisLeft - 6, y + CELL_H / 2);
       }
     },
-    [evolutionWindow, refSnap, isCompassMode, colorTheme, highlightSignificantNodes, CELL_W, CELL_H],
+    [evolutionWindow, refSnap, colorTheme, highlightSignificantNodes, CELL_W, CELL_H],
   );
 
 
   // Re-draw whenever heatmap or levels change
   useEffect(() => {
-    if (!displaySnap || !canvasRef.current) return;
-    draw(displaySnap, canvasRef.current);
-  }, [displaySnap, displayRefSnap, draw]);
+    if (!heatmap || !canvasRef.current) return;
+    draw(heatmap, canvasRef.current);
+  }, [heatmap, refSnap, draw]);
 
   // ─── Interaction ─────────────────────────────────────────────────────────────
 

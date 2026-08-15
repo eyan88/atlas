@@ -1,36 +1,14 @@
-import { useRef, useEffect } from 'react';
 import { CanvasHeatmap } from './CanvasHeatmap/CanvasHeatmap';
 import { useAppStore } from '../../store/useAppStore';
 import styles from './HeatmapContainer.module.css';
 
 interface HeatmapContainerProps {
   ticker: string;
-  isCompassMode?: boolean;
 }
 
-export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapContainerProps) {
+export function HeatmapContainer({ ticker }: HeatmapContainerProps) {
   const closeTickerPane = useAppStore((s) => s.closeTickerPane);
   const snapshot = useAppStore((s) => s.heatmapsByTicker[ticker] ?? null);
-
-  const viewportRef = useRef<HTMLDivElement>(null);
-
-  // Synchronize scrolling across all compass viewports
-  useEffect(() => {
-    if (!isCompassMode || !viewportRef.current) return;
-    const vp = viewportRef.current;
-
-    const handleScroll = () => {
-      const allViewports = document.querySelectorAll('.compass-viewport');
-      allViewports.forEach((otherVp) => {
-        if (otherVp !== vp && otherVp.scrollTop !== vp.scrollTop) {
-          otherVp.scrollTop = vp.scrollTop;
-        }
-      });
-    };
-
-    vp.addEventListener('scroll', handleScroll, { passive: true });
-    return () => vp.removeEventListener('scroll', handleScroll);
-  }, [isCompassMode]);
 
   const formatGamma = (val: number | null | undefined) => {
     if (val == null) return '—';
@@ -53,9 +31,9 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
   };
 
   return (
-    <section className={`${styles.container} ${isCompassMode ? styles.compassContainer : ''}`}>
+    <section className={styles.container}>
       <div className={styles.titleBar}>
-        <div className={isCompassMode ? styles.titleContentCompass : styles.titleContent}>
+        <div className={styles.titleContent}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
             <span className={styles.title}>{ticker}</span>
             {snapshot?.timestamp && (
@@ -106,24 +84,19 @@ export function HeatmapContainer({ ticker, isCompassMode = false }: HeatmapConta
               <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
-          {!isCompassMode && (
-            <button
-              type="button"
-              className={styles.closeBtn}
-              onClick={() => closeTickerPane(ticker)}
-              aria-label={`Close ${ticker} heatmap`}
-              title={`Close ${ticker}`}
-            >
-              ×
-            </button>
-          )}
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={() => closeTickerPane(ticker)}
+            aria-label={`Close ${ticker} heatmap`}
+            title={`Close ${ticker}`}
+          >
+            ×
+          </button>
         </div>
       </div>
-      <div 
-        ref={viewportRef}
-        className={`${styles.viewport} ${isCompassMode ? `compass-viewport ${styles.compassViewport}` : ''}`}
-      >
-        <CanvasHeatmap ticker={ticker} isCompassMode={isCompassMode} />
+      <div className={styles.viewport}>
+        <CanvasHeatmap ticker={ticker} />
       </div>
     </section>
   );

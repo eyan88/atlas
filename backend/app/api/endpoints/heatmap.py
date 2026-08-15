@@ -604,7 +604,7 @@ def _enrich_candles_with_gamma(candles: list, ticker: str, dt, db) -> list:
     For each 5-minute candle bar, find the closest DealerMetricSnapshot and attach:
     - call_wall, put_wall, gamma_flip, net_gamma (summary levels)
     - gamma_levels: full per-strike array [{strike, net_gex, abs_gex}] sorted by abs_gex desc
-      so the Compass chart can track how every significant gamma level grows/shrinks per candle.
+      so charts can track how every significant gamma level grows/shrinks per candle.
     """
     from datetime import datetime as _dt, timezone as _tz
     import numpy as _np

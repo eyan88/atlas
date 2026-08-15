@@ -5,7 +5,6 @@ import { HeatmapContainer } from './components/HeatmapContainer/HeatmapContainer
 import { TimelineControls } from './components/TimelineControls/TimelineControls';
 import { HoverTooltip } from './components/HoverTooltip/HoverTooltip';
 import { GammaFlow } from './components/GammaFlow/GammaFlow';
-import { CompassChart } from './components/HeatmapContainer/CompassChart';
 import { useAppStore, toSeconds, getEasternDateStr, findClosestSnapshot } from './store/useAppStore';
 import { api } from './api/client';
 import styles from './App.module.css';
@@ -38,7 +37,7 @@ export function App() {
     const fetchAll = async () => {
       setIsLoadingHistory(true);
       
-      const tickersToFetch = activeTab === 'compass' ? ['SPY', 'QQQ', 'IWM'] : openTickers;
+      const tickersToFetch = openTickers;
 
       await Promise.all(tickersToFetch.map(async (ticker, index) => {
         try {
@@ -154,10 +153,10 @@ export function App() {
               </div>
             )}
           </div>
-          <div className={`${styles.paneStrip} ${activeTab === 'compass' ? styles.compassStrip : ''}`} style={activeTab === 'gamma-flow' ? { display: 'flex', flex: 1, height: '100%' } : {}}>
+          <div className={styles.paneStrip} style={activeTab === 'gamma-flow' ? { display: 'flex', flex: 1, height: '100%' } : {}}>
             {activeTab === 'gamma-flow' ? (
               <GammaFlow />
-            ) : activeTab === 'heatmap' ? (
+            ) : (
               openTickers.map((ticker) => (
                 <div
                   key={ticker}
@@ -171,13 +170,6 @@ export function App() {
                   <HeatmapContainer ticker={ticker} />
                 </div>
               ))
-            ) : (
-              <>
-                <CompassChart />
-                <HeatmapContainer key="SPY-compass" ticker="SPY" isCompassMode />
-                <HeatmapContainer key="QQQ-compass" ticker="QQQ" isCompassMode />
-                <HeatmapContainer key="IWM-compass" ticker="IWM" isCompassMode />
-              </>
             )}
           </div>
         </div>
