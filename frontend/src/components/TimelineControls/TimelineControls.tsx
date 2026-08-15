@@ -125,7 +125,7 @@ export function TimelineControls() {
         <span className={styles.sliderLabel}>4:00 PM</span>
       </div>
 
-      {/* Live Toggle Button — always shows current real ET clock, never scrubber position */}
+      {/* Latest EOD Positioning Button */}
       <button
         id="toggle-live-btn"
         className={`${styles.liveBtn} ${timestamp === null ? styles.liveActive : ''}`}
@@ -134,11 +134,11 @@ export function TimelineControls() {
           useAppStore.setState({ selectedDate: todayStr });
           setTimestamp(null);
         }}
-        title={timestamp === null ? 'Active WebSocket streaming live feed' : 'Switch to real-time live trading session'}
+        title="Show latest End of Day dealer positioning snapshot"
       >
         <span className={`${styles.timeDot} ${timestamp === null ? styles.liveDot : ''}`} />
         <span className={styles.timeLabel}>
-          {timestamp === null ? `LIVE  ${liveEtTime} ET` : `GO LIVE  ${liveEtTime} ET`}
+          EOD SNAPSHOT
         </span>
       </button>
     </footer>

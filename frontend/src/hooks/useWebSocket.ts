@@ -61,11 +61,10 @@ export function useWebSocket() {
       }
     };
 
-    if (!isLive || !activeTicker) {
-      closeExisting();
-      setWsConnected(false);
-      return;
-    }
+    // End of Day positioning mode: live 15-second streaming is disabled
+    closeExisting();
+    setWsConnected(false);
+    return;
 
     const connect = () => {
       closeExisting();

@@ -261,9 +261,7 @@ def get_replay_timeline(
     ).distinct().order_by(DealerMetricSnapshot.timestamp.asc()).all()
 
     # If no snapshots exist for this ticker on this date, trigger on-the-fly backfill
-    # Only do this for historical dates strictly before Eastern Time today
-    eastern_today = (datetime.now(timezone.utc) - timedelta(hours=4)).date()
-    if not timestamps and query_date < eastern_today:
+    if not timestamps:
         from app.core.config import settings
         if settings.DATA_PROVIDER == "thetadata":
             try:
@@ -351,6 +349,20 @@ def get_heatmap_history(
         DealerMetricSnapshot.timestamp >= start_dt,
         DealerMetricSnapshot.timestamp <= end_dt
     ).order_by(DealerMetricSnapshot.timestamp.asc()).all()
+
+    if not records:
+        from app.core.config import settings
+        if settings.DATA_PROVIDER == "thetadata":
+            try:
+                from app.db.backfill_eod import run_backfill
+                run_backfill(ticker=ticker, backfill_date=query_date, db=db)
+                records = db.query(DealerMetricSnapshot).filter(
+                    DealerMetricSnapshot.ticker == ticker,
+                    DealerMetricSnapshot.timestamp >= start_dt,
+                    DealerMetricSnapshot.timestamp <= end_dt
+                ).order_by(DealerMetricSnapshot.timestamp.asc()).all()
+            except Exception as e:
+                print(f"On-the-fly backfill in get_heatmap_history failed for {ticker} date {date}: {e}")
 
     if not records:
         # Fallback to the latest available trading date on or before query_date (e.g. Friday for weekend/Sunday lookup)

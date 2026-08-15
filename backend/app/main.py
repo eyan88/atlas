@@ -6,19 +6,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.core.config import settings
 from app.api.endpoints import tickers, heatmap, gamma_flow
 from app.api.websockets import feed
-from app.services.publisher import realtime_live_publisher
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: spawn background live publisher task
-    task = asyncio.create_task(realtime_live_publisher())
+    print("Starting Atlas Backend - End of Day Dealer Positioning Service...")
     yield
-    # Shutdown: clean up background task
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    print("Stopping Atlas Backend...")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
